@@ -1,8 +1,7 @@
-@'
 # Python
 __pycache__/
 *.py[cod]
-*$py.class
+*.class
 *.so
 .Python
 env/
@@ -16,10 +15,10 @@ instance/
 *.sqlite
 *.sqlite3
 
-# ConfiguraciÃ³n sensible
+# Configuración sensible (solo raíz, no en app/)
+/config.py
 .env
 *.env
-config.py
 
 # Subidas de archivos
 uploads/
@@ -44,4 +43,3 @@ insertar_datos.py
 test_audiencia.py
 actualizar_estados.py
 notificaciones.py
-'@ | Set-Content .gitignore -Encoding UTF8
