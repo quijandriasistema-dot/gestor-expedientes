@@ -1,6 +1,7 @@
 import os
 
 class Config:
-    SECRET_KEY = os.environ.get("SECRET_KEY") or "una-clave-secreta-muy-dificil-de-adivinar"
-    SQLALCHEMY_DATABASE_URI = os.environ.get("DATABASE_URL") or "sqlite:///app.db"
+    SECRET_KEY = os.environ.get('SECRET_KEY', 'dev-secret-key-cambiar-en-produccion')
+    SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL', 'sqlite:///app.db')
     SQLALCHEMY_TRACK_MODIFICATIONS = False
+    WTF_CSRF_ENABLED = True
