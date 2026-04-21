@@ -1,0 +1,465 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- Anti-caché - Evita que el navegador guarde páginas protegidas -->
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    
+    <title>{% block title %}{% endblock %} - Sistema de Gestión de Expedientes ⚖️</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <style>
+        :root {
+            --primary-color: #1a237e;
+            --secondary-color: #c62828;
+            --accent-color: #ffd700;
+        }
+        
+        body {
+            background-color: #f5f5f5;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        
+        .navbar {
+            background: linear-gradient(135deg, var(--primary-color) 0%, #283593 100%);
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        .navbar-brand {
+            font-weight: bold;
+            color: white !important;
+        }
+        
+        .nav-link {
+            color: rgba(255,255,255,0.9) !important;
+            transition: all 0.3s;
+        }
+        
+        .nav-link:hover {
+            color: var(--accent-color) !important;
+            transform: translateY(-2px);
+        }
+        
+        .card {
+            border: none;
+            border-radius: 15px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.08);
+            transition: transform 0.3s;
+        }
+        
+        .card:hover {
+            transform: translateY(-5px);
+        }
+        
+        .btn-primary {
+            background: linear-gradient(135deg, var(--primary-color) 0%, #3949ab 100%);
+            border: none;
+            border-radius: 25px;
+            padding: 10px 25px;
+        }
+        
+        .btn-danger {
+            background: linear-gradient(135deg, var(--secondary-color) 0%, #d32f2f 100%);
+            border: none;
+            border-radius: 25px;
+        }
+        
+        .btn-success {
+            border-radius: 25px;
+            padding: 10px 25px;
+        }
+        
+        .alert {
+            border-radius: 10px;
+            border: none;
+        }
+        
+        .table {
+            background: white;
+            border-radius: 10px;
+            overflow: hidden;
+        }
+        
+        .badge {
+            padding: 8px 12px;
+            border-radius: 20px;
+        }
+        
+        .dropdown-menu {
+            border-radius: 10px;
+            border: none;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.15);
+        }
+        
+        .footer {
+            background: var(--primary-color);
+            color: white;
+            padding: 20px 0;
+            margin-top: 50px;
+        }
+        
+        /* Estilos específicos para audiencias */
+        .audiencia-card {
+            border-left: 4px solid var(--primary-color);
+        }
+        
+        .audiencia-hoy {
+            border-left-color: #28a745;
+            background: linear-gradient(90deg, rgba(40,167,69,0.1) 0%, white 100%);
+        }
+        
+        .audiencia-proxima {
+            border-left-color: #ffc107;
+            background: linear-gradient(90deg, rgba(255,193,7,0.1) 0%, white 100%);
+        }
+        
+        .audiencia-cancelada {
+            border-left-color: #dc3545;
+            opacity: 0.7;
+        }
+        
+        .audiencia-realizada {
+            border-left-color: #6c757d;
+            opacity: 0.7;
+        }
+        
+        /* Estilos para notificaciones */
+        .notification-bell {
+            position: relative;
+            font-size: 1.2rem;
+        }
+        
+        .notification-badge {
+            position: absolute;
+            top: -5px;
+            right: -5px;
+            font-size: 0.7rem;
+            padding: 0.25em 0.4em;
+            border-radius: 50%;
+            min-width: 18px;
+            height: 18px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .notification-dropdown {
+            width: 350px;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        
+        .notification-item {
+            border-bottom: 1px solid #f0f0f0;
+            padding: 12px 15px;
+            transition: background-color 0.2s;
+        }
+        
+        .notification-item:hover {
+            background-color: #f8f9fa;
+        }
+        
+        .notification-item.unread {
+            background-color: #e3f2fd;
+            border-left: 3px solid var(--primary-color);
+        }
+        
+        .notification-icon {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.2rem;
+            margin-right: 12px;
+            flex-shrink: 0;
+        }
+        
+        .notification-time {
+            font-size: 0.75rem;
+            color: #6c757d;
+        }
+        
+        .notification-empty {
+            text-align: center;
+            padding: 30px;
+            color: #6c757d;
+        }
+        
+        .notification-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 15px;
+            background-color: #f8f9fa;
+            border-bottom: 1px solid #dee2e6;
+        }
+        
+        .pulse-animation {
+            animation: pulse 2s infinite;
+        }
+        
+        @keyframes pulse {
+            0% {
+                box-shadow: 0 0 0 0 rgba(220, 53, 69, 0.7);
+            }
+            70% {
+                box-shadow: 0 0 0 10px rgba(220, 53, 69, 0);
+            }
+            100% {
+                box-shadow: 0 0 0 0 rgba(220, 53, 69, 0);
+            }
+        }
+        
+        /* Header del sistema */
+        .system-header {
+            background: linear-gradient(135deg, #1e3a5f 0%, #152a45 100%);
+            color: white;
+            padding: 1rem 0;
+            text-align: center;
+            border-bottom: 3px solid #c9a227;
+        }
+        
+        .system-header h1 {
+            margin: 0;
+            font-size: 1.5rem;
+            font-weight: 600;
+            letter-spacing: 1px;
+        }
+        
+        .system-header .subtitle {
+            font-size: 0.9rem;
+            opacity: 0.9;
+            margin-top: 0.25rem;
+        }
+    </style>
+    {% block extra_css %}{% endblock %}
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark">
+        <div class="container">
+            <a class="navbar-brand" href="{{ url_for('main.index') }}">
+                <i class="bi bi-scale-balanced"></i> ⚖️ Sistema de Gestión de Expedientes
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav me-auto">
+                    {% if session.usuario %}
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('main.index') }}">
+                            <i class="bi bi-speedometer2"></i> Dashboard
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('main.expedientes') }}">
+                            <i class="bi bi-folder-fill"></i> Expedientes
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('main.audiencias') }}">
+                            <i class="bi bi-calendar-event"></i> Audiencias
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('main.documentos') }}">
+                            <i class="bi bi-files"></i> Documentos
+                        </a>
+                    </li>
+                    {% endif %}
+                </ul>
+                <ul class="navbar-nav">
+                    {% if session.usuario %}
+                    <!-- Notificaciones -->
+                    <li class="nav-item dropdown me-3">
+                        <a class="nav-link notification-bell position-relative" href="#" id="notificacionesDropdown" 
+                           role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                            <i class="bi bi-bell-fill"></i>
+                            <span id="notif-badge" class="notification-badge bg-danger text-white" style="display: none;">
+                                0
+                            </span>
+                        </a>
+                        <ul class="dropdown-menu dropdown-menu-end notification-dropdown" aria-labelledby="notificacionesDropdown">
+                            <li class="notification-header">
+                                <span class="fw-bold"><i class="bi bi-bell"></i> Notificaciones</span>
+                                <a href="{{ url_for('main.notificaciones') }}" class="text-decoration-none small">Ver todas</a>
+                            </li>
+                            <li><hr class="dropdown-divider m-0"></li>
+                            <div id="notificaciones-preview">
+                                <li class="notification-empty">
+                                    <i class="bi bi-bell-slash fs-3 d-block mb-2"></i>
+                                    No hay notificaciones nuevas
+                                </li>
+                            </div>
+                            <li><hr class="dropdown-divider m-0"></li>
+                            <li class="text-center py-2">
+                                <button onclick="marcarTodasLeidas()" class="btn btn-sm btn-outline-primary">
+                                    <i class="bi bi-check-all"></i> Marcar todas como leídas
+                                </button>
+                            </li>
+                        </ul>
+                    </li>
+                    
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle" href="#" id="userDropdown" role="button" data-bs-toggle="dropdown">
+                            <i class="bi bi-person-circle"></i> {{ session.nombre }}
+                            <span class="badge bg-warning text-dark">{{ session.rol }}</span>
+                        </a>
+                        <ul class="dropdown-menu dropdown-menu-end">
+                            <li><a class="dropdown-item" href="{{ url_for('main.notificaciones') }}">
+                                <i class="bi bi-bell"></i> Centro de Notificaciones
+                            </a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item" href="{{ url_for('main.logout') }}">
+                                <i class="bi bi-box-arrow-right"></i> Cerrar Sesión
+                            </a></li>
+                        </ul>
+                    </li>
+                    {% endif %}
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mt-4">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ 'danger' if category == 'error' else category }} alert-dismissible fade show">
+                        {{ message }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        {% block content %}{% endblock %}
+    </div>
+
+    <footer class="footer mt-5">
+        <div class="container text-center">
+            <p class="mb-0">&copy; 2026 Quijandria Abogados EIRL - Sistema de Gestión de Expedientes</p>
+            <p class="mb-0 mt-2" style="font-size: 0.9rem; opacity: 0.8;">Desarrollado por CASTILLO MAGALLANES JUAN CARLOS</p>
+        </div>
+    </footer>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    
+    <!-- Script de Notificaciones -->
+    <script>
+        // Actualizar notificaciones al cargar la página
+        document.addEventListener('DOMContentLoaded', function() {
+            actualizarNotificaciones();
+            
+            // Actualizar cada 30 segundos
+            setInterval(actualizarNotificaciones, 30000);
+        });
+        
+        function actualizarNotificaciones() {
+            fetch('/notificaciones/no-leidas')
+                .then(response => response.json())
+                .then(data => {
+                    const badge = document.getElementById('notif-badge');
+                    const preview = document.getElementById('notificaciones-preview');
+                    
+                    // Actualizar badge
+                    if (data.count > 0) {
+                        badge.textContent = data.count > 99 ? '99+' : data.count;
+                        badge.style.display = 'flex';
+                        
+                        // Agregar animación pulse si hay notificaciones nuevas
+                        if (!badge.classList.contains('pulse-animation')) {
+                            badge.classList.add('pulse-animation');
+                        }
+                    } else {
+                        badge.style.display = 'none';
+                        badge.classList.remove('pulse-animation');
+                    }
+                    
+                    // Actualizar preview
+                    if (data.notificaciones && data.notificaciones.length > 0) {
+                        preview.innerHTML = data.notificaciones.map(n => `
+                            <li class="notification-item ${n.leida ? '' : 'unread'}">
+                                <a href="${n.link || '#'}" class="text-decoration-none text-dark d-flex align-items-start" 
+                                   onclick="marcarLeida(${n.id}, event)">
+                                    <div class="notification-icon bg-${n.color || 'info'} bg-opacity-10 text-${n.color || 'info'}">
+                                        ${n.icono || '🔔'}
+                                    </div>
+                                    <div class="flex-grow-1">
+                                        <div class="fw-bold small mb-1">${n.titulo}</div>
+                                        <div class="small text-muted text-truncate" style="max-width: 220px;">
+                                            ${n.mensaje}
+                                        </div>
+                                        <div class="notification-time mt-1">
+                                            <i class="bi bi-clock"></i> ${n.tiempo}
+                                        </div>
+                                    </div>
+                                </a>
+                            </li>
+                        `).join('');
+                    } else {
+                        preview.innerHTML = `
+                            <li class="notification-empty">
+                                <i class="bi bi-bell-slash fs-3 d-block mb-2 text-muted"></i>
+                                <span class="text-muted">No hay notificaciones nuevas</span>
+                            </li>
+                        `;
+                    }
+                })
+                .catch(error => console.error('Error al cargar notificaciones:', error));
+        }
+        
+        function marcarLeida(id, event) {
+            if (event) event.preventDefault();
+            
+            fetch(`/notificacion/${id}/leer`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // Redirigir al link si existe
+                    const link = event ? event.currentTarget.getAttribute('href') : null;
+                    if (link && link !== '#') {
+                        window.location.href = link;
+                    } else {
+                        actualizarNotificaciones();
+                    }
+                }
+            })
+            .catch(error => console.error('Error:', error));
+        }
+        
+        function marcarTodasLeidas() {
+            fetch('/notificaciones/marcar-todas', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                }
+            })
+            .then(response => {
+                if (response.ok) {
+                    actualizarNotificaciones();
+                    // Cerrar el dropdown
+                    const dropdown = document.getElementById('notificacionesDropdown');
+                    if (dropdown) {
+                        dropdown.click();
+                    }
+                }
+            })
+            .catch(error => console.error('Error:', error));
+        }
+    </script>
+    
+    {% block extra_js %}{% endblock %}
+</body>
+</html>

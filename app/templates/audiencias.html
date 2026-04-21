@@ -1,0 +1,186 @@
+{% extends "base.html" %}
+
+{% block title %}{{ title }}{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-md-8">
+        <h2><i class="bi bi-calendar-event"></i> Calendario de Audiencias</h2>
+    </div>
+    <div class="col-md-4 text-end">
+        <a href="{{ url_for('main.nueva_audiencia') }}" class="btn btn-primary">
+            <i class="bi bi-plus-circle"></i> Programar Audiencia
+        </a>
+    </div>
+</div>
+
+<!-- Estadísticas -->
+<div class="row mb-4">
+    <div class="col-md-3">
+        <div class="card bg-primary text-white">
+            <div class="card-body text-center">
+                <h3>{{ total_programadas }}</h3>
+                <p class="mb-0">Programadas</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card bg-success text-white">
+            <div class="card-body text-center">
+                <h3>{{ audiencias_hoy }}</h3>
+                <p class="mb-0">Hoy</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card bg-info text-white">
+            <div class="card-body text-center">
+                <h3>{{ audiencias_semana }}</h3>
+                <p class="mb-0">Esta Semana</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card bg-warning text-dark">
+            <div class="card-body text-center">
+                <h3>{{ hoy.strftime('%d/%m') }}</h3>
+                <p class="mb-0">Fecha Actual</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Filtros -->
+<div class="card mb-4">
+    <div class="card-header bg-light">
+        <h5 class="mb-0"><i class="bi bi-funnel"></i> Filtros de Búsqueda</h5>
+    </div>
+    <div class="card-body">
+        <form method="GET" action="{{ url_for('main.audiencias') }}">
+            <div class="row">
+                <div class="col-md-3">
+                    <label class="form-label">Desde</label>
+                    <input type="date" name="fecha_desde" class="form-control" value="{{ fecha_desde }}">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Hasta</label>
+                    <input type="date" name="fecha_hasta" class="form-control" value="{{ fecha_hasta }}">
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">Tipo</label>
+                    <select name="tipo" class="form-select">
+                        <option value="">Todos</option>
+                        <option value="audiencia" {% if tipo_filtro == 'audiencia' %}selected{% endif %}>⚖️ Audiencia</option>
+                        <option value="conciliacion" {% if tipo_filtro == 'conciliacion' %}selected{% endif %}>🤝 Conciliación</option>
+                        <option value="juicio" {% if tipo_filtro == 'juicio' %}selected{% endif %}>🏛️ Juicio Oral</option>
+                        <option value="declaracion" {% if tipo_filtro == 'declaracion' %}selected{% endif %}>📝 Declaración</option>
+                        <option value="diligencia" {% if tipo_filtro == 'diligencia' %}selected{% endif %}>🔍 Diligencia</option>
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">Estado</label>
+                    <select name="estado" class="form-select">
+                        <option value="">Todos</option>
+                        <option value="programada" {% if estado_filtro == 'programada' %}selected{% endif %}>📅 Programada</option>
+                        <option value="realizada" {% if estado_filtro == 'realizada' %}selected{% endif %}>✅ Realizada</option>
+                        <option value="aplazada" {% if estado_filtro == 'aplazada' %}selected{% endif %}>⏸️ Aplazada</option>
+                        <option value="cancelada" {% if estado_filtro == 'cancelada' %}selected{% endif %}>❌ Cancelada</option>
+                    </select>
+                </div>
+                <div class="col-md-2 d-flex align-items-end">
+                    <button type="submit" class="btn btn-primary w-100">
+                        <i class="bi bi-search"></i> Filtrar
+                    </button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Listado de Audiencias -->
+{% if audiencias %}
+    <div class="row">
+        {% for audiencia in audiencias %}
+        <div class="col-md-6 mb-3">
+            <div class="card audiencia-card {% if audiencia.es_hoy() %}audiencia-hoy{% elif audiencia.es_proxima() %}audiencia-proxima{% endif %} {% if audiencia.estado == 'cancelada' %}audiencia-cancelada{% elif audiencia.estado == 'realizada' %}audiencia-realizada{% endif %}">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-start mb-2">
+                        <div>
+                            <span class="badge bg-{{ audiencia.get_estado_color() }} mb-2">
+                                {{ audiencia.get_estado_label() }}
+                            </span>
+                            <h5 class="card-title mb-1">{{ audiencia.get_tipo_label() }}</h5>
+                        </div>
+                        <div class="text-end">
+                            <h4 class="text-primary mb-0">{{ audiencia.fecha.strftime('%d/%m/%Y') }}</h4>
+                            <small class="text-muted">{{ audiencia.hora.strftime('%H:%M') }} hrs</small>
+                        </div>
+                    </div>
+                    
+                    <hr>
+                    
+                    <p class="mb-2">
+                        <strong><i class="bi bi-folder"></i> Expediente:</strong><br>
+                        <a href="{{ url_for('main.ver_expediente', id=audiencia.expediente.id) }}">
+                            {{ audiencia.expediente.get_identificador_principal() }}
+                        </a><br>
+                        <small class="text-muted">{{ audiencia.expediente.cliente }}</small>
+                    </p>
+                    
+                    {% if audiencia.lugar %}
+                    <p class="mb-1">
+                        <i class="bi bi-geo-alt"></i> <strong>{{ audiencia.lugar }}</strong>
+                        {% if audiencia.sala %} - {{ audiencia.sala }}{% endif %}
+                    </p>
+                    {% endif %}
+                    
+                    {% if audiencia.magistrado %}
+                    <p class="mb-1">
+                        <i class="bi bi-person-badge"></i> {{ audiencia.magistrado }}
+                    </p>
+                    {% endif %}
+                    
+                    {% if audiencia.link_videollamada %}
+                    <p class="mb-1">
+                        <i class="bi bi-camera-video"></i> 
+                        <a href="{{ audiencia.link_videollamada }}" target="_blank" class="btn btn-sm btn-outline-primary">
+                            Link Videollamada
+                        </a>
+                    </p>
+                    {% endif %}
+                    
+                    {% if audiencia.observaciones %}
+                    <p class="mb-1 text-muted">
+                        <i class="bi bi-chat-left-text"></i> {{ audiencia.observaciones[:100] }}{% if audiencia.observaciones|length > 100 %}...{% endif %}
+                    </p>
+                    {% endif %}
+                    
+                    <div class="mt-3">
+                        <a href="{{ url_for('main.ver_audiencia', id=audiencia.id) }}" class="btn btn-sm btn-info">
+                            <i class="bi bi-eye"></i> Ver
+                        </a>
+                        <a href="{{ url_for('main.editar_audiencia', id=audiencia.id) }}" class="btn btn-sm btn-warning">
+                            <i class="bi bi-pencil"></i> Editar
+                        </a>
+                        {% if audiencia.estado == 'programada' %}
+                        <form method="POST" action="{{ url_for('main.cambiar_estado_audiencia', id=audiencia.id) }}" class="d-inline">
+                            <input type="hidden" name="estado" value="realizada">
+                            <button type="submit" class="btn btn-sm btn-success" onclick="return confirm('¿Marcar como realizada?')">
+                                <i class="bi bi-check-circle"></i> Realizada
+                            </button>
+                        </form>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+{% else %}
+    <div class="alert alert-info text-center">
+        <i class="bi bi-info-circle" style="font-size: 3rem;"></i>
+        <h4>No hay audiencias programadas</h4>
+        <p>Presione "Programar Audiencia" para agregar una nueva.</p>
+    </div>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,167 @@
+{% extends "base.html" %}
+
+{% block content %}
+    <div class="dashboard">
+        <h1>
+            <span>📁</span>
+            <span>Gestión de Expedientes</span>
+        </h1>
+        
+        <span class="rol-badge">{{ rol }}</span>
+        
+        <!-- BOTÓN NUEVO EXPEDIENTE -->
+        <div style="margin-bottom: 1.5rem;">
+            <a href="{{ url_for('main.nuevo_expediente') }}" class="btn btn-primary" style="display: inline-block; width: auto;">
+                <span>➕</span> Nuevo Expediente
+            </a>
+        </div>
+        
+        <!-- 🔍 BUSCADOR AGREGADO -->
+        <div class="search-container" style="background: var(--color-bg-light); padding: 1.5rem; border-radius: 12px; margin-bottom: 2rem; border: 1px solid var(--color-border);">
+            <h3 style="margin-bottom: 1rem; color: var(--color-primary); font-size: 1.1rem;">
+                <span>🔍</span> Buscar Expedientes
+            </h3>
+            
+            <form method="GET" action="{{ url_for('main.expedientes') }}" class="search-form" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; align-items: end;">
+                
+                <!-- Buscar por Expediente/DNI -->
+                <div class="form-group" style="margin: 0;">
+                    <label style="display: block; margin-bottom: 0.5rem; font-weight: 500; font-size: 0.9rem; color: var(--color-text);">
+                        N° Expediente o DNI
+                    </label>
+                    <input type="text" 
+                           name="buscar_numero" 
+                           value="{{ request.args.get('buscar_numero', '') }}"
+                           placeholder="Ej: 00123-2024 o 12345678"
+                           style="width: 100%; padding: 0.75rem; border: 1px solid var(--color-border); border-radius: 8px; font-size: 0.95rem;">
+                </div>
+                
+                <!-- Buscar por Cliente -->
+                <div class="form-group" style="margin: 0;">
+                    <label style="display: block; margin-bottom: 0.5rem; font-weight: 500; font-size: 0.9rem; color: var(--color-text);">
+                        Cliente (Apellidos/Nombres)
+                    </label>
+                    <input type="text" 
+                           name="buscar_cliente" 
+                           value="{{ request.args.get('buscar_cliente', '') }}"
+                           placeholder="Ej: García López Juan"
+                           style="width: 100%; padding: 0.75rem; border: 1px solid var(--color-border); border-radius: 8px; font-size: 0.95rem;">
+                </div>
+                
+                <!-- Filtro por Tipo -->
+                <div class="form-group" style="margin: 0;">
+                    <label style="display: block; margin-bottom: 0.5rem; font-weight: 500; font-size: 0.9rem; color: var(--color-text);">
+                        Tipo de Expediente
+                    </label>
+                    <select name="filtro_tipo" style="width: 100%; padding: 0.75rem; border: 1px solid var(--color-border); border-radius: 8px; font-size: 0.95rem; background: white;">
+                        <option value="">Todos los tipos</option>
+                        <option value="civil" {% if request.args.get('filtro_tipo') == 'civil' %}selected{% endif %}>⚖️ Civil</option>
+                        <option value="penal" {% if request.args.get('filtro_tipo') == 'penal' %}selected{% endif %}>⚔️ Penal</option>
+                        <option value="administrativo" {% if request.args.get('filtro_tipo') == 'administrativo' %}selected{% endif %}>🏛️ Administrativo</option>
+                        <option value="conciliacion" {% if request.args.get('filtro_tipo') == 'conciliacion' %}selected{% endif %}>🤝 Conciliación</option>
+                        <option value="archivo" {% if request.args.get('filtro_tipo') == 'archivo' %}selected{% endif %}>📦 Archivo</option>
+                    </select>
+                </div>
+                
+                <!-- Filtro por Estado -->
+                <div class="form-group" style="margin: 0;">
+                    <label style="display: block; margin-bottom: 0.5rem; font-weight: 500; font-size: 0.9rem; color: var(--color-text);">
+                        Estado
+                    </label>
+                    <select name="filtro_estado" style="width: 100%; padding: 0.75rem; border: 1px solid var(--color-border); border-radius: 8px; font-size: 0.95rem; background: white;">
+                        <option value="">Todos los estados</option>
+                        <option value="activo" {% if request.args.get('filtro_estado') == 'activo' %}selected{% endif %}>🟢 Activo</option>
+                        <option value="en_proceso" {% if request.args.get('filtro_estado') == 'en_proceso' %}selected{% endif %}>🟡 En Proceso</option>
+                        <option value="pendiente" {% if request.args.get('filtro_estado') == 'pendiente' %}selected{% endif %}>🟠 Pendiente</option>
+                        <option value="resuelto" {% if request.args.get('filtro_estado') == 'resuelto' %}selected{% endif %}>🔵 Resuelto</option>
+                        <option value="archivado" {% if request.args.get('filtro_estado') == 'archivado' %}selected{% endif %}>⚪ Archivado</option>
+                    </select>
+                </div>
+                
+                <!-- Botones de acción -->
+                <div class="form-group" style="margin: 0; display: flex; gap: 0.5rem;">
+                    <button type="submit" class="btn btn-primary" style="flex: 1; padding: 0.75rem;">
+                        <span>🔍</span> Buscar
+                    </button>
+                    <a href="{{ url_for('main.expedientes') }}" class="btn" style="padding: 0.75rem 1rem; text-decoration: none; display: flex; align-items: center;" title="Limpiar filtros">
+                        <span>🔄</span>
+                    </a>
+                </div>
+            </form>
+        </div>
+        
+        <!-- RESULTADOS Y CONTADOR -->
+        {% if request.args %}
+        <div style="margin-bottom: 1rem; padding: 0.75rem 1rem; background: var(--color-primary-light); border-radius: 8px; color: var(--color-primary); font-size: 0.9rem;">
+            <span>📊</span> 
+            {% if expedientes %}
+                Se encontraron <strong>{{ expedientes|length }}</strong> expediente(s)
+                {% if request.args.get('buscar_numero') %} con número/DNI "<em>{{ request.args.get('buscar_numero') }}</em>"{% endif %}
+                {% if request.args.get('buscar_cliente') %} para cliente "<em>{{ request.args.get('buscar_cliente') }}</em>"{% endif %}
+            {% else %}
+                No se encontraron expedientes con los filtros aplicados
+            {% endif %}
+            <a href="{{ url_for('main.expedientes') }}" style="margin-left: 1rem; color: var(--color-primary); text-decoration: underline; font-size: 0.85rem;">(Limpiar búsqueda)</a>
+        </div>
+        {% endif %}
+        
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th>N° Expediente</th>
+                        <th>Tipo</th>
+                        <th>Cliente</th>
+                        <th>Materia</th>
+                        <th>Estado</th>
+                        <th>Fecha Registro</th>
+                        <th>Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% if expedientes %}
+                        {% for exp in expedientes %}
+                        <tr>
+                            <td>
+                                {% if exp.tipo == 'administrativo' %}
+                                    <strong>DNI:</strong> {{ exp.dni or '-' }}
+                                {% else %}
+                                    {{ exp.numero_expediente }}
+                                {% endif %}
+                            </td>
+                            <td>{{ exp.get_tipo_label() }}</td>
+                            <td>{{ exp.cliente }}</td>
+                            <td>{{ exp.materia }}</td>
+                            <td>
+                                <span class="badge badge-{{ exp.get_estado_color() }}">
+                                    {{ exp.get_estado_label() }}
+                                </span>
+                            </td>
+                            <td>{{ exp.fecha_registro.strftime('%d/%m/%Y') }}</td>
+                            <td>
+                                <a href="{{ url_for('main.ver_expediente', id=exp.id) }}" class="btn" style="font-size: 0.8rem;">Ver</a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    {% else %}
+                        <tr>
+                            <td colspan="7" style="text-align: center; color: var(--color-text-light); padding: 3rem;">
+                                {% if request.args %}
+                                    🔍 No se encontraron expedientes con los criterios de búsqueda.<br>
+                                    <small>Prueba con otros términos o <a href="{{ url_for('main.expedientes') }}">ver todos</a></small>
+                                {% else %}
+                                    📭 No hay expedientes registrados aún.<br>
+                                    <small>Presione "Nuevo Expediente" para comenzar.</small>
+                                {% endif %}
+                            </td>
+                        </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+        
+        <div style="margin-top: 2rem; text-align: center;">
+            <a href="{{ url_for('main.index') }}" class="btn">← Volver al Panel</a>
+        </div>
+    </div>
+{% endblock %}

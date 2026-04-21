@@ -1,0 +1,483 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="dashboard-container">
+    <!-- Header del Estudio -->
+    <div class="dashboard-header">
+        <div class="studio-display">
+            <span class="scales-icon">⚖️</span>
+            <div class="studio-name-main">Quijandria Abogados</div>
+        </div>
+        <div class="welcome-text">Sistema de Gestión de Expedientes Legales</div>
+    </div>
+    
+    <!-- Bienvenida y Rol -->
+    <div class="welcome-section">
+        <h1>
+            <span>👋</span>
+            <span>Hola, {{ usuario }}</span>
+        </h1>
+        <span class="rol-badge">{{ rol }}</span>
+    </div>
+    
+    <!-- Acciones Rápidas -->
+    <h2 class="section-title">
+        <span>⚡</span>
+        <span>Acciones Rápidas</span>
+    </h2>
+    
+    <div class="quick-actions">
+        <a href="{{ url_for('main.nuevo_expediente') }}" class="quick-action-btn">
+            <span class="quick-icon">➕</span>
+            <span class="quick-label">Nuevo Expediente</span>
+        </a>
+        
+        <a href="{{ url_for('main.subir_documento') }}" class="quick-action-btn">
+            <span class="quick-icon">📄</span>
+            <span class="quick-label">Nuevo Documento</span>
+        </a>
+        
+        <a href="{{ url_for('main.nueva_audiencia') }}" class="quick-action-btn">
+            <span class="quick-icon">📅</span>
+            <span class="quick-label">Programar Audiencia</span>
+        </a>
+        
+        {% if rol in ['DESARROLLADOR', 'ADMINISTRADOR'] %}
+        <a href="{{ url_for('main.gestion_usuarios_admin') if rol == 'ADMINISTRADOR' else url_for('main.gestion_usuarios_dev') }}" class="quick-action-btn">
+            <span class="quick-icon">👥</span>
+            <span class="quick-label">Gestión de Usuarios</span>
+        </a>
+        {% endif %}
+    </div>
+    
+    <!-- Resumen del Estudio -->
+    <div class="section-header-with-export">
+        <h2 class="section-title">
+            <span>📊</span>
+            <span>Resumen del Estudio</span>
+        </h2>
+        
+        <!-- Botones de exportación (solo Admin/Dev) -->
+        {% if rol in ['DESARROLLADOR', 'ADMINISTRADOR'] %}
+        <div class="export-buttons">
+            <a href="{{ url_for('main.exportar_excel', tipo='todos') }}" class="btn btn-export btn-excel" title="Exportar todos a Excel">
+                <span>📊</span> Excel
+            </a>
+            <a href="{{ url_for('main.exportar_pdf', tipo='todos') }}" class="btn btn-export btn-pdf" title="Exportar todos a PDF">
+                <span>📄</span> PDF
+            </a>
+        </div>
+        {% endif %}
+    </div>
+    
+    <div class="stats-grid">
+        <!-- Total Expedientes -->
+        <div class="stat-card stat-total">
+            <div class="stat-icon">📁</div>
+            <div class="stat-number">{{ total_expedientes }}</div>
+            <div class="stat-label">Total Expedientes</div>
+            <a href="{{ url_for('main.expedientes') }}" class="stat-link">Ver todos →</a>
+            
+            {% if rol in ['DESARROLLADOR', 'ADMINISTRADOR'] %}
+            <div class="stat-export">
+                <a href="{{ url_for('main.exportar_excel', tipo='todos') }}" class="export-link" title="Excel">📊</a>
+                <a href="{{ url_for('main.exportar_pdf', tipo='todos') }}" class="export-link" title="PDF">📄</a>
+            </div>
+            {% endif %}
+        </div>
+        
+        <!-- Civil -->
+        {% if 'todo' in modulos_permitidos or 'civil' in modulos_permitidos %}
+        <div class="stat-card stat-civil">
+            <div class="stat-icon">⚖️</div>
+            <div class="stat-number">{{ civil_count }}</div>
+            <div class="stat-label">Derecho Civil</div>
+            <a href="{{ url_for('main.expedientes_por_tipo', tipo='civil') }}" class="stat-link">Acceder →</a>
+            
+            {% if rol in ['DESARROLLADOR', 'ADMINISTRADOR'] %}
+            <div class="stat-export">
+                <a href="{{ url_for('main.exportar_excel', tipo='civil') }}" class="export-link" title="Excel">📊</a>
+                <a href="{{ url_for('main.exportar_pdf', tipo='civil') }}" class="export-link" title="PDF">📄</a>
+            </div>
+            {% endif %}
+        </div>
+        {% endif %}
+        
+        <!-- Penal -->
+        {% if 'todo' in modulos_permitidos or 'penal' in modulos_permitidos %}
+        <div class="stat-card stat-penal">
+            <div class="stat-icon">🚔</div>
+            <div class="stat-number">{{ penal_count }}</div>
+            <div class="stat-label">Derecho Penal</div>
+            <a href="{{ url_for('main.expedientes_por_tipo', tipo='penal') }}" class="stat-link">Acceder →</a>
+            
+            {% if rol in ['DESARROLLADOR', 'ADMINISTRADOR'] %}
+            <div class="stat-export">
+                <a href="{{ url_for('main.exportar_excel', tipo='penal') }}" class="export-link" title="Excel">📊</a>
+                <a href="{{ url_for('main.exportar_pdf', tipo='penal') }}" class="export-link" title="PDF">📄</a>
+            </div>
+            {% endif %}
+        </div>
+        {% endif %}
+        
+        <!-- Administrativo -->
+        {% if 'todo' in modulos_permitidos or 'administrativo' in modulos_permitidos %}
+        <div class="stat-card stat-admin">
+            <div class="stat-icon">🏛️</div>
+            <div class="stat-number">{{ admin_count }}</div>
+            <div class="stat-label">Administrativo</div>
+            <a href="{{ url_for('main.expedientes_por_tipo', tipo='administrativo') }}" class="stat-link">Acceder →</a>
+            
+            {% if rol in ['DESARROLLADOR', 'ADMINISTRADOR'] %}
+            <div class="stat-export">
+                <a href="{{ url_for('main.exportar_excel', tipo='administrativo') }}" class="export-link" title="Excel">📊</a>
+                <a href="{{ url_for('main.exportar_pdf', tipo='administrativo') }}" class="export-link" title="PDF">📄</a>
+            </div>
+            {% endif %}
+        </div>
+        {% endif %}
+        
+        <!-- Conciliación -->
+        {% if 'todo' in modulos_permitidos or 'conciliacion' in modulos_permitidos %}
+        <div class="stat-card stat-conciliacion">
+            <div class="stat-icon">🤝</div>
+            <div class="stat-number">{{ conciliacion_count }}</div>
+            <div class="stat-label">Conciliación</div>
+            <a href="{{ url_for('main.expedientes_por_tipo', tipo='conciliacion') }}" class="stat-link">Acceder →</a>
+            
+            {% if rol in ['DESARROLLADOR', 'ADMINISTRADOR'] %}
+            <div class="stat-export">
+                <a href="{{ url_for('main.exportar_excel', tipo='conciliacion') }}" class="export-link" title="Excel">📊</a>
+                <a href="{{ url_for('main.exportar_pdf', tipo='conciliacion') }}" class="export-link" title="PDF">📄</a>
+            </div>
+            {% endif %}
+        </div>
+        {% endif %}
+        
+        <!-- Archivo -->
+        {% if 'todo' in modulos_permitidos or 'archivo' in modulos_permitidos %}
+        <div class="stat-card stat-archivo">
+            <div class="stat-icon">📦</div>
+            <div class="stat-number">{{ archivo_count }}</div>
+            <div class="stat-label">Archivo</div>
+            <a href="{{ url_for('main.expedientes_por_tipo', tipo='archivo') }}" class="stat-link">Acceder →</a>
+            
+            {% if rol in ['DESARROLLADOR', 'ADMINISTRADOR'] %}
+            <div class="stat-export">
+                <a href="{{ url_for('main.exportar_excel', tipo='archivo') }}" class="export-link" title="Excel">📊</a>
+                <a href="{{ url_for('main.exportar_pdf', tipo='archivo') }}" class="export-link" title="PDF">📄</a>
+            </div>
+            {% endif %}
+        </div>
+        {% endif %}
+    </div>
+    
+    <!-- Búsqueda Rápida - ACTUALIZADA -->
+    <h2 class="section-title">
+        <span>🔍</span>
+        <span>Búsqueda Rápida</span>
+    </h2>
+    
+    <div class="search-section" style="background: white; padding: 1.5rem; border-radius: 12px; border: 1px solid var(--color-border);">
+        <form action="{{ url_for('main.expedientes') }}" method="GET" class="search-form">
+            
+            <div class="search-row" style="display: grid; grid-template-columns: 2fr 2fr 1fr auto; gap: 1rem; align-items: end;">
+                
+                <!-- Buscar por Expediente/DNI -->
+                <div class="form-group" style="margin: 0;">
+                    <label style="display: block; margin-bottom: 0.5rem; font-weight: 500; font-size: 0.9rem; color: var(--color-text);">
+                        N° Expediente o DNI
+                    </label>
+                    <input type="text" 
+                           name="buscar_numero" 
+                           class="form-control"
+                           placeholder="Ej: 00123-2024 o 12345678"
+                           style="width: 100%; padding: 0.75rem; border: 1px solid var(--color-border); border-radius: 8px; font-size: 0.95rem;">
+                </div>
+                
+                <!-- Buscar por Cliente -->
+                <div class="form-group" style="margin: 0;">
+                    <label style="display: block; margin-bottom: 0.5rem; font-weight: 500; font-size: 0.9rem; color: var(--color-text);">
+                        Cliente (Apellidos/Nombres)
+                    </label>
+                    <input type="text" 
+                           name="buscar_cliente" 
+                           class="form-control"
+                           placeholder="Ej: García López Juan"
+                           style="width: 100%; padding: 0.75rem; border: 1px solid var(--color-border); border-radius: 8px; font-size: 0.95rem;">
+                </div>
+                
+                <!-- Filtro por Tipo -->
+                <div class="form-group" style="margin: 0;">
+                    <label style="display: block; margin-bottom: 0.5rem; font-weight: 500; font-size: 0.9rem; color: var(--color-text);">
+                        Tipo
+                    </label>
+                    <select name="filtro_tipo" 
+                            class="form-control"
+                            style="width: 100%; padding: 0.75rem; border: 1px solid var(--color-border); border-radius: 8px; background: white; font-size: 0.95rem;">
+                        <option value="">Todos</option>
+                        <option value="civil">⚖️ Civil</option>
+                        <option value="penal">⚔️ Penal</option>
+                        <option value="administrativo">🏛️ Admin</option>
+                        <option value="conciliacion">🤝 Conciliación</option>
+                        <option value="archivo">📦 Archivo</option>
+                    </select>
+                </div>
+                
+                <!-- Botón Buscar -->
+                <div class="form-group" style="margin: 0;">
+                    <button type="submit" class="btn btn-primary" style="padding: 0.75rem 1.5rem; width: 100%; display: flex; align-items: center; justify-content: center; gap: 0.5rem;">
+                        <span>🔍</span> Buscar
+                    </button>
+                </div>
+            </div>
+        </form>
+        
+        <div class="search-filters" style="margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--color-border);">
+            <span class="search-tip-title" style="color: var(--color-primary); font-weight: 500;">💡 Consejos de búsqueda:</span>
+            <span class="search-tip-text" style="display: block; margin-top: 0.5rem; font-size: 0.9rem; color: var(--color-text-light); line-height: 1.6;">
+                • <strong>N° Expediente:</strong> Busca en Civil, Penal, Conciliación y Archivo<br>
+                • <strong>DNI:</strong> Busca en casos Administrativos (también funciona en otros tipos)<br>
+                • <strong>Cliente:</strong> Búsqueda parcial por apellidos o nombres<br>
+                • Puedes combinar filtros para resultados más precisos
+            </span>
+        </div>
+    </div>
+    
+    <!-- Agenda de Audiencias -->
+    <h2 class="section-title">
+        <span>📅</span>
+        <span>Agenda de Audiencias</span>
+    </h2>
+    
+    <div class="agenda-section">
+        <div class="agenda-cards">
+            <div class="agenda-card agenda-hoy">
+                <div class="agenda-header">
+                    <span class="agenda-icon">🔴</span>
+                    <span class="agenda-title">Hoy</span>
+                </div>
+                <div class="agenda-count">{{ audiencias_hoy }}</div>
+                <div class="agenda-label">audiencias</div>
+            </div>
+            
+            <div class="agenda-card agenda-manana">
+                <div class="agenda-header">
+                    <span class="agenda-icon">⏰</span>
+                    <span class="agenda-title">Mañana</span>
+                </div>
+                <div class="agenda-count">{{ audiencias_manana }}</div>
+                <div class="agenda-label">audiencias</div>
+            </div>
+            
+            <div class="agenda-card agenda-semana">
+                <div class="agenda-header">
+                    <span class="agenda-icon">📅</span>
+                    <span class="agenda-title">Esta Semana</span>
+                </div>
+                <div class="agenda-count">{{ audiencias_semana }}</div>
+                <div class="agenda-label">audiencias</div>
+            </div>
+        </div>
+        
+        <!-- Alerta de audiencias próximas -->
+        {% if proximas_audiencias %}
+        <div class="audiencias-alert">
+            <div class="alert-header">
+                <span>⚠️</span>
+                <strong>Audiencias Próximas</strong>
+            </div>
+            <ul class="alert-list">
+                {% for aud in proximas_audiencias[:3] %}
+                <li class="alert-item">
+                    <span class="alert-date">
+                        {{ aud.fecha.strftime('%d/%m/%Y') }} a las {{ aud.hora.strftime('%H:%M') }}
+                    </span>
+                    <span class="alert-client">
+                        {{ aud.expediente.cliente if aud.expediente else 'Cliente' }}
+                    </span>
+                    <span class="alert-tipo">({{ aud.get_tipo_label() }})</span>
+                    <a href="{{ url_for('main.ver_audiencia', id=aud.id) }}" class="btn btn-small btn-warning">
+                        Ver
+                    </a>
+                </li>
+                {% endfor %}
+            </ul>
+        </div>
+        {% endif %}
+        
+        <div class="agenda-actions">
+            <a href="{{ url_for('main.audiencias') }}" class="btn btn-primary">
+                <span>📅</span> Ver Calendario Completo
+            </a>
+        </div>
+    </div>
+    
+    <!-- Expedientes Recientes -->
+    <h2 class="section-title">
+        <span>📋</span>
+        <span>Expedientes Recientes</span>
+    </h2>
+    
+    <div class="table-container">
+        <table>
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Tipo</th>
+                    <th>Identificación</th>
+                    <th>Cliente</th>
+                    <th>Materia</th>
+                    <th>Estado</th>
+                    <th>Fecha</th>
+                    <th>Acciones</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% if expedientes_recientes %}
+                    {% for exp in expedientes_recientes %}
+                    <tr>
+                        <td>#{{ exp.id }}</td>
+                        <td>{{ exp.get_tipo_label() }}</td>
+                        <td>
+                            {% if exp.tipo == 'administrativo' %}
+                                <strong>DNI:</strong> {{ exp.dni or '-' }}
+                            {% else %}
+                                <strong>Exp:</strong> {{ exp.numero_expediente }}
+                            {% endif %}
+                        </td>
+                        <td>{{ exp.cliente }}</td>
+                        <td>{{ exp.materia }}</td>
+                        <td>
+                            <span class="badge badge-{{ exp.get_estado_color() }}">
+                                {{ exp.get_estado_label() }}
+                            </span>
+                        </td>
+                        <td>{{ exp.fecha_registro.strftime('%d/%m/%Y') }}</td>
+                        <td>
+                            <a href="{{ url_for('main.ver_expediente', id=exp.id) }}" class="btn btn-small">Ver</a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                {% else %}
+                    <tr>
+                        <td colspan="8" class="empty-state">
+                            <div class="empty-icon">📭</div>
+                            <div class="empty-text">No hay expedientes registrados aún</div>
+                            <div class="empty-hint">
+                                Use "Nuevo Expediente" en Acciones Rápidas para comenzar
+                            </div>
+                        </td>
+                    </tr>
+                {% endif %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+/* ============================================
+   ESTILOS PARA EXPORTACIÓN Y FILTRADO
+   ============================================ */
+
+/* Header de sección con botones de exportación */
+.section-header-with-export {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 1rem;
+    margin-bottom: 1rem;
+}
+
+.section-header-with-export .section-title {
+    margin: 0;
+}
+
+/* Botones de exportación */
+.export-buttons {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.btn-export {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.5rem 1rem;
+    border-radius: 6px;
+    font-size: 0.85rem;
+    font-weight: 500;
+    text-decoration: none;
+    transition: all 0.2s ease;
+}
+
+.btn-excel {
+    background: #10b981;
+    color: white;
+    border: 1px solid #059669;
+}
+
+.btn-excel:hover {
+    background: #059669;
+    transform: translateY(-1px);
+}
+
+.btn-pdf {
+    background: #ef4444;
+    color: white;
+    border: 1px solid #dc2626;
+}
+
+.btn-pdf:hover {
+    background: #dc2626;
+    transform: translateY(-1px);
+}
+
+/* Exportación en tarjetas de estadísticas */
+.stat-export {
+    display: flex;
+    gap: 0.5rem;
+    justify-content: center;
+    margin-top: 0.75rem;
+    padding-top: 0.75rem;
+    border-top: 1px solid rgba(0,0,0,0.1);
+}
+
+.stat-export .export-link {
+    font-size: 1.1rem;
+    text-decoration: none;
+    opacity: 0.7;
+    transition: opacity 0.2s;
+}
+
+.stat-export .export-link:hover {
+    opacity: 1;
+    transform: scale(1.1);
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .section-header-with-export {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+    
+    .export-buttons {
+        width: 100%;
+    }
+    
+    .btn-export {
+        flex: 1;
+        justify-content: center;
+    }
+    
+    /* Búsqueda responsive */
+    .search-row {
+        grid-template-columns: 1fr !important;
+    }
+}
+</style>
+{% endblock %}

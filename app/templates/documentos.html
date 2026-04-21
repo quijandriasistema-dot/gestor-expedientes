@@ -1,0 +1,188 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="dashboard">
+    <!-- Header -->
+    <div class="dashboard-header">
+        <div class="studio-display">
+            <span class="scales-icon">⚖️</span>
+            <div class="studio-name-main">Quijandria Abogados</div>
+        </div>
+        <div class="welcome-text">Sistema de Gestión de Expedientes Legales</div>
+    </div>
+    
+    <!-- Título -->
+    <h1 style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.5rem;">
+        <span>📁</span>
+        <span>Gestión de Documentos</span>
+    </h1>
+    <p style="color: var(--color-text-light); margin-bottom: 1.5rem;">
+        Administre todos los documentos del estudio jurídico.
+    </p>
+    
+    <!-- Acciones principales -->
+    <div style="display: flex; gap: 1rem; margin-bottom: 1.5rem; flex-wrap: wrap;">
+        <a href="{{ url_for('main.subir_documento') }}" class="btn btn-primary btn-lg">
+            ➕ Subir Nuevo Documento
+        </a>
+        <a href="{{ url_for('main.expedientes') }}" class="btn btn-secondary btn-lg">
+            📂 Ver Expedientes
+        </a>
+    </div>
+    
+    <!-- Filtros de búsqueda -->
+    <div class="form-container" style="margin-bottom: 1.5rem; background: #f8fafc;">
+        <h3 style="margin-bottom: 1rem;">🔍 Filtrar Documentos</h3>
+        
+        <form method="GET" action="{{ url_for('main.documentos') }}">
+            <div class="form-row">
+                <div class="form-col-3">
+                    <div class="form-group">
+                        <label>Buscar por título</label>
+                        <input type="text" name="q" class="form-control" value="{{ termino_busqueda }}" placeholder="Nombre del documento...">
+                    </div>
+                </div>
+                
+                <div class="form-col-3">
+                    <div class="form-group">
+                        <label>Categoría</label>
+                        <select name="categoria" class="form-control">
+                            <option value="">Todas las categorías</option>
+                            <option value="escrito" {% if categoria_filtro == 'escrito' %}selected{% endif %}>📝 Escrito</option>
+                            <option value="resolucion" {% if categoria_filtro == 'resolucion' %}selected{% endif %}>⚖️ Resolución</option>
+                            <option value="contrato" {% if categoria_filtro == 'contrato' %}selected{% endif %}>📄 Contrato</option>
+                            <option value="evidencia" {% if categoria_filtro == 'evidencia' %}selected{% endif %}>📷 Evidencia</option>
+                            <option value="poder" {% if categoria_filtro == 'poder' %}selected{% endif %}>✍️ Poder</option>
+                            <option value="notificacion" {% if categoria_filtro == 'notificacion' %}selected{% endif %}>📬 Notificación</option>
+                            <option value="otros" {% if categoria_filtro == 'otros' %}selected{% endif %}>📎 Otros</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <div class="form-col-3">
+                    <div class="form-group">
+                        <label>Expediente</label>
+                        <select name="expediente_id" class="form-control">
+                            <option value="0">Todos los expedientes</option>
+                            {% for id, nombre in form_busqueda.expediente_id.choices %}
+                                {% if id != 0 %}
+                                    <option value="{{ id }}" {% if expediente_filtro == id %}selected{% endif %}>{{ nombre }}</option>
+                                {% endif %}
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="form-actions" style="margin-top: 1rem;">
+                <button type="submit" class="btn btn-primary">🔍 Buscar</button>
+                <a href="{{ url_for('main.documentos') }}" class="btn btn-secondary">🔄 Limpiar</a>
+            </div>
+        </form>
+    </div>
+    
+    <!-- Listado de documentos -->
+    {% if documentos.items %}
+    <div class="table-container">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>📄 Documento</th>
+                    <th>🏷️ Categoría</th>
+                    <th>📁 Expediente</th>
+                    <th>📅 Fecha</th>
+                    <th>👤 Subido por</th>
+                    <th>💾 Tamaño</th>
+                    <th>⚙️ Acciones</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for doc in documentos.items %}
+                <tr>
+                    <td>
+                        <div style="display: flex; align-items: center; gap: 0.5rem;">
+                            <span style="font-size: 1.5rem;">{{ doc.get_icono() }}</span>
+                            <div>
+                                <strong>{{ doc.titulo }}</strong>
+                                <br>
+                                <small style="color: var(--color-text-light);">{{ doc.nombre_archivo }}</small>
+                            </div>
+                        </div>
+                    </td>
+                    <td>
+                        <span class="badge badge-info">{{ doc.get_tipo_label() }}</span>
+                    </td>
+                    <td>
+                        {% if doc.expediente_id %}
+                            <a href="{{ url_for('main.ver_expediente', id=doc.expediente_id) }}">
+                                {{ doc.expediente.get_identificador_principal() if doc.expediente else 'N/A' }}
+                            </a>
+                        {% else %}
+                            <span style="color: var(--color-text-light);">Documento General</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {{ doc.fecha_subida.strftime('%d/%m/%Y') }}
+                        <br>
+                        <small>{{ doc.fecha_subida.strftime('%H:%M') }}</small>
+                    </td>
+                    <td>{{ doc.usuario_subida }}</td>
+                    <td>{{ doc.get_tamaño_formateado() }}</td>
+                    <td>
+                        <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+                            <!-- ✅ NUEVO: Botón Visualizar (solo PDF e imágenes) -->
+                            {% if doc.tipo_archivo.lower() in ['pdf', 'jpg', 'jpeg', 'png', 'gif'] %}
+                            <a href="{{ url_for('main.visualizar_documento', id=doc.id) }}" target="_blank" class="btn btn-small btn-success" title="Visualizar">
+                                👁️ Ver
+                            </a>
+                            {% endif %}
+                            
+                            <a href="{{ url_for('main.descargar_documento', id=doc.id) }}" class="btn btn-small btn-primary" title="Descargar">
+                                ⬇️ Descargar
+                            </a>
+                            
+                            {% if rol in ['ADMINISTRADOR', 'DESARROLLADOR'] %}
+                            <form method="POST" action="{{ url_for('main.eliminar_documento', id=doc.id) }}" 
+                                  onsubmit="return confirm('¿Eliminar permanentemente este documento?');" style="display: inline;">
+                                <button type="submit" class="btn btn-small btn-danger" title="Eliminar">
+                                    🗑️
+                                </button>
+                            </form>
+                            {% endif %}
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    
+    <!-- Paginación -->
+    {% if documentos.pages > 1 %}
+    <div style="display: flex; justify-content: center; gap: 0.5rem; margin-top: 1.5rem;">
+        {% if documentos.has_prev %}
+            <a href="{{ url_for('main.documentos', page=documentos.prev_num, categoria=categoria_filtro, expediente_id=expediente_filtro, q=termino_busqueda) }}" class="btn btn-secondary">← Anterior</a>
+        {% endif %}
+        
+        <span style="padding: 0.5rem 1rem; background: white; border-radius: 8px; border: 1px solid #e5e7eb;">
+            Página {{ documentos.page }} de {{ documentos.pages }}
+        </span>
+        
+        {% if documentos.has_next %}
+            <a href="{{ url_for('main.documentos', page=documentos.next_num, categoria=categoria_filtro, expediente_id=expediente_filtro, q=termino_busqueda) }}" class="btn btn-secondary">Siguiente →</a>
+        {% endif %}
+    </div>
+    {% endif %}
+    
+    {% else %}
+    <div style="text-align: center; padding: 3rem; background: white; border-radius: 12px; border: 2px dashed #e5e7eb;">
+        <div style="font-size: 4rem; margin-bottom: 1rem;">📂</div>
+        <h3>No hay documentos</h3>
+        <p style="color: var(--color-text-light);">Comience subiendo su primer documento.</p>
+        <a href="{{ url_for('main.subir_documento') }}" class="btn btn-primary btn-lg" style="margin-top: 1rem;">
+            ➕ Subir Documento
+        </a>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
