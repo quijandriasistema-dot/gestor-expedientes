@@ -1,4 +1,9 @@
+cd "D:\JUAN CARLOS\JUANC\APLICATIVOS WEB\gestor-expedientes-web"
+
+# Sobrescribe vercel.json con configuración completa
+Set-Content -Path "vercel.json" -Value @"
 {
+  "version": 2,
   "builds": [
     {
       "src": "index.py",
@@ -12,3 +17,9 @@
     }
   ]
 }
+"@
+
+# Sube a GitHub
+git add vercel.json
+git commit -m "Actualiza vercel.json v2 - fuerza nuevo deploy"
+git push origin main

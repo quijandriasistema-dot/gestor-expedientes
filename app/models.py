@@ -356,3 +356,61 @@ class Notificacion(db.Model):
             return "ayer"
         else:
             return f"hace {diff.days} días"
+        
+# ============================================
+# MODELO USUARIO - SUPABASE (tabla: usuario)
+# ============================================
+
+class Usuario(db.Model):
+    __tablename__ = 'usuario'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    username = db.Column(db.String(80), unique=True, nullable=False)
+    password_hash = db.Column(db.String(256), nullable=False)
+    nombre = db.Column(db.String(100), nullable=False)
+    email = db.Column(db.String(120))
+    rol = db.Column(db.String(20), default='USUARIO')
+    modulos = db.Column(db.Text, default='[]')
+    activo = db.Column(db.Boolean, default=True)
+    fecha_registro = db.Column(db.DateTime, default=datetime.utcnow)
+    ultimo_acceso = db.Column(db.DateTime)
+    
+    def __repr__(self):
+        return f'<Usuario {self.username}>'
+    
+    def get_modulos_list(self):
+        """Devuelve la lista de módulos permitidos"""
+        import json
+        try:
+            return json.loads(self.modulos) if self.modulos else []
+        except:
+            return []
+    
+    def set_modulos_list(self, modulos_list):
+        """Guarda la lista de módulos como JSON string"""
+        import json
+        self.modulos = json.dumps(modulos_list) if isinstance(modulos_list, list) else '[]'
+    
+    def check_password(self, password):
+        """Verifica contraseña con bcrypt"""
+        import bcrypt
+        return bcrypt.checkpw(password.encode('utf-8'), self.password_hash.encode('utf-8'))
+    
+    def set_password(self, password):
+        """Genera hash bcrypt de la contraseña"""
+        import bcrypt
+        password_bytes = password.encode('utf-8')
+        salt = bcrypt.gensalt(rounds=12)
+        self.password_hash = bcrypt.hashpw(password_bytes, salt).decode('utf-8')
+    
+    def to_dict(self):
+        """Devuelve datos del usuario (sin password)"""
+        return {
+            'username': self.username,
+            'nombre': self.nombre,
+            'email': self.email,
+            'rol': self.rol,
+            'modulos': self.get_modulos_list(),
+            'activo': self.activo,
+            'fecha_registro': self.fecha_registro.strftime('%Y-%m-%d %H:%M') if self.fecha_registro else None
+        }

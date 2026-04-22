@@ -4,10 +4,11 @@ from flask import Blueprint, render_template, request, redirect, url_for, flash,
 from functools import wraps
 from datetime import datetime, timedelta, date
 from app import db
-from app.models import Expediente, EstadoHistorial, Audiencia, Documento, Notificacion
+from app.models import Expediente, EstadoHistorial, Audiencia, Documento, Notificacion, Usuario
 from app.forms import ExpedienteForm, EstadoForm, BusquedaForm, AudienciaForm, BusquedaAudienciaForm, DocumentoForm, BusquedaDocumentoForm
 import json
 import os
+import bcrypt
 
 # ============================================
 # IMPORTS PARA EXPORTACIÓN (PDF/EXCEL)
@@ -23,52 +24,45 @@ from reportlab.lib.units import inch
 bp = Blueprint('main', __name__)
 
 # ============================================
-# CONFIGURACIÓN DE USUARIOS Y PERSISTENCIA
+# CONFIGURACIÓN DE USUARIOS - SUPABASE (tabla: usuario)
 # ============================================
 
-# Ruta del archivo de usuarios
-USUARIOS_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'instance', 'usuarios.json')
-
-# Usuarios por defecto (se usan si no existe el archivo)
-USUARIOS_DEFAULT = {
-    'dev': {
-        'password': 'dev123',
-        'nombre': 'Desarrollador Principal',
-        'rol': 'DESARROLLADOR',
-        'modulos': ['todo']
-    },
-    'admin': {
-        'password': 'admin123',
-        'nombre': 'Administrador del Sistema',
-        'rol': 'ADMINISTRADOR',
-        'modulos': ['todo']
-    },
-    'usuario1': {
-        'password': 'user123',
-        'nombre': 'Abogado Junior',
-        'rol': 'USUARIO',
-        'modulos': ['civil', 'penal']
-    }
-}
-
 def _cargar_usuarios():
-    """Carga usuarios desde archivo JSON o usa los default"""
-    if os.path.exists(USUARIOS_FILE):
-        try:
-            with open(USUARIOS_FILE, 'r', encoding='utf-8') as f:
-                return json.load(f)
-        except:
-            pass
-    return USUARIOS_DEFAULT.copy()
+    """Carga usuarios activos desde Supabase (tabla usuario)"""
+    usuarios = {}
+    try:
+        for u in Usuario.query.filter_by(activo=True).all():
+            usuarios[u.username] = {
+                'password_hash': u.password_hash,
+                'nombre': u.nombre,
+                'rol': u.rol,
+                'modulos': u.get_modulos_list()
+            }
+    except Exception as e:
+        print(f"Error cargando usuarios: {e}")
+    return usuarios
 
 def _guardar_usuarios():
-    """Guarda usuarios en archivo JSON"""
-    os.makedirs(os.path.dirname(USUARIOS_FILE), exist_ok=True)
-    with open(USUARIOS_FILE, 'w', encoding='utf-8') as f:
-        json.dump(USUARIOS, f, indent=2, ensure_ascii=False)
+    """Ya no se usa - los usuarios se guardan directamente en Supabase"""
+    pass
 
 # Cargar usuarios al inicio
 USUARIOS = _cargar_usuarios()
+
+# ============================================
+# FUNCIONES AUXILIARES DE USUARIOS
+# ============================================
+
+def _get_usuario(username):
+    """Obtiene un usuario de Supabase por username"""
+    return Usuario.query.filter_by(username=username, activo=True).first()
+
+def _verificar_password(username, password):
+    """Verifica contraseña usando bcrypt"""
+    usuario = _get_usuario(username)
+    if usuario and usuario.check_password(password):
+        return True
+    return False
 
 # ============================================
 # DECORADOR ANTI-CACHÉ
@@ -305,23 +299,24 @@ def root():
 @bp.route('/login', methods=['GET', 'POST'])
 @no_cache
 def login():
-    """Página de login"""
+    """Página de login - consulta Supabase tabla usuario"""
     if request.method == 'POST':
         username = request.form.get('username', '').strip()
         password = request.form.get('password', '').strip()
 
-        # Recargar usuarios por si se modificaron
-        global USUARIOS
-        USUARIOS = _cargar_usuarios()
+        usuario = _get_usuario(username)
 
-        if username in USUARIOS:
-            user = USUARIOS[username]
-            if user['password'] == password:
+        if usuario:
+            if usuario.check_password(password):
+                # Actualizar último acceso
+                usuario.ultimo_acceso = datetime.now()
+                db.session.commit()
+                
                 session['usuario'] = username
-                session['nombre'] = user['nombre']
-                session['rol'] = user['rol']
-                session['modulos'] = user['modulos']
-                flash(f'Bienvenido, {user["nombre"]}', 'success')
+                session['nombre'] = usuario.nombre
+                session['rol'] = usuario.rol
+                session['modulos'] = usuario.get_modulos_list()
+                flash(f'Bienvenido, {usuario.nombre}', 'success')
                 return redirect(url_for('main.index'))
             else:
                 flash('Contraseña incorrecta', 'error')
@@ -953,23 +948,28 @@ def gestion_usuarios_admin():
     ADMINISTRADOR: 
     - Puede crear usuarios (no administradores)
     - Puede eliminar usuarios (no desarrollador ni otros admins)
-    - Puede asignar módulos a usuarios
     """
     if session.get('rol') not in ['ADMINISTRADOR', 'DESARROLLADOR']:
         flash('No tiene permisos para acceder a esta sección', 'error')
         return redirect(url_for('main.index'))
 
-    # Si es desarrollador, redirigir a su vista especial
     if session.get('rol') == 'DESARROLLADOR':
         return redirect(url_for('main.gestion_usuarios_dev'))
 
-    # Recargar usuarios por si se modificaron
-    global USUARIOS
-    USUARIOS = _cargar_usuarios()
+    # Cargar usuarios desde Supabase
+    usuarios_db = {}
+    for u in Usuario.query.filter_by(activo=True).all():
+        usuarios_db[u.username] = {
+            'nombre': u.nombre,
+            'rol': u.rol,
+            'modulos': u.get_modulos_list(),
+            'email': u.email,
+            'fecha_registro': u.fecha_registro
+        }
 
     return render_template('admin_usuarios.html',
                          title='Gestión de Usuarios',
-                         usuarios=USUARIOS,
+                         usuarios=usuarios_db,
                          rol=session.get('rol', 'USUARIO'))
 
 @bp.route('/dev/usuarios')
@@ -980,189 +980,182 @@ def gestion_usuarios_dev():
     DESARROLLADOR:
     - Vista completa de todos los usuarios
     - Puede crear administradores y usuarios
-    - Puede eliminar cualquier usuario (incluido administradores)
-    - Acceso total sin restricciones
+    - Puede eliminar cualquier usuario
     """
     if session.get('rol') != 'DESARROLLADOR':
         flash('No tiene permisos para acceder a esta sección', 'error')
         return redirect(url_for('main.index'))
 
-    # Recargar usuarios
-    global USUARIOS
-    USUARIOS = _cargar_usuarios()
+    usuarios_db = {}
+    for u in Usuario.query.filter_by(activo=True).all():
+        usuarios_db[u.username] = {
+            'nombre': u.nombre,
+            'rol': u.rol,
+            'modulos': u.get_modulos_list(),
+            'email': u.email,
+            'fecha_registro': u.fecha_registro
+        }
 
     return render_template('admin_usuarios_dev.html',
                          title='Gestión de Usuarios - Desarrollador',
-                         usuarios=USUARIOS,
+                         usuarios=usuarios_db,
                          rol=session.get('rol', 'USUARIO'))
 
 @bp.route('/api/usuario/<username>')
 @requiere_login
 @no_cache
 def api_obtener_usuario(username):
-    """API para obtener datos de un usuario específico"""
+    """API para obtener datos de un usuario específico desde Supabase"""
     rol_actual = session.get('rol')
 
-    # Solo ADMINISTRADOR o DESARROLLADOR pueden ver detalles
     if rol_actual not in ['ADMINISTRADOR', 'DESARROLLADOR']:
         return jsonify({'success': False, 'error': 'Sin permisos'}), 403
 
-    if username not in USUARIOS:
+    usuario = _get_usuario(username)
+    if not usuario:
         return jsonify({'success': False, 'error': 'Usuario no encontrado'}), 404
 
-    usuario = USUARIOS[username]
-
-    # RESTRICCIONES DE ADMINISTRADOR
+    # Restricciones de ADMINISTRADOR
     if rol_actual == 'ADMINISTRADOR':
-        # No puede ver detalles del desarrollador
-        if usuario['rol'] == 'DESARROLLADOR':
+        if usuario.rol == 'DESARROLLADOR':
             return jsonify({'success': False, 'error': 'No puede ver detalles del desarrollador'}), 403
-        # No puede ver detalles de otros administradores
-        if usuario['rol'] == 'ADMINISTRADOR' and username != session.get('usuario'):
+        if usuario.rol == 'ADMINISTRADOR' and username != session.get('usuario'):
             return jsonify({'success': False, 'error': 'No puede ver detalles de otros administradores'}), 403
 
     return jsonify({
         'success': True,
-        'username': username,
-        'nombre': usuario['nombre'],
-        'rol': usuario['rol'],
-        'modulos': usuario['modulos']
+        'username': usuario.username,
+        'nombre': usuario.nombre,
+        'rol': usuario.rol,
+        'modulos': usuario.get_modulos_list(),
+        'email': usuario.email
     })
 
 @bp.route('/api/usuario/crear', methods=['POST'])
 @requiere_login
 @no_cache
 def api_crear_usuario():
-    """API para crear usuarios según permisos del rol"""
+    """API para crear usuarios en Supabase (tabla usuario)"""
     rol_actual = session.get('rol')
 
-    # Solo ADMINISTRADOR o DESARROLLADOR pueden crear usuarios
     if rol_actual not in ['ADMINISTRADOR', 'DESARROLLADOR']:
         return jsonify({'success': False, 'error': 'Sin permisos'}), 403
 
     data = request.get_json()
-    username = data.get('username', '').strip()
+    username = data.get('username', '').strip().lower()
     nombre = data.get('nombre', '').strip()
     password = data.get('password', '').strip()
     rol_nuevo = data.get('rol', 'USUARIO')
     modulos = data.get('modulos', ['civil'])
+    email = data.get('email', '').strip()
 
     # Validaciones
     if not username or not nombre or not password:
         return jsonify({'success': False, 'error': 'Datos incompletos'}), 400
 
-    if username in USUARIOS:
+    # Verificar si ya existe
+    if Usuario.query.filter_by(username=username).first():
         return jsonify({'success': False, 'error': 'El usuario ya existe'}), 400
 
-    # RESTRICCIONES DE ADMINISTRADOR
+    # Restricciones de ADMINISTRADOR
     if rol_actual == 'ADMINISTRADOR':
-        # No puede crear administradores
-        if rol_nuevo == 'ADMINISTRADOR':
-            return jsonify({'success': False, 'error': 'No puede crear administradores'}), 403
+        if rol_nuevo in ['ADMINISTRADOR', 'DESARROLLADOR']:
+            return jsonify({'success': False, 'error': 'No puede crear administradores o desarrolladores'}), 403
 
-        # No puede crear desarrolladores
-        if rol_nuevo == 'DESARROLLADOR':
-            return jsonify({'success': False, 'error': 'No puede crear desarrolladores'}), 403
-
-    # Crear usuario
     try:
-        USUARIOS[username] = {
-            'password': password,
-            'nombre': nombre,
-            'rol': rol_nuevo,
-            'modulos': modulos if isinstance(modulos, list) else [modulos]
-        }
+        nuevo = Usuario(
+            username=username,
+            nombre=nombre,
+            email=email or f'{username}@quijandria.com',
+            rol=rol_nuevo
+        )
+        nuevo.set_password(password)
+        nuevo.set_modulos_list(modulos if isinstance(modulos, list) else [modulos])
 
-        _guardar_usuarios()
+        db.session.add(nuevo)
+        db.session.commit()
 
-        return jsonify({'success': True, 'message': 'Usuario creado correctamente'})
+        return jsonify({'success': True, 'message': 'Usuario creado correctamente en Supabase'})
     except Exception as e:
+        db.session.rollback()
         return jsonify({'success': False, 'error': str(e)}), 500
 
 @bp.route('/api/usuario/eliminar/<username>', methods=['DELETE'])
 @requiere_login
 @no_cache
 def api_eliminar_usuario(username):
-    """API para eliminar usuarios según permisos del rol"""
+    """API para eliminar usuarios en Supabase (soft delete)"""
     rol_actual = session.get('rol')
 
-    # Solo ADMINISTRADOR o DESARROLLADOR pueden eliminar
     if rol_actual not in ['ADMINISTRADOR', 'DESARROLLADOR']:
         return jsonify({'success': False, 'error': 'Sin permisos'}), 403
 
-    # No puede eliminarse a sí mismo
     if username == session.get('usuario'):
         return jsonify({'success': False, 'error': 'No puede eliminarse a sí mismo'}), 400
 
-    # Verificar que el usuario existe
-    if username not in USUARIOS:
+    usuario = _get_usuario(username)
+    if not usuario:
         return jsonify({'success': False, 'error': 'Usuario no encontrado'}), 404
 
-    usuario_objetivo = USUARIOS[username]
-
-    # RESTRICCIONES DE ADMINISTRADOR
+    # Restricciones de ADMINISTRADOR
     if rol_actual == 'ADMINISTRADOR':
-        # No puede eliminar desarrolladores
-        if usuario_objetivo['rol'] == 'DESARROLLADOR':
+        if usuario.rol == 'DESARROLLADOR':
             return jsonify({'success': False, 'error': 'No puede eliminar al desarrollador'}), 403
-
-        # No puede eliminar otros administradores
-        if usuario_objetivo['rol'] == 'ADMINISTRADOR':
+        if usuario.rol == 'ADMINISTRADOR':
             return jsonify({'success': False, 'error': 'No puede eliminar a otros administradores'}), 403
 
-    # Eliminar usuario
     try:
-        del USUARIOS[username]
-        _guardar_usuarios()
+        # Soft delete: marcar como inactivo
+        usuario.activo = False
+        db.session.commit()
         return jsonify({'success': True, 'message': 'Usuario eliminado correctamente'})
     except Exception as e:
+        db.session.rollback()
         return jsonify({'success': False, 'error': str(e)}), 500
 
 @bp.route('/api/usuario/editar/<username>', methods=['PUT'])
 @requiere_login
 @no_cache
 def api_editar_usuario(username):
-    """API para editar usuarios según permisos del rol"""
+    """API para editar usuarios en Supabase"""
     rol_actual = session.get('rol')
 
     if rol_actual not in ['ADMINISTRADOR', 'DESARROLLADOR']:
         return jsonify({'success': False, 'error': 'Sin permisos'}), 403
 
-    if username not in USUARIOS:
+    usuario = _get_usuario(username)
+    if not usuario:
         return jsonify({'success': False, 'error': 'Usuario no encontrado'}), 404
 
     data = request.get_json()
-    usuario_objetivo = USUARIOS[username]
 
-    # RESTRICCIONES DE ADMINISTRADOR
+    # Restricciones de ADMINISTRADOR
     if rol_actual == 'ADMINISTRADOR':
-        # No puede editar desarrolladores
-        if usuario_objetivo['rol'] == 'DESARROLLADOR':
+        if usuario.rol == 'DESARROLLADOR':
             return jsonify({'success': False, 'error': 'No puede editar al desarrollador'}), 403
-
-        # No puede editar otros administradores
-        if usuario_objetivo['rol'] == 'ADMINISTRADOR' and username != session.get('usuario'):
+        if usuario.rol == 'ADMINISTRADOR' and username != session.get('usuario'):
             return jsonify({'success': False, 'error': 'No puede editar a otros administradores'}), 403
 
-        # No puede cambiar el rol a administrador o desarrollador
         nuevo_rol = data.get('rol')
         if nuevo_rol in ['ADMINISTRADOR', 'DESARROLLADOR']:
             return jsonify({'success': False, 'error': 'No puede asignar ese rol'}), 403
 
-    # Actualizar datos
     try:
         if 'nombre' in data:
-            USUARIOS[username]['nombre'] = data['nombre']
+            usuario.nombre = data['nombre']
         if 'password' in data and data['password']:
-            USUARIOS[username]['password'] = data['password']
+            usuario.set_password(data['password'])
         if 'modulos' in data:
-            USUARIOS[username]['modulos'] = data['modulos'] if isinstance(data['modulos'], list) else [data['modulos']]
+            usuario.set_modulos_list(data['modulos'] if isinstance(data['modulos'], list) else [data['modulos']])
+        if 'email' in data:
+            usuario.email = data['email']
         if 'rol' in data and rol_actual == 'DESARROLLADOR':
-            USUARIOS[username]['rol'] = data['rol']
+            usuario.rol = data['rol']
 
-        _guardar_usuarios()
+        db.session.commit()
         return jsonify({'success': True, 'message': 'Usuario actualizado correctamente'})
     except Exception as e:
+        db.session.rollback()
         return jsonify({'success': False, 'error': str(e)}), 500
 
 # ============================================
