@@ -57,7 +57,6 @@
             <span>Resumen del Estudio</span>
         </h2>
         
-        <!-- Botones de exportación (solo Admin/Dev) -->
         {% if rol in ['DESARROLLADOR', 'ADMINISTRADOR'] %}
         <div class="export-buttons">
             <a href="{{ url_for('main.exportar_excel', tipo='todos') }}" class="btn btn-export btn-excel" title="Exportar todos a Excel">
@@ -172,7 +171,7 @@
         {% endif %}
     </div>
     
-    <!-- Búsqueda Rápida - ACTUALIZADA -->
+    <!-- Búsqueda Rápida -->
     <h2 class="section-title">
         <span>🔍</span>
         <span>Búsqueda Rápida</span>
@@ -291,7 +290,7 @@
                 {% for aud in proximas_audiencias[:3] %}
                 <li class="alert-item">
                     <span class="alert-date">
-                        {{ aud.fecha.strftime('%d/%m/%Y') }} a las {{ aud.hora.strftime('%H:%M') }}
+                        {{ aud.fecha|fecha }} a las {{ aud.hora|hora }}
                     </span>
                     <span class="alert-client">
                         {{ aud.expediente.cliente if aud.expediente else 'Cliente' }}
@@ -353,7 +352,7 @@
                                 {{ exp.get_estado_label() }}
                             </span>
                         </td>
-                        <td>{{ exp.fecha_registro.strftime('%d/%m/%Y') }}</td>
+                        <td>{{ exp.fecha_registro|fecha }}</td>
                         <td>
                             <a href="{{ url_for('main.ver_expediente', id=exp.id) }}" class="btn btn-small">Ver</a>
                         </td>
@@ -382,7 +381,6 @@
    ESTILOS PARA EXPORTACIÓN Y FILTRADO
    ============================================ */
 
-/* Header de sección con botones de exportación */
 .section-header-with-export {
     display: flex;
     justify-content: space-between;
@@ -396,7 +394,6 @@
     margin: 0;
 }
 
-/* Botones de exportación */
 .export-buttons {
     display: flex;
     gap: 0.5rem;
@@ -436,7 +433,6 @@
     transform: translateY(-1px);
 }
 
-/* Exportación en tarjetas de estadísticas */
 .stat-export {
     display: flex;
     gap: 0.5rem;
@@ -458,7 +454,6 @@
     transform: scale(1.1);
 }
 
-/* Responsive */
 @media (max-width: 768px) {
     .section-header-with-export {
         flex-direction: column;
@@ -474,7 +469,6 @@
         justify-content: center;
     }
     
-    /* Búsqueda responsive */
     .search-row {
         grid-template-columns: 1fr !important;
     }
