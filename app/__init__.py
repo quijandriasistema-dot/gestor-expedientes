@@ -7,40 +7,20 @@ db = SQLAlchemy()
 def create_app():
     app = Flask(__name__)
     
-    # ============================================
-    # CONFIGURACIÓN
-    # ============================================
-    
+    # Configuración
     app.config['SECRET_KEY'] = 'tu-clave-secreta-aqui-2026-cambiar-en-produccion'
     app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///gestor_expedientes.db'
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
     
-    # ============================================
-    # UPLOADS - Detectar Vercel
-    # ============================================
-    
-    is_vercel = os.environ.get('VERCEL') == '1' or os.environ.get('VERCEL_ENV') is not None
-    
-    if is_vercel:
-        # En Vercel: usar /tmp (única carpeta writable)
-        app.config['UPLOAD_FOLDER'] = '/tmp/uploads/documentos'
-    else:
-        # En local: carpeta del proyecto
-        app.config['UPLOAD_FOLDER'] = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'uploads', 'documentos')
-        os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
-    
+    # Uploads
+    app.config['UPLOAD_FOLDER'] = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'uploads', 'documentos')
+    os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
     app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024
     
-    # ============================================
-    # INICIALIZAR BASE DE DATOS
-    # ============================================
-    
+    # Inicializar DB
     db.init_app(app)
     
-    # ============================================
-    # FILTROS JINJA2 SEGUROS PARA FECHAS
-    # ============================================
-    
+    # Filtros Jinja2 seguros para fechas
     @app.template_filter('fecha')
     def fecha_filter(value, formato='%d/%m/%Y'):
         if value is None:
@@ -59,17 +39,11 @@ def create_app():
             return 'Sin fecha'
         return value.strftime(formato)
     
-    # ============================================
-    # REGISTRAR RUTAS
-    # ============================================
-    
+    # Blueprints
     from app.routes import bp as main_bp
     app.register_blueprint(main_bp)
     
-    # ============================================
-    # CREAR TABLAS AL INICIAR
-    # ============================================
-    
+    # Crear tablas
     with app.app_context():
         db.create_all()
     
