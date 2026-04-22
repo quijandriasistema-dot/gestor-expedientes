@@ -137,7 +137,7 @@
                                     {{ exp.get_estado_label() }}
                                 </span>
                             </td>
-                            <td>{{ exp.fecha_registro.strftime('%d/%m/%Y') if exp.fecha_registro else 'Sin fecha' }}</td>
+                            <td>{{ exp.fecha_registro | fecha }}</td>
                             <td>
                                 <a href="{{ url_for('main.ver_expediente', id=exp.id) }}" class="btn" style="font-size: 0.8rem;">Ver</a>
                             </td>
