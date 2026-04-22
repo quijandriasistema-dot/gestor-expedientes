@@ -25,7 +25,15 @@
         <form method="POST" action="{{ url_for('main.nuevo_expediente') }}">
             {{ form.hidden_tag() }}
             
-            <!-- Sección 1: Tipo de Expediente -->
+            <!-- Campo oculto: estado inicial -->
+            <input type="hidden" name="estado_actual" value="ingresado">
+            
+            <!-- Campo oculto: usuario que registra -->
+            <input type="hidden" name="usuario_registro" value="{{ session.get('usuario', 'sistema') }}">
+            
+            <!-- ============================================ -->
+            <!-- SECCIÓN 1: Tipo de Expediente -->
+            <!-- ============================================ -->
             <div class="form-section">
                 <h3><span>📋</span> Tipo de Expediente *</h3>
                 <div class="form-row">
@@ -43,11 +51,13 @@
                 </div>
             </div>
             
-            <!-- Sección 2: Identificación (DNI y N° Expediente según tipo) -->
+            <!-- ============================================ -->
+            <!-- SECCIÓN 2: Identificación del Caso -->
+            <!-- ============================================ -->
             <div class="form-section" id="seccion-identificacion">
                 <h3><span>🆔</span> Identificación del Caso</h3>
                 
-                <!-- DNI - Visible para Administrativo, Penal, Conciliación, Archivo -->
+                <!-- DNI - Visible para: Administrativo, Penal, Conciliación, Archivo -->
                 <div class="form-row" id="campo-dni-container" style="display: none;">
                     <div class="form-col-2">
                         <div class="form-group">
@@ -68,11 +78,12 @@
                     </div>
                 </div>
                 
-                <!-- N° Expediente - Visible para Civil, Penal, Conciliación, Archivo -->
+                <!-- N° Expediente - Visible para: Civil, Penal, Conciliación, Archivo -->
+                <!-- Oculto pero presente para Administrativo (envía vacío) -->
                 <div class="form-row" id="campo-expediente-container" style="display: none;">
                     <div class="form-col-2">
                         <div class="form-group">
-                            <label for="numero_expediente">N° de Expediente <span style="color: #dc2626;">*</span></label>
+                            <label for="numero_expediente" id="label-expediente">N° de Expediente <span id="required-expediente" style="color: #dc2626;">*</span></label>
                             {{ form.numero_expediente(class="form-control", id="numero_expediente") }}
                             {% if form.numero_expediente.errors %}
                                 {% for error in form.numero_expediente.errors %}
@@ -84,15 +95,17 @@
                 </div>
             </div>
             
-            <!-- Sección 3: Materia/Asunto (para Archivo, va antes de Cliente según Excel) -->
-            <div class="form-section" id="seccion-materia-archivo" style="display: none;">
+            <!-- ============================================ -->
+            <!-- SECCIÓN 3: Materia / Asunto (ÚNICA - para todos los tipos) -->
+            <!-- ============================================ -->
+            <div class="form-section" id="seccion-materia">
                 <h3><span>📄</span> Materia / Asunto *</h3>
                 
                 <div class="form-row">
                     <div class="form-col-2">
                         <div class="form-group">
                             {{ form.materia.label }}
-                            {{ form.materia(class="form-control", id="materia-archivo") }}
+                            {{ form.materia(class="form-control", id="materia") }}
                             {% if form.materia.errors %}
                                 {% for error in form.materia.errors %}
                                     <span class="error">{{ error }}</span>
@@ -103,10 +116,13 @@
                 </div>
             </div>
             
-            <!-- Sección 4: Ubicación Física (solo para Archivo) -->
+            <!-- ============================================ -->
+            <!-- SECCIÓN 4: Campos Específicos por Tipo -->
+            <!-- ============================================ -->
+            
+            <!-- 4A: Ubicación Física (solo Archivo) -->
             <div class="form-section campos-especificos" id="campos-archivo-ubicacion" style="display: none;">
                 <h3><span>📦</span> Ubicación Física del Expediente</h3>
-                
                 <div class="form-group">
                     {{ form.ubicacion_archivo.label }}
                     {{ form.ubicacion_archivo(class="form-control", id="ubicacion_archivo", placeholder="Ej: Estante A - Fila 3 - Caja 12") }}
@@ -116,26 +132,7 @@
                 </div>
             </div>
             
-            <!-- Sección 5: Materia General (para otros tipos, no Archivo) -->
-            <div class="form-section" id="seccion-materia-general">
-                <h3><span>📄</span> Materia / Asunto *</h3>
-                
-                <div class="form-row">
-                    <div class="form-col-2">
-                        <div class="form-group">
-                            {{ form.materia.label }}
-                            {{ form.materia(class="form-control", id="materia-general") }}
-                            {% if form.materia.errors %}
-                                {% for error in form.materia.errors %}
-                                    <span class="error">{{ error }}</span>
-                                {% endfor %}
-                            {% endif %}
-                        </div>
-                    </div>
-                </div>
-            </div>
-            
-            <!-- Sección 6: Campos Conciliación -->
+            <!-- 4B: Información de Conciliación -->
             <div class="form-section campos-especificos" id="campos-conciliacion" style="display: none;">
                 <h3><span>🤝</span> Información de Conciliación</h3>
                 
@@ -164,7 +161,86 @@
                 </div>
             </div>
             
-            <!-- Sección 7: Datos del Cliente (para todos los tipos) -->
+            <!-- 4C: Información Administrativa -->
+            <div class="form-section campos-especificos" id="campos-administrativo" style="display: none;">
+                <h3><span>🏛️</span> Información Administrativa</h3>
+                
+                <div class="form-row">
+                    <div class="form-col-2">
+                        <div class="form-group">
+                            {{ form.entidad_receptora.label }}
+                            {{ form.entidad_receptora(class="form-control") }}
+                        </div>
+                    </div>
+                    
+                    <div class="form-col-2">
+                        <div class="form-group">
+                            {{ form.tramite.label }}
+                            {{ form.tramite(class="form-control") }}
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 4D: Información Judicial (Civil) -->
+            <div class="form-section campos-especificos" id="campos-civil" style="display: none;">
+                <h3><span>⚖️</span> Información Judicial</h3>
+                
+                <div class="form-row">
+                    <div class="form-col-2">
+                        <div class="form-group">
+                            {{ form.secretario.label }}
+                            {{ form.secretario(class="form-control") }}
+                        </div>
+                    </div>
+                    
+                    <div class="form-col-2">
+                        <div class="form-group">
+                            {{ form.juez.label }}
+                            {{ form.juez(class="form-control") }}
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    {{ form.juzgado.label }}
+                    {{ form.juzgado(class="form-control", placeholder="Ej: Juzgado Civil de Lima") }}
+                </div>
+            </div>
+            
+            <!-- 4E: Información Penal -->
+            <div class="form-section campos-especificos" id="campos-penal" style="display: none;">
+                <h3><span>🚔</span> Información Penal</h3>
+                
+                <div class="form-row">
+                    <div class="form-col-2">
+                        <div class="form-group">
+                            {{ form.numero_cf.label }}
+                            {{ form.numero_cf(class="form-control") }}
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="form-row">
+                    <div class="form-col-2">
+                        <div class="form-group">
+                            {{ form.fiscal.label }}
+                            {{ form.fiscal(class="form-control") }}
+                        </div>
+                    </div>
+                    
+                    <div class="form-col-2">
+                        <div class="form-group">
+                            {{ form.juzgado.label }}
+                            {{ form.juzgado(class="form-control", placeholder="Ej: Juzgado Penal de Lima") }}
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- ============================================ -->
+            <!-- SECCIÓN 5: Datos del Cliente (para todos) -->
+            <!-- ============================================ -->
             <div class="form-section" id="seccion-cliente">
                 <h3><span>👤</span> Datos del Cliente</h3>
                 
@@ -193,89 +269,9 @@
                 </div>
             </div>
             
-            <!-- Sección 8: Campos Administrativos -->
-            <div class="form-section campos-especificos" id="campos-administrativo" style="display: none;">
-                <h3><span>🏛️</span> Información Administrativa</h3>
-                
-                <div class="form-row">
-                    <div class="form-col-2">
-                        <div class="form-group">
-                            {{ form.entidad_receptora.label }}
-                            {{ form.entidad_receptora(class="form-control") }}
-                        </div>
-                    </div>
-                    
-                    <div class="form-col-2">
-                        <div class="form-group">
-                            {{ form.tramite.label }}
-                            {{ form.tramite(class="form-control") }}
-                        </div>
-                    </div>
-                </div>
-            </div>
-            
-            <!-- Sección 9: Campos Civiles -->
-            <div class="form-section campos-especificos" id="campos-civil" style="display: none;">
-                <h3><span>⚖️</span> Información Judicial</h3>
-                
-                <div class="form-row">
-                    <div class="form-col-2">
-                        <div class="form-group">
-                            {{ form.secretario.label }}
-                            {{ form.secretario(class="form-control") }}
-                        </div>
-                    </div>
-                    
-                    <div class="form-col-2">
-                        <div class="form-group">
-                            {{ form.juez.label }}
-                            {{ form.juez(class="form-control") }}
-                        </div>
-                    </div>
-                </div>
-            </div>
-            
-            <!-- Sección 10: Campos Penales -->
-            <div class="form-section campos-especificos" id="campos-penal" style="display: none;">
-                <h3><span>🚔</span> Información Penal</h3>
-                
-                <div class="form-row">
-                    <div class="form-col-2">
-                        <div class="form-group">
-                            {{ form.numero_cf.label }}
-                            {{ form.numero_cf(class="form-control") }}
-                        </div>
-                    </div>
-                </div>
-            </div>
-            
-            <!-- Sección 11: Fiscal y Juzgado (para Penal) -->
-            <div class="form-section campos-especificos" id="campos-penal-fiscal-juzgado" style="display: none;">
-                <h3><span>⚖️</span> Datos del Juzgado y Fiscalía</h3>
-                
-                <div class="form-row">
-                    <div class="form-col-2">
-                        <div class="form-group">
-                            {{ form.fiscal.label }}
-                            {{ form.fiscal(class="form-control") }}
-                        </div>
-                    </div>
-                    
-                    <div class="form-col-2">
-                        <div class="form-group">
-                            {{ form.juzgado.label }}
-                            {{ form.juzgado(class="form-control") }}
-                        </div>
-                    </div>
-                </div>
-            </div>
-            
-            <!-- Sección 12: Campos Archivo (resto de campos si los hay) -->
-            <div class="form-section campos-especificos" id="campos-archivo" style="display: none;">
-                <!-- Ubicación ya está arriba, esta sección es para compatibilidad -->
-            </div>
-            
-            <!-- Sección 13: Descripción Detallada (AL FINAL para todos) -->
+            <!-- ============================================ -->
+            <!-- SECCIÓN 6: Descripción / Notas (AL FINAL) -->
+            <!-- ============================================ -->
             <div class="form-section">
                 <h3><span>📝</span> Descripción / Notas Adicionales</h3>
                 
@@ -288,7 +284,9 @@
                 </div>
             </div>
             
-            <!-- Botones de acción -->
+            <!-- ============================================ -->
+            <!-- BOTONES DE ACCIÓN -->
+            <!-- ============================================ -->
             <div class="form-actions">
                 <button type="submit" class="btn btn-primary btn-lg" id="btn-guardar">
                     💾 Guardar Expediente
@@ -302,14 +300,14 @@
 </div>
 
 <script>
-    // Configuración de campos según tipo de expediente
+    // ============================================
+    // CONFIGURACIÓN DE CAMPOS SEGÚN TIPO
+    // ============================================
     const configuracionTipos = {
         'administrativo': {
             muestraDNI: true,
             dniObligatorio: true,
             muestraExpediente: false,
-            muestraMateriaArchivo: false,
-            muestraMateriaGeneral: true,
             labelDNI: 'DNI *',
             labelCliente: 'Cliente / Interesado *',
             placeholderDNI: 'Ingrese DNI y presione Tab o Enter para buscar cliente...',
@@ -322,8 +320,6 @@
             muestraDNI: false,
             dniObligatorio: false,
             muestraExpediente: true,
-            muestraMateriaArchivo: false,
-            muestraMateriaGeneral: true,
             labelDNI: 'DNI',
             labelCliente: 'Cliente / Interesado *',
             placeholderDNI: '',
@@ -336,22 +332,18 @@
             muestraDNI: true,
             dniObligatorio: false,
             muestraExpediente: true,
-            muestraMateriaArchivo: false,
-            muestraMateriaGeneral: true,
             labelDNI: 'DNI (Opcional)',
             labelCliente: 'Cliente / Interesado *',
             placeholderDNI: 'Ingrese DNI y presione Tab o Enter para buscar...',
             ayudaDNI: 'Ingrese un DNI y presione <strong>Tab</strong> o <strong>Enter</strong> para autocompletar (opcional)',
             ayudaCliente: 'Ingrese los apellidos y nombres completos',
-            camposEspecificos: ['campos-penal', 'campos-penal-fiscal-juzgado'],
+            camposEspecificos: ['campos-penal'],
             sincronizarSolicitanteCliente: false
         },
         'conciliacion': {
             muestraDNI: true,
             dniObligatorio: false,
             muestraExpediente: true,
-            muestraMateriaArchivo: false,
-            muestraMateriaGeneral: true,
             labelDNI: 'DNI (Opcional)',
             labelCliente: 'Solicitante Principal *',
             placeholderDNI: 'Ingrese DNI y presione Tab o Enter para buscar...',
@@ -364,32 +356,26 @@
             muestraDNI: true,
             dniObligatorio: false,
             muestraExpediente: true,
-            muestraMateriaArchivo: true,  // ✅ Materia va primero para Archivo
-            muestraMateriaGeneral: false, // ✅ Ocultar materia general
             labelDNI: 'DNI (Opcional)',
             labelCliente: 'Cliente / Interesado *',
             placeholderDNI: 'Ingrese DNI y presione Tab o Enter para buscar...',
             ayudaDNI: 'Ingrese un DNI y presione <strong>Tab</strong> o <strong>Enter</strong> para autocompletar (opcional)',
             ayudaCliente: 'Ingrese los apellidos y nombres completos',
-            camposEspecificos: ['campos-archivo-ubicacion', 'campos-archivo'], // ✅ Mostrar ubicación primero
+            camposEspecificos: ['campos-archivo-ubicacion'],
             sincronizarSolicitanteCliente: false
         }
     };
     
+    // ============================================
+    // FUNCIÓN PRINCIPAL: Actualizar campos según tipo
+    // ============================================
     function actualizarCamposSegunTipo() {
         const tipo = document.getElementById('tipo').value;
         const config = configuracionTipos[tipo];
         
-        if (!config) {
-            document.getElementById('campo-dni-container').style.display = 'none';
-            document.getElementById('campo-expediente-container').style.display = 'none';
-            document.getElementById('seccion-materia-archivo').style.display = 'none';
-            document.getElementById('seccion-materia-general').style.display = 'none';
-            document.querySelectorAll('.campos-especificos').forEach(el => el.style.display = 'none');
-            return;
-        }
+        if (!config) return;
         
-        // Configurar campo DNI
+        // --- DNI ---
         const dniContainer = document.getElementById('campo-dni-container');
         const dniLabel = document.getElementById('label-dni');
         const dniInput = document.getElementById('dni');
@@ -407,55 +393,43 @@
             dniInput.value = '';
         }
         
-        // Configurar campo N° Expediente
+        // --- N° Expediente ---
         const expedienteContainer = document.getElementById('campo-expediente-container');
         const expedienteInput = document.getElementById('numero_expediente');
+        const requiredExpediente = document.getElementById('required-expediente');
         
         if (config.muestraExpediente) {
             expedienteContainer.style.display = 'flex';
+            expedienteInput.value = '';
+            if (requiredExpediente) requiredExpediente.style.display = 'inline';
         } else {
             expedienteContainer.style.display = 'none';
-            expedienteInput.value = '-';
+            expedienteInput.value = '';  // ✅ Enviar vacío, no '-'
+            if (requiredExpediente) requiredExpediente.style.display = 'none';
         }
         
-        // ✅ CONFIGURAR MATERIA PARA ARCHIVO (antes que Cliente)
-        const materiaArchivo = document.getElementById('seccion-materia-archivo');
-        const materiaGeneral = document.getElementById('seccion-materia-general');
-        
-        if (materiaArchivo) {
-            materiaArchivo.style.display = config.muestraMateriaArchivo ? 'block' : 'none';
-        }
-        if (materiaGeneral) {
-            materiaGeneral.style.display = config.muestraMateriaGeneral ? 'block' : 'none';
-        }
-        
-        // Configurar label de cliente según tipo
+        // --- Cliente ---
         const clienteLabel = document.getElementById('label-cliente');
         const clienteAyuda = document.getElementById('ayuda-cliente');
-        if (clienteLabel) {
-            clienteLabel.textContent = config.labelCliente;
-        }
-        if (clienteAyuda) {
-            clienteAyuda.textContent = config.ayudaCliente;
-        }
+        if (clienteLabel) clienteLabel.textContent = config.labelCliente;
+        if (clienteAyuda) clienteAyuda.textContent = config.ayudaCliente;
         
-        // Mostrar/ocultar campos específicos
+        // --- Campos específicos ---
         document.querySelectorAll('.campos-especificos').forEach(el => el.style.display = 'none');
-        
         if (config.camposEspecificos) {
             config.camposEspecificos.forEach(id => {
-                const camposEspecificos = document.getElementById(id);
-                if (camposEspecificos) {
-                    camposEspecificos.style.display = 'block';
-                }
+                const el = document.getElementById(id);
+                if (el) el.style.display = 'block';
             });
         }
         
-        // Configurar sincronización Solicitante → Cliente
+        // --- Sincronización Solicitante → Cliente ---
         configurarSincronizacionSolicitanteCliente(config.sincronizarSolicitanteCliente);
     }
     
-    // Sincronizar Solicitante con Cliente
+    // ============================================
+    // SINCRONIZAR SOLICITANTE → CLIENTE
+    // ============================================
     function configurarSincronizacionSolicitanteCliente(activar) {
         const solicitanteInput = document.getElementById('solicitante');
         const clienteInput = document.getElementById('cliente');
@@ -485,7 +459,9 @@
         }
     }
     
-    // Variable para evitar búsquedas múltiples simultáneas
+    // ============================================
+    // BÚSQUEDA AUTOMÁTICA POR DNI
+    // ============================================
     let busquedaEnProgreso = false;
     
     function configurarBusquedaAutomatica(inputDNI) {
@@ -544,7 +520,7 @@
                         if (tipo === 'conciliacion') {
                             document.getElementById('conciliador')?.focus();
                         } else if (document.getElementById('telefono').value) {
-                            document.getElementById('materia-general')?.focus() || document.getElementById('materia-archivo')?.focus();
+                            document.getElementById('materia')?.focus();
                         } else {
                             document.getElementById('telefono').focus();
                         }
@@ -584,6 +560,9 @@
             });
     }
     
+    // ============================================
+    // MENSAJES TEMPORALES
+    // ============================================
     function mostrarMensajeTemporal(mensaje, tipo) {
         const mensajeDiv = document.createElement('div');
         mensajeDiv.textContent = mensaje;
@@ -619,9 +598,13 @@
         }, 3000);
     }
     
+    // ============================================
+    // INICIALIZAR
+    // ============================================
     document.getElementById('tipo').addEventListener('change', actualizarCamposSegunTipo);
     actualizarCamposSegunTipo();
     
+    // Estilos de animación
     const style = document.createElement('style');
     style.textContent = `
         @keyframes slideIn {
