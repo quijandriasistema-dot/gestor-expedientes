@@ -1641,6 +1641,11 @@ def subir_documento():
         flash('No tiene permisos para subir documentos', 'error')
         return redirect(url_for('main.index'))
 
+    # BLOQUEAR en Vercel (sistema de archivos de solo lectura)
+    if os.environ.get('VERCEL') == '1' or os.environ.get('VERCEL_ENV') is not None:
+        flash('La subida de documentos no está disponible en la versión web. Use la versión local.', 'warning')
+        return redirect(url_for('main.documentos'))
+
     form = DocumentoForm()
     form.expediente_id.choices = get_expedientes_choices()
 
@@ -1655,6 +1660,9 @@ def subir_documento():
                 timestamp = int(time.time())
                 nombre_unico = f"{timestamp}_{filename_original}"
 
+                # Crear carpeta si no existe (solo en local)
+                os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+                
                 ruta_archivo = os.path.join(UPLOAD_FOLDER, nombre_unico)
                 archivo.save(ruta_archivo)
 
