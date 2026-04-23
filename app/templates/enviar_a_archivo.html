@@ -38,7 +38,7 @@
     <!-- Formulario -->
     <div class="form-container">
         <form method="POST" action="{{ url_for('main.enviar_a_archivo', id=expediente_original.id) }}" novalidate>
-            {{ form.hidden_tag() }}
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             
             <!-- ============================================ -->
             <!-- DATOS HEREDADOS (solo lectura) -->
