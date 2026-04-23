@@ -415,4 +415,3 @@ class Usuario(db.Model):
             'fecha_registro': self.fecha_registro.strftime('%Y-%m-%d %H:%M') if self.fecha_registro else None
         }
     
-get_tiempo_transcurrido
