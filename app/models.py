@@ -342,20 +342,20 @@ class Notificacion(db.Model):
         return f'<Notificacion {self.tipo}: {self.titulo}>'
     
     def get_tiempo_transcurrido(self):
-        """Devuelve tiempo legible desde creación"""
+        if self.fecha_creacion is None:
+            return 'Fecha desconocida'
+    
         diff = datetime.now() - self.fecha_creacion
-        
-        if diff.days == 0:
-            if diff.seconds < 60:
-                return "hace un momento"
-            elif diff.seconds < 3600:
-                return f"hace {diff.seconds // 60} min"
-            else:
-                return f"hace {diff.seconds // 3600} h"
-        elif diff.days == 1:
-            return "ayer"
-        else:
-            return f"hace {diff.days} días"
+    
+        if diff.days > 0:
+            return f'Hace {diff.days} día(s)'
+        hours = diff.seconds // 3600
+        if hours > 0:
+            return f'Hace {hours} hora(s)'
+        minutes = diff.seconds // 60
+        if minutes > 0:
+            return f'Hace {minutes} minuto(s)'
+        return 'Hace un momento'
         
 # ============================================
 # MODELO USUARIO - SUPABASE (tabla: usuario)
@@ -414,3 +414,5 @@ class Usuario(db.Model):
             'activo': self.activo,
             'fecha_registro': self.fecha_registro.strftime('%Y-%m-%d %H:%M') if self.fecha_registro else None
         }
+    
+get_tiempo_transcurrido
