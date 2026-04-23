@@ -2754,8 +2754,9 @@ def enviar_a_archivo(id):
         return redirect(url_for('main.ver_expediente', id=id))
 
     # Validar que esté en estado concluido o similar
-    estados_permitidos = ['concluido', 'resuelto', 'archivado', 'finalizado', 
-                          'ingresado', 'en_proceso', 'audiencia_programada']
+    estados_permitidos = ['proceso_completado', 'resuelto_favorable', 'resuelto_desfavorable', 
+                        'archivado', 'enviado_a_archivo', 'ingresado', 'en_proceso', 
+                        'audiencia_programada', 'seguimiento', 'derivado_juzgado']
     
     if expediente_original.estado_actual not in estados_permitidos:
         flash('El expediente debe estar concluido para enviarlo a archivo', 'warning')

@@ -35,7 +35,7 @@
             </a>
 
             <!-- BOTÓN ENVIAR A ARCHIVO (solo si no es archivo y está concluido) -->
-            {% if expediente.tipo != 'archivo' and expediente.estado_actual in ['concluido', 'resuelto', 'archivado', 'finalizado'] %}
+            {% if expediente.tipo != 'archivo' and expediente.estado_actual in ['proceso_completado', 'resuelto_favorable', 'resuelto_desfavorable', 'archivado', 'enviado_a_archivo'] %}
             <a href="{{ url_for('main.enviar_a_archivo', id=expediente.id) }}" class="btn btn-action btn-archivo" title="Enviar expediente concluido al archivo">
                 <span>🗂️</span> Enviar a Archivo
             </a>
