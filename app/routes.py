@@ -2755,9 +2755,9 @@ def enviar_a_archivo(id):
 
     # Validar que esté en estado concluido o similar
     estados_permitidos = ['proceso_completado', 'resuelto_favorable', 'resuelto_desfavorable', 
-                        'archivado', 'enviado_a_archivo', 'ingresado', 'en_proceso', 
-                        'audiencia_programada', 'seguimiento', 'derivado_juzgado']
-    
+                          'archivado', 'enviado_a_archivo', 'ingresado', 'en_proceso', 
+                          'audiencia_programada', 'seguimiento', 'derivado_juzgado']
+
     if expediente_original.estado_actual not in estados_permitidos:
         flash('El expediente debe estar concluido para enviarlo a archivo', 'warning')
         return redirect(url_for('main.ver_expediente', id=id))
@@ -2772,6 +2772,7 @@ def enviar_a_archivo(id):
             if not ubicacion:
                 flash('La ubicación física es obligatoria', 'error')
                 return render_template('enviar_a_archivo.html',
+                                     title='Enviar a Archivo',
                                      expediente_original=expediente_original,
                                      hoy=date.today().isoformat(),
                                      rol=session.get('rol', 'USUARIO'))
@@ -2782,7 +2783,7 @@ def enviar_a_archivo(id):
             except ValueError:
                 fecha_archivado = date.today()
 
-            # Crear nuevo expediente tipo 'archivo'
+            # 1. Crear nuevo expediente tipo 'archivo'
             expediente_archivo = Expediente(
                 tipo='archivo',
                 numero_expediente=expediente_original.numero_expediente,
@@ -2800,12 +2801,13 @@ def enviar_a_archivo(id):
             )
 
             db.session.add(expediente_archivo)
-            
-            # Marcar original como enviado a archivo
+            db.session.flush()  # ← OBTIENE EL ID sin commit definitivo
+
+            # 2. Marcar original como enviado a archivo
             expediente_original.estado_actual = 'enviado_a_archivo'
             expediente_original.fecha_actualizacion = datetime.now()
 
-            # Agregar historial al original
+            # 3. Agregar historial al original (id ya existe)
             historial_original = EstadoHistorial(
                 expediente_id=expediente_original.id,
                 estado='enviado_a_archivo',
@@ -2815,7 +2817,7 @@ def enviar_a_archivo(id):
             )
             db.session.add(historial_original)
 
-            # Agregar historial al nuevo archivo
+            # 4. Agregar historial al NUEVO archivo (id ya disponible gracias a flush)
             historial_archivo = EstadoHistorial(
                 expediente_id=expediente_archivo.id,
                 estado='archivado',
@@ -2826,6 +2828,7 @@ def enviar_a_archivo(id):
             )
             db.session.add(historial_archivo)
 
+            # 5. Commit final de TODO
             db.session.commit()
 
             flash(f'✅ Expediente archivado correctamente. Nuevo ID en archivo: {expediente_archivo.id}', 'success')
@@ -2837,6 +2840,7 @@ def enviar_a_archivo(id):
             import traceback
             traceback.print_exc()
             return render_template('enviar_a_archivo.html',
+                                 title='Enviar a Archivo',
                                  expediente_original=expediente_original,
                                  hoy=date.today().isoformat(),
                                  rol=session.get('rol', 'USUARIO'))
@@ -2847,7 +2851,6 @@ def enviar_a_archivo(id):
                          expediente_original=expediente_original,
                          hoy=date.today().isoformat(),
                          rol=session.get('rol', 'USUARIO'))
-
 # ============================================
 # FIN DEL ARCHIVO
 # ============================================
