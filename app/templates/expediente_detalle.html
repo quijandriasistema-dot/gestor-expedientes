@@ -16,7 +16,6 @@
 
         <div class="header-actions">
             {% if rol in ['DESARROLLADOR', 'ADMINISTRADOR'] %}
-            <!-- Grupo: Exportar/Imprimir -->
             <div class="action-group">
                 <span class="action-label">Exportar:</span>
                 <a href="{{ url_for('main.exportar_resumen_pdf', id=expediente.id) }}" class="btn btn-action btn-resumen-pdf" title="Resumen PDF para cliente">
@@ -34,6 +33,13 @@
             <a href="{{ url_for('main.editar_expediente', id=expediente.id) }}" class="btn btn-action btn-edit">
                 <span>✏️</span> Editar
             </a>
+
+            <!-- BOTÓN ENVIAR A ARCHIVO (solo si no es archivo y está concluido) -->
+            {% if expediente.tipo != 'archivo' and expediente.estado_actual in ['concluido', 'resuelto', 'archivado', 'finalizado'] %}
+            <a href="{{ url_for('main.enviar_a_archivo', id=expediente.id) }}" class="btn btn-action btn-archivo" title="Enviar expediente concluido al archivo">
+                <span>🗂️</span> Enviar a Archivo
+            </a>
+            {% endif %}
 
             <a href="{{ url_for('main.expedientes') }}" class="btn btn-action btn-back">
                 <span>←</span> Volver
@@ -77,7 +83,7 @@
 
             <div class="info-item">
                 <label>Fecha Registro:</label>
-                <span class="info-value">{{ expediente.fecha_registro.strftime('%d/%m/%Y %H:%M') }}</span>
+                <span class="info-value">{{ expediente.fecha_registro | fecha_hora }}</span>
             </div>
 
             {% if expediente.tipo == 'civil' %}
@@ -137,6 +143,10 @@
                 <label>Ubicación en Archivo:</label>
                 <span class="info-value">{{ expediente.ubicacion_archivo or 'No especificada' }}</span>
             </div>
+            <div class="info-item">
+                <label>Fecha de Archivado:</label>
+                <span class="info-value">{{ expediente.fecha_archivado | fecha }}</span>
+            </div>
             {% endif %}
         </div>
 
@@ -146,11 +156,49 @@
         </div>
     </div>
 
-    <!-- Historial de Estados -->
+    <!-- ============================================ -->
+    <!-- FORMULARIO: NUEVA ACTUALIZACIÓN DE ESTADO -->
+    <!-- ============================================ -->
     <div class="detalle-section">
         <div class="section-header">
             <h2 class="section-title">
-                <span>📈</span> Historial de Estados
+                <span>➕</span> Nueva Actualización
+            </h2>
+        </div>
+        
+        <form method="POST" action="{{ url_for('main.agregar_estado', id=expediente.id) }}" class="form-actualizacion" novalidate>
+            {{ form_estado.hidden_tag() }}
+            
+            <div class="form-row-actualizacion">
+                <div class="form-group-actualizacion">
+                    <label for="estado">Nuevo Estado *</label>
+                    {{ form_estado.estado(class="form-control", id="estado") }}
+                </div>
+                
+                <div class="form-group-actualizacion flex-grow">
+                    <label for="descripcion">¿Qué se realizó? *</label>
+                    {{ form_estado.descripcion(class="form-control", id="descripcion", placeholder="Ej: Cliente trajo documento X para presentar. Se programó audiencia para el 15/05...") }}
+                </div>
+                
+                <div class="form-group-actualizacion btn-container">
+                    <button type="submit" class="btn btn-primary">
+                        <span>💾</span> Guardar Actualización
+                    </button>
+                </div>
+            </div>
+            <small class="form-hint">
+                💡 <strong>Tip:</strong> Describe detalladamente lo que ocurrió en esta actualización. Esto alimenta el historial completo del caso.
+            </small>
+        </form>
+    </div>
+
+    <!-- ============================================ -->
+    <!-- HISTORIAL DE ESTADOS (TIMELINE MEJORADO) -->
+    <!-- ============================================ -->
+    <div class="detalle-section">
+        <div class="section-header">
+            <h2 class="section-title">
+                <span>📈</span> Historial de Estados y Actuaciones
             </h2>
             <span class="count-badge">{{ historial|length }} registros</span>
         </div>
@@ -163,10 +211,18 @@
                 <div class="timeline-content">
                     <div class="timeline-header">
                         <span class="timeline-estado">{{ h.estado }}</span>
-                        <span class="timeline-fecha">{{ h.fecha.strftime('%d/%m/%Y %H:%M') }}</span>
+                        <span class="timeline-fecha">{{ h.fecha | fecha_hora }}</span>
                     </div>
-                    <p class="timeline-descripcion">{{ h.descripcion or 'Sin descripción' }}</p>
-                    <span class="timeline-usuario">👤 {{ h.usuario or 'Sistema' }}</span>
+                    
+                    <!-- NOTA DESCRIPTIVA (lo importante) -->
+                    <div class="timeline-nota">
+                        <span class="nota-label">📝 Actuación realizada:</span>
+                        <p class="nota-texto">{{ h.descripcion or 'Sin descripción de actuación' }}</p>
+                    </div>
+                    
+                    <div class="timeline-footer">
+                        <span class="timeline-usuario">👤 {{ h.usuario or 'Sistema' }}</span>
+                    </div>
                 </div>
             </div>
             {% endfor %}
@@ -175,6 +231,7 @@
         <div class="empty-state">
             <span>📭</span>
             <p>No hay historial de estados registrado</p>
+            <p class="empty-hint">Use el formulario de arriba para registrar la primera actualización</p>
         </div>
         {% endif %}
     </div>
@@ -196,7 +253,7 @@
             <div class="audiencia-card">
                 <div class="audiencia-header">
                     <span class="audiencia-fecha">
-                        📅 {{ a.fecha.strftime('%d/%m/%Y') }} a las {{ a.hora.strftime('%H:%M') }}
+                        📅 {{ a.fecha | fecha }} a las {{ a.hora | hora }}
                     </span>
                     <span class="badge badge-{{ a.get_estado_color() }}">
                         {{ a.get_estado_label() }}
@@ -382,6 +439,18 @@
     background: #d97706;
 }
 
+/* Botón Enviar a Archivo */
+.btn-archivo {
+    background: #6b7280;
+    color: white;
+    border: 2px dashed #9ca3af;
+}
+
+.btn-archivo:hover {
+    background: #4b5563;
+    transform: translateY(-1px);
+}
+
 .btn-back {
     background: #6b7280;
     color: white;
@@ -462,7 +531,78 @@
     line-height: 1.5;
 }
 
-/* Timeline de historial */
+/* ============================================
+   FORMULARIO DE ACTUALIZACIÓN
+   ============================================ */
+
+.form-actualizacion {
+    background: #f8fafc;
+    padding: 1.25rem;
+    border-radius: 10px;
+    border: 1px solid #e2e8f0;
+}
+
+.form-row-actualizacion {
+    display: flex;
+    gap: 1rem;
+    align-items: flex-end;
+    flex-wrap: wrap;
+}
+
+.form-group-actualizacion {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+}
+
+.form-group-actualizacion label {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: #475569;
+}
+
+.form-group-actualizacion .form-control {
+    padding: 0.6rem 0.8rem;
+    border: 1px solid #cbd5e1;
+    border-radius: 6px;
+    font-size: 0.95rem;
+    background: white;
+}
+
+.form-group-actualizacion .form-control:focus {
+    outline: none;
+    border-color: var(--color-primary);
+    box-shadow: 0 0 0 3px rgba(30, 58, 138, 0.1);
+}
+
+.form-group-actualizacion select.form-control {
+    min-width: 180px;
+}
+
+.form-group-actualizacion input[type="text"].form-control {
+    min-width: 350px;
+}
+
+.flex-grow {
+    flex: 1;
+    min-width: 300px;
+}
+
+.btn-container {
+    padding-bottom: 0.1rem;
+}
+
+.form-hint {
+    display: block;
+    margin-top: 0.75rem;
+    color: #64748b;
+    font-size: 0.85rem;
+}
+
+/* ============================================
+   TIMELINE MEJORADO
+   ============================================ */
+
 .timeline {
     position: relative;
     padding-left: 2rem;
@@ -499,35 +639,83 @@
     background: #f9fafb;
     padding: 1rem;
     border-radius: 8px;
+    border: 1px solid #e2e8f0;
 }
 
 .timeline-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 0.5rem;
+    margin-bottom: 0.75rem;
     flex-wrap: wrap;
     gap: 0.5rem;
 }
 
 .timeline-estado {
-    font-weight: 600;
+    font-weight: 700;
     color: var(--color-primary);
+    font-size: 1rem;
 }
 
 .timeline-fecha {
     font-size: 0.85rem;
     color: var(--color-text-light);
+    font-weight: 500;
 }
 
-.timeline-descripcion {
+/* Nota descriptiva (el elemento clave) */
+.timeline-nota {
+    background: white;
+    padding: 0.75rem 1rem;
+    border-radius: 6px;
+    border-left: 3px solid #059669;
     margin: 0.5rem 0;
-    color: var(--color-text);
+}
+
+.nota-label {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: #059669;
+    display: block;
+    margin-bottom: 0.3rem;
+}
+
+.nota-texto {
+    margin: 0;
+    color: #334155;
+    line-height: 1.5;
+    font-size: 0.95rem;
+    white-space: pre-wrap;
+}
+
+.timeline-footer {
+    margin-top: 0.75rem;
+    padding-top: 0.5rem;
+    border-top: 1px dashed #e2e8f0;
 }
 
 .timeline-usuario {
     font-size: 0.85rem;
     color: var(--color-text-light);
+}
+
+/* Estados vacíos */
+.empty-state {
+    text-align: center;
+    padding: 3rem;
+    color: var(--color-text-light);
+}
+
+.empty-state span {
+    font-size: 3rem;
+    display: block;
+    margin-bottom: 1rem;
+}
+
+.empty-hint {
+    font-size: 0.9rem;
+    margin-top: 0.5rem;
+    color: #94a3b8;
 }
 
 /* Tarjetas de audiencia */
@@ -571,19 +759,6 @@
     gap: 0.5rem;
 }
 
-/* Estados vacíos */
-.empty-state {
-    text-align: center;
-    padding: 3rem;
-    color: var(--color-text-light);
-}
-
-.empty-state span {
-    font-size: 3rem;
-    display: block;
-    margin-bottom: 1rem;
-}
-
 /* Responsive */
 @media (max-width: 768px) {
     .detalle-header {
@@ -609,6 +784,19 @@
 
     .info-grid {
         grid-template-columns: 1fr;
+    }
+
+    .form-row-actualizacion {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .form-group-actualizacion input[type="text"].form-control {
+        min-width: 100%;
+    }
+
+    .flex-grow {
+        min-width: 100%;
     }
 }
 </style>

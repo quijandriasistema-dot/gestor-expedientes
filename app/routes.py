@@ -2733,6 +2733,119 @@ def exportar_resumen_pdf(id):
         download_name=f'Resumen_{expediente.numero_expediente.replace("/", "_")}_{datetime.now().strftime("%Y%m%d")}.pdf'
     )
 
+# ============================================
+# RUTA: ENVIAR EXPEDIENTE A ARCHIVO
+# ============================================
+
+@bp.route('/expediente/<int:id>/enviar-a-archivo', methods=['GET', 'POST'])
+@requiere_login
+@no_cache
+def enviar_a_archivo(id):
+    """Envía un expediente concluido al módulo Archivo (Opción B: Copiar)"""
+    if not puede_ver_modulo('expedientes'):
+        flash('No tiene permisos para archivar expedientes', 'error')
+        return redirect(url_for('main.index'))
+
+    expediente_original = Expediente.query.get_or_404(id)
+
+    # Validar que no sea ya un archivo
+    if expediente_original.tipo == 'archivo':
+        flash('Este expediente ya está en archivo', 'warning')
+        return redirect(url_for('main.ver_expediente', id=id))
+
+    # Validar que esté en estado concluido o similar
+    estados_permitidos = ['concluido', 'resuelto', 'archivado', 'finalizado', 
+                          'ingresado', 'en_proceso', 'audiencia_programada']
+    
+    if expediente_original.estado_actual not in estados_permitidos:
+        flash('El expediente debe estar concluido para enviarlo a archivo', 'warning')
+        return redirect(url_for('main.ver_expediente', id=id))
+
+    if request.method == 'POST':
+        try:
+            # Obtener datos del formulario
+            ubicacion = request.form.get('ubicacion_archivo', '').strip()
+            fecha_archivado_str = request.form.get('fecha_archivado', '').strip()
+            nota_final = request.form.get('nota_final', '').strip()
+
+            if not ubicacion:
+                flash('La ubicación física es obligatoria', 'error')
+                return render_template('enviar_a_archivo.html',
+                                     expediente_original=expediente_original,
+                                     hoy=date.today().isoformat(),
+                                     rol=session.get('rol', 'USUARIO'))
+
+            # Parsear fecha
+            try:
+                fecha_archivado = datetime.strptime(fecha_archivado_str, '%Y-%m-%d').date() if fecha_archivado_str else date.today()
+            except ValueError:
+                fecha_archivado = date.today()
+
+            # Crear nuevo expediente tipo 'archivo'
+            expediente_archivo = Expediente(
+                tipo='archivo',
+                numero_expediente=expediente_original.numero_expediente,
+                cliente=expediente_original.cliente,
+                telefono=expediente_original.telefono,
+                dni=expediente_original.dni,
+                materia=expediente_original.materia,
+                descripcion=(expediente_original.descripcion or '') + 
+                           f"\n\n=== ENVIADO A ARCHIVO ===\nFecha: {fecha_archivado.strftime('%d/%m/%Y')}\n" +
+                           (f"Nota final: {nota_final}" if nota_final else ""),
+                ubicacion_archivo=ubicacion,
+                fecha_archivado=fecha_archivado,
+                estado_actual='archivado',
+                usuario_registro=session.get('nombre', 'Sistema')
+            )
+
+            db.session.add(expediente_archivo)
+            
+            # Marcar original como enviado a archivo
+            expediente_original.estado_actual = 'enviado_a_archivo'
+            expediente_original.fecha_actualizacion = datetime.now()
+
+            # Agregar historial al original
+            historial_original = EstadoHistorial(
+                expediente_id=expediente_original.id,
+                estado='enviado_a_archivo',
+                descripcion=f'Expediente enviado a archivo. Ubicación: {ubicacion}. ' +
+                           (f'Nota: {nota_final}' if nota_final else ''),
+                usuario=session.get('nombre', 'Sistema')
+            )
+            db.session.add(historial_original)
+
+            # Agregar historial al nuevo archivo
+            historial_archivo = EstadoHistorial(
+                expediente_id=expediente_archivo.id,
+                estado='archivado',
+                descripcion=f'Expediente archivado desde {expediente_original.get_tipo_label()} N° {expediente_original.get_identificador_principal()}. ' +
+                           f'Ubicación: {ubicacion}. ' +
+                           (f'Resumen: {nota_final}' if nota_final else ''),
+                usuario=session.get('nombre', 'Sistema')
+            )
+            db.session.add(historial_archivo)
+
+            db.session.commit()
+
+            flash(f'✅ Expediente archivado correctamente. Nuevo ID en archivo: {expediente_archivo.id}', 'success')
+            return redirect(url_for('main.ver_expediente', id=expediente_archivo.id))
+
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Error al archivar expediente: {str(e)}', 'error')
+            import traceback
+            traceback.print_exc()
+            return render_template('enviar_a_archivo.html',
+                                 expediente_original=expediente_original,
+                                 hoy=date.today().isoformat(),
+                                 rol=session.get('rol', 'USUARIO'))
+
+    # GET: Mostrar formulario
+    return render_template('enviar_a_archivo.html',
+                         title='Enviar a Archivo',
+                         expediente_original=expediente_original,
+                         hoy=date.today().isoformat(),
+                         rol=session.get('rol', 'USUARIO'))
 
 # ============================================
 # FIN DEL ARCHIVO
