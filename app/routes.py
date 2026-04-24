@@ -3081,7 +3081,8 @@ def subir_documento_drive():
             fecha_documento=fecha_doc,
             usuario_subida=session.get('nombre', 'Sistema'),
             tipo_archivo=archivo.filename.split('.')[-1].lower(),
-            tamaño_bytes=len(file_content)
+            tamaño_bytes=len(file_content),
+        # ruta_archivo=''  # ← Ya no es necesario, puede ser null
         )
         
         db.session.add(nuevo_documento)
