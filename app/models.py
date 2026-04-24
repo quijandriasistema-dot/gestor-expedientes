@@ -224,10 +224,7 @@ class Documento(db.Model):
     url_drive = db.Column(db.String(500))
     drive_file_id = db.Column(db.String(100))
     ubicacion = db.Column(db.String(20), default='local')  # 'local', 'drive', 'ambos'
-    
-    # Relación
-    expediente = db.relationship('Expediente', backref='documentos')
-    
+
     # === MÉTODOS ===
     def get_tamaño_formateado(self):
         """Usa tamaño_bytes (tu campo)"""
