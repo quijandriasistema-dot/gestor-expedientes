@@ -2873,8 +2873,13 @@ from app.drive_service import (
 def auth_google():
     """Inicia flujo de autorización con Google Drive"""
     try:
-        auth_url = get_auth_url()
-        return redirect(auth_url)
+        auth_data = get_auth_url()
+        
+        # Guardar state y code_verifier en sesión
+        session['oauth_state'] = auth_data['state']
+        session['code_verifier'] = auth_data['code_verifier']
+        
+        return redirect(auth_data['url'])
     except Exception as e:
         flash(f'Error iniciando autorización: {str(e)}', 'danger')
         return redirect(request.referrer or url_for('main.index'))
@@ -2893,10 +2898,17 @@ def oauth2callback():
         flash('Error: No se recibió código de autorización', 'danger')
         return redirect(url_for('main.index'))
     
+    # Recuperar code_verifier de sesión
+    code_verifier = session.get('code_verifier')
+    if not code_verifier:
+        flash('Error: Sesión de autorización expirada. Intente nuevamente.', 'danger')
+        return redirect(url_for('main.index'))
+    
     try:
-        credentials = exchange_code(code)
+        # Intercambiar código con verifier
+        credentials = exchange_code(code, code_verifier)
         
-        # Guardar token en Supabase (tabla google_tokens)
+        # ← GUARDAR TOKEN EN BASE DE DATOS
         usuario_id = session.get('usuario_id')
         if not usuario_id:
             flash('Error: No se pudo identificar al usuario. Inicie sesión nuevamente.', 'danger')
@@ -2914,7 +2926,7 @@ def oauth2callback():
         token_json = json.dumps(credentials)
         
         if existing:
-            # Actualizar
+            # Actualizar token existente
             db.session.execute(
                 text("""
                     UPDATE google_tokens 
@@ -2924,7 +2936,7 @@ def oauth2callback():
                 {'token': token_json, 'uid': usuario_id}
             )
         else:
-            # Insertar nuevo
+            # Insertar nuevo token
             db.session.execute(
                 text("""
                     INSERT INTO google_tokens (usuario_id, google_token, fecha_creacion, fecha_actualizacion)
@@ -2935,9 +2947,14 @@ def oauth2callback():
         
         db.session.commit()
         flash('✅ Google Drive conectado correctamente', 'success')
+        
     except Exception as e:
         db.session.rollback()
         flash(f'Error conectando Google Drive: {str(e)}', 'danger')
+    
+    # Limpiar sesión
+    session.pop('oauth_state', None)
+    session.pop('code_verifier', None)
     
     return redirect(url_for('main.index'))
 
