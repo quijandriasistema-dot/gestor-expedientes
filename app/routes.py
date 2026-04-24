@@ -1643,10 +1643,10 @@ def subir_documento():
         flash('No tiene permisos para subir documentos', 'error')
         return redirect(url_for('main.index'))
 
-    # BLOQUEAR en Vercel (sistema de archivos de solo lectura)
+    # En Vercel: redirigir a subir-documento-drive (Google Drive)
     if os.environ.get('VERCEL') == '1' or os.environ.get('VERCEL_ENV') is not None:
-        flash('La subida de documentos no está disponible en la versión web. Use la versión local.', 'warning')
-        return redirect(url_for('main.documentos'))
+        flash('En la versión web, los documentos se suben a Google Drive.', 'info')
+        return redirect(url_for('main.subir_documento_drive'))
 
     form = DocumentoForm()
     form.expediente_id.choices = get_expedientes_choices()
@@ -1662,7 +1662,6 @@ def subir_documento():
                 timestamp = int(time.time())
                 nombre_unico = f"{timestamp}_{filename_original}"
 
-                # Crear carpeta si no existe (solo en local)
                 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
                 
                 ruta_archivo = os.path.join(UPLOAD_FOLDER, nombre_unico)
@@ -1684,7 +1683,8 @@ def subir_documento():
                     tamaño_bytes=tamaño,
                     ruta_archivo=nombre_unico,
                     fecha_documento=form.fecha_documento.data,
-                    usuario_subida=session.get('nombre', 'Sistema')
+                    usuario_subida=session.get('nombre', 'Sistema'),
+                    ubicacion='local'
                 )
 
                 db.session.add(nuevo_documento)
@@ -2948,10 +2948,30 @@ def oauth2callback():
 # SUBIR DOCUMENTO A GOOGLE DRIVE
 # ============================================
 
-@bp.route('/subir-documento-drive', methods=['POST'])
+@bp.route('/subir-documento-drive', methods=['GET', 'POST'])
 @requiere_login
 def subir_documento_drive():
     """Sube documento a Google Drive"""
+    
+    # Si es GET, mostrar formulario
+    if request.method == 'GET':
+        form = DocumentoForm()
+        form.expediente_id.choices = get_expedientes_choices()
+        
+        # Obtener expediente_id de query string si viene de un expediente específico
+        expediente_id = request.args.get('expediente_id', type=int)
+        expediente = None
+        if expediente_id:
+            expediente = Expediente.query.get(expediente_id)
+        
+        return render_template('subir_documento.html',
+                             title='Subir a Google Drive',
+                             form=form,
+                             expediente=expediente,
+                             rol=session.get('rol', 'USUARIO'),
+                             modo_drive=True)
+    
+    # POST: Procesar subida
     if 'archivo' not in request.files:
         flash('No se seleccionó archivo', 'danger')
         return redirect(request.referrer or url_for('main.documentos'))
@@ -2998,7 +3018,7 @@ def subir_documento_drive():
         # Subir a Drive
         resultado = subir_archivo(service, file_content, archivo.filename, mime_type)
         
-        # Guardar en base de datos - USAR tamaño_bytes (nombre de tu tabla)
+        # Guardar en base de datos
         from datetime import datetime
         fecha_doc = None
         if request.form.get('fecha_documento'):
@@ -3019,7 +3039,7 @@ def subir_documento_drive():
             fecha_documento=fecha_doc,
             usuario_subida=session.get('nombre', 'Sistema'),
             tipo_archivo=archivo.filename.split('.')[-1].lower(),
-            tamaño_bytes=len(file_content)  # ← CORREGIDO: usa tamaño_bytes
+            tamaño_bytes=len(file_content)
         )
         
         db.session.add(nuevo_documento)
