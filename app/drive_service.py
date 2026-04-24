@@ -1,45 +1,87 @@
 # app/drive_service.py
 import os
-import io
-from google.oauth2.credentials import Credentials
+import base64
+import hashlib
+import secrets
 from google_auth_oauthlib.flow import Flow
 from googleapiclient.discovery import build
-from googleapiclient.http import MediaIoBaseUpload, MediaIoBaseDownload
+from google.auth.transport.requests import Request
 
-CLIENT_ID = os.environ.get('GOOGLE_CLIENT_ID')
-CLIENT_SECRET = os.environ.get('GOOGLE_CLIENT_SECRET')
-REDIRECT_URI = os.environ.get('GOOGLE_REDIRECT_URI', 'https://gestor-expedientes-nine.vercel.app/oauth2callback')
-
-SCOPES = [
-    'https://www.googleapis.com/auth/drive.file',
-    'https://www.googleapis.com/auth/drive.readonly'
-]
-
-CLIENT_CONFIG = {
-    "web": {
-        "client_id": CLIENT_ID,
-        "client_secret": CLIENT_SECRET,
-        "auth_uri": "https://accounts.google.com/o/oauth2/auth",
-        "token_uri": "https://oauth2.googleapis.com/token",
-        "redirect_uris": [REDIRECT_URI]
-    }
-}
+# Configuración
+SCOPES = ['https://www.googleapis.com/auth/drive.file']
+REDIRECT_URI = os.environ.get('REDIRECT_URI', 'https://gestor-expedientes-nine.vercel.app/oauth2callback')
 
 def get_auth_url():
-    if not CLIENT_ID or not CLIENT_SECRET:
-        raise ValueError("Faltan variables de entorno GOOGLE_CLIENT_ID o GOOGLE_CLIENT_SECRET")
+    """Genera URL de autorización con PKCE"""
+    # Generar PKCE verifier
+    code_verifier = base64.urlsafe_b64encode(
+        secrets.token_bytes(32)
+    ).decode('utf-8').rstrip('=')
     
-    flow = Flow.from_client_config(CLIENT_CONFIG, scopes=SCOPES, redirect_uri=REDIRECT_URI)
-    auth_url, _ = flow.authorization_url(
+    # Generar challenge
+    code_challenge = base64.urlsafe_b64encode(
+        hashlib.sha256(code_verifier.encode('utf-8')).digest()
+    ).decode('utf-8').rstrip('=')
+    
+    # Crear flujo OAuth con PKCE
+    client_config = {
+        "web": {
+            "client_id": os.environ.get('GOOGLE_CLIENT_ID'),
+            "client_secret": os.environ.get('GOOGLE_CLIENT_SECRET'),
+            "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+            "token_uri": "https://oauth2.googleapis.com/token",
+            "redirect_uris": [REDIRECT_URI]
+        }
+    }
+    
+    flow = Flow.from_client_config(
+        client_config,
+        scopes=SCOPES,
+        redirect_uri=REDIRECT_URI
+    )
+    
+    # Construir URL de autorización con PKCE
+    auth_url, state = flow.authorization_url(
         access_type='offline',
         include_granted_scopes='true',
-        prompt='consent'
+        prompt='consent',
+        code_challenge=code_challenge,
+        code_challenge_method='S256'
     )
-    return auth_url
+    
+    # ← FORZAR retorno como diccionario explícito
+    resultado = {
+        'url': str(auth_url),
+        'state': str(state),
+        'code_verifier': str(code_verifier)
+    }
+    
+    return resultado
 
-def exchange_code(code):
-    flow = Flow.from_client_config(CLIENT_CONFIG, scopes=SCOPES, redirect_uri=REDIRECT_URI)
-    flow.fetch_token(code=code)
+def exchange_code(code, code_verifier):
+    """Intercambia código por token usando PKCE verifier"""
+    client_config = {
+        "web": {
+            "client_id": os.environ.get('GOOGLE_CLIENT_ID'),
+            "client_secret": os.environ.get('GOOGLE_CLIENT_SECRET'),
+            "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+            "token_uri": "https://oauth2.googleapis.com/token",
+            "redirect_uris": [REDIRECT_URI]
+        }
+    }
+    
+    flow = Flow.from_client_config(
+        client_config,
+        scopes=SCOPES,
+        redirect_uri=REDIRECT_URI
+    )
+    
+    # Intercambiar código con verifier
+    flow.fetch_token(
+        code=code,
+        code_verifier=code_verifier
+    )
+    
     credentials = flow.credentials
     
     return {
@@ -52,7 +94,10 @@ def exchange_code(code):
     }
 
 def get_drive_service(credentials_dict):
-    credentials = Credentials(
+    """Crea servicio de Drive desde credenciales guardadas"""
+    from google.oauth2.credentials import Credentials
+    
+    creds = Credentials(
         token=credentials_dict['token'],
         refresh_token=credentials_dict.get('refresh_token'),
         token_uri=credentials_dict['token_uri'],
@@ -60,14 +105,24 @@ def get_drive_service(credentials_dict):
         client_secret=credentials_dict['client_secret'],
         scopes=credentials_dict['scopes']
     )
-    return build('drive', 'v3', credentials=credentials)
-
-def subir_archivo(service, file_content, filename, mime_type, folder_id=None):
-    file_metadata = {'name': filename}
-    if folder_id:
-        file_metadata['parents'] = [folder_id]
     
-    media = MediaIoBaseUpload(io.BytesIO(file_content), mimetype=mime_type, resumable=True)
+    # Refrescar si expiró
+    if creds.expired and creds.refresh_token:
+        creds.refresh(Request())
+    
+    return build('drive', 'v3', credentials=creds)
+
+def subir_archivo(service, file_content, filename, mime_type='application/pdf'):
+    """Sube archivo a Google Drive"""
+    from googleapiclient.http import MediaIoBaseUpload
+    import io
+    
+    file_metadata = {'name': filename}
+    media = MediaIoBaseUpload(
+        io.BytesIO(file_content),
+        mimetype=mime_type,
+        resumable=True
+    )
     
     file = service.files().create(
         body=file_metadata,
@@ -76,52 +131,42 @@ def subir_archivo(service, file_content, filename, mime_type, folder_id=None):
     ).execute()
     
     return {
-        'id': file.get('id'),
-        'url': file.get('webViewLink'),
-        'download_url': file.get('webContentLink')
+        'id': file['id'],
+        'url': file.get('webViewLink', f"https://drive.google.com/file/d/{file['id']}/view")
     }
 
 def eliminar_archivo(service, file_id):
-    try:
-        service.files().delete(fileId=file_id).execute()
-        return True
-    except Exception as e:
-        print(f"Error eliminando archivo de Drive: {e}")
-        return False
+    """Elimina archivo de Google Drive"""
+    service.files().delete(fileId=file_id).execute()
+    return True
 
 def obtener_espacio_usado(service):
-    try:
-        about = service.about().get(fields='storageQuota').execute()
-        quota = about.get('storageQuota', {})
-        
-        limit = int(quota.get('limit', 15 * 1024**3))
-        usage = int(quota.get('usage', 0))
-        usage_in_drive = int(quota.get('usageInDrive', usage))
-        
-        return {
-            'limite_gb': limit / (1024**3),
-            'usado_gb': usage_in_drive / (1024**3),
-            'porcentaje': (usage_in_drive / limit * 100) if limit > 0 else 0
-        }
-    except Exception as e:
-        print(f"Error obteniendo espacio: {e}")
-        return {
-            'limite_gb': 15,
-            'usado_gb': 0,
-            'porcentaje': 0
-        }
+    """Obtiene información de espacio en Drive"""
+    about = service.about().get(fields='storageQuota').execute()
+    quota = about['storageQuota']
+    
+    usado = int(quota.get('usage', 0))
+    total = int(quota.get('limit', 15 * 1024**3))  # 15GB default
+    
+    return {
+        'usado_bytes': usado,
+        'total_bytes': total,
+        'libre_bytes': total - usado,
+        'porcentaje': (usado / total) * 100 if total > 0 else 0
+    }
 
 def descargar_archivo(service, file_id):
-    try:
-        request = service.files().get_media(fileId=file_id)
-        file_content = io.BytesIO()
-        downloader = MediaIoBaseDownload(file_content, request)
-        
-        done = False
-        while not done:
-            status, done = downloader.next_chunk()
-        
-        return file_content.getvalue()
-    except Exception as e:
-        print(f"Error descargando archivo: {e}")
-        return None
+    """Descarga archivo de Google Drive"""
+    request = service.files().get_media(fileId=file_id)
+    
+    from googleapiclient.http import MediaIoBaseDownload
+    import io
+    
+    fh = io.BytesIO()
+    downloader = MediaIoBaseDownload(fh, request)
+    
+    done = False
+    while not done:
+        status, done = downloader.next_chunk()
+    
+    return fh.getvalue()

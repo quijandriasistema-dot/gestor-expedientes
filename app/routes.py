@@ -2875,12 +2875,25 @@ def auth_google():
     try:
         auth_data = get_auth_url()
         
-        # Guardar state y code_verifier en sesión
+        # ← DEBUG: Ver qué tipo de dato devuelve
+        print(f"DEBUG: tipo de auth_data = {type(auth_data)}")
+        print(f"DEBUG: valor de auth_data = {str(auth_data)[:100]}")
+        
+        # Si es string (URL directa), manejarlo
+        if isinstance(auth_data, str):
+            session['oauth_state'] = 'manual_state'
+            session['code_verifier'] = 'manual_verifier'
+            return redirect(auth_data)
+        
+        # Si es diccionario (lo esperado)
         session['oauth_state'] = auth_data['state']
         session['code_verifier'] = auth_data['code_verifier']
         
         return redirect(auth_data['url'])
+        
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         flash(f'Error iniciando autorización: {str(e)}', 'danger')
         return redirect(request.referrer or url_for('main.index'))
 
