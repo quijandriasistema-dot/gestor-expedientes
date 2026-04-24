@@ -115,18 +115,23 @@
                             {% endif %}
                             
                             <!-- Descargar (solo si está en local) -->
-                            {% if doc.ubicacion in ['local', 'ambos'] and doc.ruta_local %}
+                            {% if doc.ubicacion in ['local', 'ambos'] and doc.ruta_archivo %}
                             <a href="{{ url_for('main.descargar_documento', id=doc.id) }}" class="btn btn-small btn-primary">
                                 ⬇️ Descargar
                             </a>
                             {% endif %}
                             
-                            <!-- Eliminar -->
+                            <!-- Reemplaza el bloque de eliminar (~línea 108) por esto: -->
                             {% if rol in ['ADMINISTRADOR', 'DESARROLLADOR'] %}
-                            <form method="POST" action="{{ url_for('main.eliminar_documento', id=doc.id) }}" 
-                                  onsubmit="return confirm('¿Eliminar este documento?');" style="display: inline;">
-                                <button type="submit" class="btn btn-small btn-danger">🗑️</button>
-                            </form>
+                                {% if doc.ubicacion == 'drive' %}
+                                <form method="POST" action="{{ url_for('main.eliminar_documento_drive', id=doc.id) }}" 
+                                    onsubmit="return confirm('¿Eliminar este documento de Google Drive?');" style="display: inline;">
+                                {% else %}
+                                <form method="POST" action="{{ url_for('main.eliminar_documento', id=doc.id) }}" 
+                                    onsubmit="return confirm('¿Eliminar este documento?');" style="display: inline;">
+                                {% endif %}
+                                    <button type="submit" class="btn btn-small btn-danger">🗑️</button>
+                                </form>
                             {% endif %}
                         </div>
                     </td>

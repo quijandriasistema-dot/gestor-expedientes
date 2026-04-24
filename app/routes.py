@@ -3059,7 +3059,7 @@ def ver_documento(id):
 # ELIMINAR DOCUMENTO (Drive y/o Local)
 # ============================================
 
-@bp.route('/documento/<int:id>/eliminar', methods=['POST'])
+@bp.route('/documento/<int:id>/eliminar-drive', methods=['POST'])
 @requiere_login
 def eliminar_documento_drive(id):
     """Elimina documento de Drive y/o local"""

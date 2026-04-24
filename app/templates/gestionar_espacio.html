@@ -58,7 +58,7 @@
                                             <i class="fas fa-file-pdf text-danger"></i> {{ doc.titulo }}
                                         </td>
                                         <td>#{{ doc.expediente_id }}</td>
-                                        <td>{{ "%.2f"|format(doc.tamano / 1024 / 1024) }} MB</td>
+                                        <td>{{ doc.get_tamaño_formateado() }}</td>
                                         <td>{{ doc.fecha_subida.strftime('%d/%m/%Y') }}</td>
                                         <td>
                                             <a href="{{ url_for('main.ver_documento', id=doc.id) }}" class="btn btn-sm btn-info" target="_blank">
