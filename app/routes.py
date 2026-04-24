@@ -3010,6 +3010,10 @@ def subir_documento_drive():
     archivo = request.files['archivo']
     expediente_id = request.form.get('expediente_id', type=int)
     
+    # ← CORREGIDO: Si expediente_id es 0, convertir a None
+    if expediente_id == 0:
+        expediente_id = None
+    
     if archivo.filename == '':
         flash('Nombre de archivo vacío', 'danger')
         return redirect(request.referrer or url_for('main.documentos'))
@@ -3031,8 +3035,15 @@ def subir_documento_drive():
             flash('❌ Debes conectar Google Drive primero. Haz clic en "Subir a Google Drive" para autorizar.', 'warning')
             return redirect(url_for('main.auth_google'))
         
+        # ← FIX COMPLETO: Manejar si Supabase devuelve dict o string
         import json
-        credentials_dict = json.loads(result[0])
+        token_data = result[0]
+        
+        if isinstance(token_data, dict):
+            credentials_dict = token_data  # Ya es dict, usar directo
+        else:
+            credentials_dict = json.loads(token_data)  # Es string, parsear
+        
         service = get_drive_service(credentials_dict)
         
         # Verificar espacio antes de subir
@@ -3177,7 +3188,11 @@ def gestionar_espacio():
             return redirect(url_for('main.auth_google'))
         
         import json
-        credentials_dict = json.loads(result[0])
+        token_data = result[0]
+        if isinstance(token_data, dict):
+            credentials_dict = token_data
+        else:
+            credentials_dict = json.loads(token_data)
         service = get_drive_service(credentials_dict)
         espacio = obtener_espacio_usado(service)
         
@@ -3282,3 +3297,4 @@ def liberar_espacio():
 # ============================================
 # FIN DEL ARCHIVO
 # ============================================
+
