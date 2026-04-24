@@ -2897,14 +2897,11 @@ def oauth2callback():
         credentials = exchange_code(code)
         
         # Guardar token en Supabase (tabla google_tokens)
-        # Necesitamos el usuario_id de la sesión
         usuario_id = session.get('usuario_id')
         if not usuario_id:
             flash('Error: No se pudo identificar al usuario. Inicie sesión nuevamente.', 'danger')
             return redirect(url_for('main.logout'))
         
-        # Usar SQLAlchemy en lugar de supabase client directo
-        from app import db
         from sqlalchemy import text
         
         # Verificar si ya existe token para este usuario
@@ -2964,10 +2961,14 @@ def subir_documento_drive():
         if expediente_id:
             expediente = Expediente.query.get(expediente_id)
         
+        # ← CORREGIDO: Agregar lista de expedientes para el select
+        expedientes = Expediente.query.order_by(Expediente.fecha_registro.desc()).all()
+        
         return render_template('subir_documento.html',
                              title='Subir a Google Drive',
                              form=form,
                              expediente=expediente,
+                             expedientes=expedientes,  # ← CORREGIDO
                              rol=session.get('rol', 'USUARIO'),
                              modo_drive=True)
     
@@ -3211,7 +3212,7 @@ def liberar_espacio():
                     file_content = descargar_archivo(service, documento.drive_file_id)
                     
                     if file_content:
-                        # Guardar en carpeta local - USAR UPLOAD_FOLDER existente
+                        # Guardar en carpeta local
                         os.makedirs(UPLOAD_FOLDER, exist_ok=True)
                         
                         local_filename = f"exp_{documento.expediente_id}_{documento.nombre_archivo}"
@@ -3223,8 +3224,8 @@ def liberar_espacio():
                         # Eliminar de Drive
                         eliminar_archivo(service, documento.drive_file_id)
                         
-                        # Actualizar registro - USAR ruta_archivo (nombre de tu tabla)
-                        documento.ruta_archivo = local_filename  # ← CORREGIDO
+                        # Actualizar registro
+                        documento.ruta_archivo = local_filename
                         documento.url_drive = None
                         documento.drive_file_id = None
                         documento.ubicacion = 'local'
