@@ -27,26 +27,41 @@
     </div>
     {% endif %}
     
-    <!-- Formulario -->
-    <div class="form-container">
-        <form method="POST" action="" enctype="multipart/form-data">
-            {{ form.hidden_tag() }}
+    <!-- Tabs: Local vs Drive -->
+    <div style="display: flex; gap: 0; margin-bottom: 1.5rem; border-bottom: 2px solid #e5e7eb;">
+        <button type="button" onclick="mostrarForm('local')" id="tab-local" class="btn" style="border-radius: 8px 8px 0 0; border-bottom: 3px solid #0ea5e9; background: #f0f9ff;">
+            <i class="fas fa-desktop"></i> Guardar Localmente
+        </button>
+        <button type="button" onclick="mostrarForm('drive')" id="tab-drive" class="btn" style="border-radius: 8px 8px 0 0; border-bottom: 3px solid transparent;">
+            <i class="fab fa-google-drive"></i> Subir a Google Drive
+        </button>
+    </div>
+    
+    <!-- Formulario LOCAL -->
+    <div id="form-local" class="form-container">
+        <form method="POST" action="{{ url_for('main.subir_documento') }}" enctype="multipart/form-data">
+            {% if expediente %}
+                <input type="hidden" name="expediente_id" value="{{ expediente.id }}">
+            {% endif %}
             
             <!-- Sección 1: Expediente relacionado -->
             <div class="form-section">
                 <h3><span>📁</span> Expediente Relacionado</h3>
-                
                 <div class="form-row">
                     <div class="form-col-2">
                         <div class="form-group">
-                            {{ form.expediente_id.label }}
+                            <label>Expediente</label>
                             {% if expediente %}
-                                {{ form.expediente_id(class="form-control", disabled=true) }}
+                                <input type="text" class="form-control" value="{{ expediente.get_identificador_principal() }} - {{ expediente.cliente }}" disabled>
                                 <input type="hidden" name="expediente_id" value="{{ expediente.id }}">
                             {% else %}
-                                {{ form.expediente_id(class="form-control") }}
+                                <select name="expediente_id" class="form-control" required>
+                                    <option value="">Seleccione un expediente...</option>
+                                    {% for exp in expedientes %}
+                                    <option value="{{ exp.id }}">{{ exp.get_identificador_principal() }} - {{ exp.cliente }}</option>
+                                    {% endfor %}
+                                </select>
                             {% endif %}
-                            <small style="color: var(--color-text-light);">Seleccione "Ninguno" para documentos generales</small>
                         </div>
                     </div>
                 </div>
@@ -55,68 +70,52 @@
             <!-- Sección 2: Información del documento -->
             <div class="form-section">
                 <h3><span>📝</span> Información del Documento</h3>
-                
                 <div class="form-row">
                     <div class="form-col-2">
                         <div class="form-group">
-                            {{ form.titulo.label }}
-                            {{ form.titulo(class="form-control", placeholder="Ej: Escrito de Demanda, Resolución N° 123...") }}
-                            {% if form.titulo.errors %}
-                                {% for error in form.titulo.errors %}
-                                    <span class="error">{{ error }}</span>
-                                {% endfor %}
-                            {% endif %}
+                            <label>Título *</label>
+                            <input type="text" name="titulo" class="form-control" placeholder="Ej: Escrito de Demanda, Resolución N° 123..." required>
                         </div>
                     </div>
-                    
                     <div class="form-col-2">
                         <div class="form-group">
-                            {{ form.categoria.label }}
-                            {{ form.categoria(class="form-control") }}
-                            {% if form.categoria.errors %}
-                                {% for error in form.categoria.errors %}
-                                    <span class="error">{{ error }}</span>
-                                {% endfor %}
-                            {% endif %}
+                            <label>Categoría</label>
+                            <select name="categoria" class="form-control">
+                                <option value="escrito">📝 Escrito</option>
+                                <option value="resolucion">⚖️ Resolución</option>
+                                <option value="contrato">📄 Contrato</option>
+                                <option value="evidencia">📷 Evidencia</option>
+                                <option value="poder">✍️ Poder</option>
+                                <option value="notificacion">📬 Notificación</option>
+                                <option value="otros" selected>📎 Otros</option>
+                            </select>
                         </div>
                     </div>
                 </div>
-                
                 <div class="form-row">
                     <div class="form-col-2">
                         <div class="form-group">
-                            {{ form.fecha_documento.label }}
-                            {{ form.fecha_documento(class="form-control", type="date") }}
-                            <small style="color: var(--color-text-light);">Fecha que indica el documento (opcional)</small>
+                            <label>Fecha del Documento</label>
+                            <input type="date" name="fecha_documento" class="form-control">
                         </div>
                     </div>
                 </div>
-                
                 <div class="form-group">
-                    {{ form.descripcion.label }}
-                    {{ form.descripcion(class="form-control", rows=3, placeholder="Descripción o observaciones sobre el documento...") }}
+                    <label>Descripción</label>
+                    <textarea name="descripcion" class="form-control" rows="3" placeholder="Descripción o observaciones..."></textarea>
                 </div>
             </div>
             
             <!-- Sección 3: Archivo -->
             <div class="form-section">
                 <h3><span>📎</span> Archivo</h3>
-                
                 <div class="form-group">
-                    {{ form.archivo.label }}
-                    {{ form.archivo(class="form-control", accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png,.gif,.mp4,.mp3,.zip,.rar,.txt") }}
-                    {% if form.archivo.errors %}
-                        {% for error in form.archivo.errors %}
-                            <span class="error">{{ error }}</span>
-                        {% endfor %}
-                    {% endif %}
-                    
+                    <label>Archivo *</label>
+                    <input type="file" name="archivo" class="form-control" accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png,.gif,.mp4,.mp3,.zip,.rar,.txt" required>
                     <div style="margin-top: 0.5rem; padding: 0.75rem; background: #f0f9ff; border-radius: 6px; border-left: 3px solid #0ea5e9;">
                         <small style="color: #0369a1;">
-                            <strong>📋 Formatos permitidos:</strong><br>
-                            PDF, Word (.doc, .docx), Excel (.xls, .xlsx),<br>
-                            Imágenes (.jpg, .png, .gif), Audio/Video (.mp3, .mp4),<br>
-                            Comprimidos (.zip, .rar), Texto (.txt)
+                            <strong>📋 Formatos permitidos:</strong> PDF, Word, Excel, Imágenes, Audio/Video, Comprimidos, Texto<br>
+                            <strong>⚠️ Se guardará en el servidor local.</strong> Solo accesible desde esta computadora.
                         </small>
                     </div>
                 </div>
@@ -124,8 +123,107 @@
             
             <!-- Botones -->
             <div class="form-actions">
-                {{ form.submit(class="btn btn-primary btn-lg") }}
-                
+                <button type="submit" class="btn btn-primary btn-lg">💾 Guardar Localmente</button>
+                {% if expediente %}
+                    <a href="{{ url_for('main.expediente_documentos', id=expediente.id) }}" class="btn btn-secondary btn-lg">❌ Cancelar</a>
+                {% else %}
+                    <a href="{{ url_for('main.documentos') }}" class="btn btn-secondary btn-lg">❌ Cancelar</a>
+                {% endif %}
+            </div>
+        </form>
+    </div>
+    
+    <!-- Formulario GOOGLE DRIVE -->
+    <div id="form-drive" class="form-container" style="display: none;">
+        <form method="POST" action="{{ url_for('main.subir_documento_drive') }}" enctype="multipart/form-data">
+            {% if expediente %}
+                <input type="hidden" name="expediente_id" value="{{ expediente.id }}">
+            {% endif %}
+            
+            <!-- Sección 1: Expediente relacionado -->
+            <div class="form-section">
+                <h3><span>📁</span> Expediente Relacionado</h3>
+                <div class="form-row">
+                    <div class="form-col-2">
+                        <div class="form-group">
+                            <label>Expediente</label>
+                            {% if expediente %}
+                                <input type="text" class="form-control" value="{{ expediente.get_identificador_principal() }} - {{ expediente.cliente }}" disabled>
+                                <input type="hidden" name="expediente_id" value="{{ expediente.id }}">
+                            {% else %}
+                                <select name="expediente_id" class="form-control" required>
+                                    <option value="">Seleccione un expediente...</option>
+                                    {% for exp in expedientes %}
+                                    <option value="{{ exp.id }}">{{ exp.get_identificador_principal() }} - {{ exp.cliente }}</option>
+                                    {% endfor %}
+                                </select>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Sección 2: Información del documento -->
+            <div class="form-section">
+                <h3><span>📝</span> Información del Documento</h3>
+                <div class="form-row">
+                    <div class="form-col-2">
+                        <div class="form-group">
+                            <label>Título *</label>
+                            <input type="text" name="titulo" class="form-control" placeholder="Ej: Escrito de Demanda, Resolución N° 123..." required>
+                        </div>
+                    </div>
+                    <div class="form-col-2">
+                        <div class="form-group">
+                            <label>Categoría</label>
+                            <select name="categoria" class="form-control">
+                                <option value="escrito">📝 Escrito</option>
+                                <option value="resolucion">⚖️ Resolución</option>
+                                <option value="contrato">📄 Contrato</option>
+                                <option value="evidencia">📷 Evidencia</option>
+                                <option value="poder">✍️ Poder</option>
+                                <option value="notificacion">📬 Notificación</option>
+                                <option value="otros" selected>📎 Otros</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-col-2">
+                        <div class="form-group">
+                            <label>Fecha del Documento</label>
+                            <input type="date" name="fecha_documento" class="form-control">
+                        </div>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Descripción</label>
+                    <textarea name="descripcion" class="form-control" rows="3" placeholder="Descripción o observaciones..."></textarea>
+                </div>
+            </div>
+            
+            <!-- Sección 3: Archivo -->
+            <div class="form-section">
+                <h3><span>☁️</span> Archivo para Google Drive</h3>
+                <div class="form-group">
+                    <label>Archivo *</label>
+                    <input type="file" name="archivo" class="form-control" accept=".pdf,.jpg,.jpeg,.png" required>
+                    <div style="margin-top: 0.5rem; padding: 0.75rem; background: #e8f5e9; border-radius: 6px; border-left: 3px solid #4caf50;">
+                        <small style="color: #2e7d32;">
+                            <strong>☁️ Se subirá a Google Drive.</strong><br>
+                            <strong>Formatos recomendados:</strong> PDF, JPG, PNG<br>
+                            <strong>Límite:</strong> 15 GB total en tu cuenta de Google Drive.<br>
+                            <strong>✅ Ventaja:</strong> Accesible desde cualquier lugar con internet.
+                        </small>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Botones -->
+            <div class="form-actions">
+                <button type="submit" class="btn btn-success btn-lg">
+                    <i class="fab fa-google-drive"></i> Subir a Google Drive
+                </button>
                 {% if expediente %}
                     <a href="{{ url_for('main.expediente_documentos', id=expediente.id) }}" class="btn btn-secondary btn-lg">❌ Cancelar</a>
                 {% else %}
@@ -135,4 +233,29 @@
         </form>
     </div>
 </div>
+
+<script>
+function mostrarForm(tipo) {
+    // Ocultar ambos formularios
+    document.getElementById('form-local').style.display = 'none';
+    document.getElementById('form-drive').style.display = 'none';
+    
+    // Resetear estilos de tabs
+    document.getElementById('tab-local').style.borderBottom = '3px solid transparent';
+    document.getElementById('tab-local').style.background = 'transparent';
+    document.getElementById('tab-drive').style.borderBottom = '3px solid transparent';
+    document.getElementById('tab-drive').style.background = 'transparent';
+    
+    // Mostrar form seleccionado y activar tab
+    if (tipo === 'local') {
+        document.getElementById('form-local').style.display = 'block';
+        document.getElementById('tab-local').style.borderBottom = '3px solid #0ea5e9';
+        document.getElementById('tab-local').style.background = '#f0f9ff';
+    } else {
+        document.getElementById('form-drive').style.display = 'block';
+        document.getElementById('tab-drive').style.borderBottom = '3px solid #4caf50';
+        document.getElementById('tab-drive').style.background = '#e8f5e9';
+    }
+}
+</script>
 {% endblock %}

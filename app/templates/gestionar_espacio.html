@@ -1,0 +1,98 @@
+{% extends "base.html" %}
+
+{% block title %}Gestionar Espacio - Google Drive{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-12">
+            <h2><i class="fab fa-google-drive"></i> Gestión de Espacio en Google Drive</h2>
+            
+            <!-- Alerta de espacio -->
+            <div class="alert alert-{% if espacio.porcentaje >= 80 %}danger{% elif espacio.porcentaje >= 60 %}warning{% else %}info{% endif %}">
+                <h5><i class="fas fa-hdd"></i> Uso de Almacenamiento</h5>
+                <div class="progress mb-2" style="height: 25px;">
+                    <div class="progress-bar {% if espacio.porcentaje >= 80 %}bg-danger{% elif espacio.porcentaje >= 60 %}bg-warning{% else %}bg-success{% endif %}" 
+                         role="progressbar" 
+                         style="width: {{ espacio.porcentaje }}%">
+                        {{ "%.1f"|format(espacio.porcentaje) }}%
+                    </div>
+                </div>
+                <p class="mb-0">
+                    <strong>{{ "%.2f"|format(espacio.usado_gb) }} GB</strong> usados de 
+                    <strong>{{ "%.0f"|format(espacio.limite_gb) }} GB</strong> disponibles
+                </p>
+                {% if espacio.porcentaje >= 80 %}
+                <hr>
+                <p class="mb-0 text-danger"><i class="fas fa-exclamation-triangle"></i> 
+                    Estás al <strong>{{ "%.1f"|format(espacio.porcentaje) }}%</strong>. Debes liberar espacio para seguir subiendo documentos.
+                </p>
+                {% endif %}
+            </div>
+            
+            <!-- Documentos en Drive -->
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="fas fa-file-alt"></i> Documentos en Google Drive</h5>
+                </div>
+                <div class="card-body">
+                    {% if documentos %}
+                    <form method="POST" action="{{ url_for('main.liberar_espacio') }}">
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead>
+                                    <tr>
+                                        <th><input type="checkbox" id="selectAll"></th>
+                                        <th>Documento</th>
+                                        <th>Expediente</th>
+                                        <th>Tamaño</th>
+                                        <th>Fecha</th>
+                                        <th>Acciones</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for doc in documentos %}
+                                    <tr>
+                                        <td><input type="checkbox" name="documentos[]" value="{{ doc.id }}"></td>
+                                        <td>
+                                            <i class="fas fa-file-pdf text-danger"></i> {{ doc.titulo }}
+                                        </td>
+                                        <td>#{{ doc.expediente_id }}</td>
+                                        <td>{{ "%.2f"|format(doc.tamano / 1024 / 1024) }} MB</td>
+                                        <td>{{ doc.fecha_subida.strftime('%d/%m/%Y') }}</td>
+                                        <td>
+                                            <a href="{{ url_for('main.ver_documento', id=doc.id) }}" class="btn btn-sm btn-info" target="_blank">
+                                                <i class="fas fa-eye"></i>
+                                            </a>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                        
+                        <div class="mt-3">
+                            <button type="submit" name="accion" value="mover_local" class="btn btn-warning">
+                                <i class="fas fa-download"></i> Mover seleccionados a Local
+                            </button>
+                            <button type="submit" name="accion" value="eliminar" class="btn btn-danger" 
+                                    onclick="return confirm('¿Eliminar permanentemente? Esta acción no se puede deshacer.')">
+                                <i class="fas fa-trash"></i> Eliminar seleccionados
+                            </button>
+                        </div>
+                    </form>
+                    {% else %}
+                    <p class="text-muted">No hay documentos en Google Drive.</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.getElementById('selectAll').addEventListener('change', function() {
+    document.querySelectorAll('input[name="documentos[]"]').forEach(cb => cb.checked = this.checked);
+});
+</script>
+{% endblock %}

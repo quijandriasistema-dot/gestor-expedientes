@@ -312,7 +312,9 @@ def login():
                 usuario.ultimo_acceso = datetime.now()
                 db.session.commit()
                 
+                # CORREGIDO - Agregar usuario_id:
                 session['usuario'] = username
+                session['usuario_id'] = usuario.id  # ← AGREGAR ESTA LÍNEA
                 session['nombre'] = usuario.nombre
                 session['rol'] = usuario.rol
                 session['modulos'] = usuario.get_modulos_list()
@@ -2851,6 +2853,381 @@ def enviar_a_archivo(id):
                          expediente_original=expediente_original,
                          hoy=date.today().isoformat(),
                          rol=session.get('rol', 'USUARIO'))
+
+# ============================================
+# GOOGLE DRIVE INTEGRACIÓN - DOCUMENTOS EN LA NUBE
+# ============================================
+
+from app.drive_service import (
+    get_auth_url, exchange_code, get_drive_service,
+    subir_archivo, eliminar_archivo, obtener_espacio_usado,
+    descargar_archivo
+)
+
+# ============================================
+# GOOGLE DRIVE OAUTH
+# ============================================
+
+@bp.route('/auth/google')
+@requiere_login
+def auth_google():
+    """Inicia flujo de autorización con Google Drive"""
+    try:
+        auth_url = get_auth_url()
+        return redirect(auth_url)
+    except Exception as e:
+        flash(f'Error iniciando autorización: {str(e)}', 'danger')
+        return redirect(request.referrer or url_for('main.index'))
+
+@bp.route('/oauth2callback')
+def oauth2callback():
+    """Callback de Google OAuth"""
+    code = request.args.get('code')
+    error = request.args.get('error')
+    
+    if error:
+        flash(f'Error de autorización: {error}', 'danger')
+        return redirect(url_for('main.index'))
+    
+    if not code:
+        flash('Error: No se recibió código de autorización', 'danger')
+        return redirect(url_for('main.index'))
+    
+    try:
+        credentials = exchange_code(code)
+        
+        # Guardar token en Supabase (tabla google_tokens)
+        # Necesitamos el usuario_id de la sesión
+        usuario_id = session.get('usuario_id')
+        if not usuario_id:
+            flash('Error: No se pudo identificar al usuario. Inicie sesión nuevamente.', 'danger')
+            return redirect(url_for('main.logout'))
+        
+        # Usar SQLAlchemy en lugar de supabase client directo
+        from app import db
+        from sqlalchemy import text
+        
+        # Verificar si ya existe token para este usuario
+        existing = db.session.execute(
+            text("SELECT id FROM google_tokens WHERE usuario_id = :uid"),
+            {'uid': usuario_id}
+        ).fetchone()
+        
+        import json
+        token_json = json.dumps(credentials)
+        
+        if existing:
+            # Actualizar
+            db.session.execute(
+                text("""
+                    UPDATE google_tokens 
+                    SET google_token = :token, fecha_actualizacion = NOW() 
+                    WHERE usuario_id = :uid
+                """),
+                {'token': token_json, 'uid': usuario_id}
+            )
+        else:
+            # Insertar nuevo
+            db.session.execute(
+                text("""
+                    INSERT INTO google_tokens (usuario_id, google_token, fecha_creacion, fecha_actualizacion)
+                    VALUES (:uid, :token, NOW(), NOW())
+                """),
+                {'uid': usuario_id, 'token': token_json}
+            )
+        
+        db.session.commit()
+        flash('✅ Google Drive conectado correctamente', 'success')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Error conectando Google Drive: {str(e)}', 'danger')
+    
+    return redirect(url_for('main.index'))
+
+# ============================================
+# SUBIR DOCUMENTO A GOOGLE DRIVE
+# ============================================
+
+@bp.route('/subir-documento-drive', methods=['POST'])
+@requiere_login
+def subir_documento_drive():
+    """Sube documento a Google Drive"""
+    if 'archivo' not in request.files:
+        flash('No se seleccionó archivo', 'danger')
+        return redirect(request.referrer or url_for('main.documentos'))
+    
+    archivo = request.files['archivo']
+    expediente_id = request.form.get('expediente_id', type=int)
+    
+    if archivo.filename == '':
+        flash('Nombre de archivo vacío', 'danger')
+        return redirect(request.referrer or url_for('main.documentos'))
+    
+    # Verificar token de Google
+    usuario_id = session.get('usuario_id')
+    if not usuario_id:
+        flash('Error de sesión. Inicie sesión nuevamente.', 'danger')
+        return redirect(url_for('main.logout'))
+    
+    try:
+        from sqlalchemy import text
+        result = db.session.execute(
+            text("SELECT google_token FROM google_tokens WHERE usuario_id = :uid"),
+            {'uid': usuario_id}
+        ).fetchone()
+        
+        if not result:
+            flash('❌ Debes conectar Google Drive primero. Haz clic en "Subir a Google Drive" para autorizar.', 'warning')
+            return redirect(url_for('main.auth_google'))
+        
+        import json
+        credentials_dict = json.loads(result[0])
+        service = get_drive_service(credentials_dict)
+        
+        # Verificar espacio antes de subir
+        espacio = obtener_espacio_usado(service)
+        
+        if espacio['porcentaje'] >= 80:
+            flash(f'⚠️ Google Drive al {espacio["porcentaje"]:.1f}%. Libera espacio antes de subir más documentos.', 'warning')
+            return redirect(url_for('main.gestionar_espacio'))
+        
+        # Leer archivo
+        file_content = archivo.read()
+        mime_type = archivo.content_type or 'application/octet-stream'
+        
+        # Subir a Drive
+        resultado = subir_archivo(service, file_content, archivo.filename, mime_type)
+        
+        # Guardar en base de datos - USAR tamaño_bytes (nombre de tu tabla)
+        from datetime import datetime
+        fecha_doc = None
+        if request.form.get('fecha_documento'):
+            try:
+                fecha_doc = datetime.strptime(request.form['fecha_documento'], '%Y-%m-%d').date()
+            except:
+                pass
+        
+        nuevo_documento = Documento(
+            expediente_id=expediente_id,
+            titulo=request.form.get('titulo', archivo.filename),
+            nombre_archivo=archivo.filename,
+            url_drive=resultado['url'],
+            drive_file_id=resultado['id'],
+            ubicacion='drive',
+            categoria=request.form.get('categoria', 'otros'),
+            descripcion=request.form.get('descripcion'),
+            fecha_documento=fecha_doc,
+            usuario_subida=session.get('nombre', 'Sistema'),
+            tipo_archivo=archivo.filename.split('.')[-1].lower(),
+            tamaño_bytes=len(file_content)  # ← CORREGIDO: usa tamaño_bytes
+        )
+        
+        db.session.add(nuevo_documento)
+        db.session.commit()
+        
+        flash('✅ Documento subido a Google Drive correctamente', 'success')
+        
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Error subiendo a Drive: {str(e)}', 'danger')
+    
+    if expediente_id:
+        return redirect(url_for('main.expediente_documentos', id=expediente_id))
+    return redirect(url_for('main.documentos'))
+
+# ============================================
+# VER DOCUMENTO DESDE GOOGLE DRIVE
+# ============================================
+
+@bp.route('/documento/<int:id>/ver')
+@requiere_login
+def ver_documento(id):
+    """Muestra documento desde Google Drive en viewer embebido"""
+    documento = Documento.query.get_or_404(id)
+    
+    if documento.ubicacion == 'local':
+        flash('📁 Este documento solo está disponible en la oficina (almacenamiento local)', 'info')
+        return redirect(request.referrer or url_for('main.expediente_documentos', id=documento.expediente_id))
+    
+    if not documento.drive_file_id:
+        flash('Documento no disponible en la nube', 'danger')
+        return redirect(request.referrer or url_for('main.expediente_documentos', id=documento.expediente_id))
+    
+    return render_template('ver_documento.html', documento=documento)
+
+# ============================================
+# ELIMINAR DOCUMENTO (Drive y/o Local)
+# ============================================
+
+@bp.route('/documento/<int:id>/eliminar', methods=['POST'])
+@requiere_login
+def eliminar_documento_drive(id):
+    """Elimina documento de Drive y/o local"""
+    documento = Documento.query.get_or_404(id)
+    
+    try:
+        # Si está en Drive, eliminar de Drive primero
+        if documento.ubicacion in ['drive', 'ambos'] and documento.drive_file_id:
+            usuario_id = session.get('usuario_id')
+            if usuario_id:
+                from sqlalchemy import text
+                result = db.session.execute(
+                    text("SELECT google_token FROM google_tokens WHERE usuario_id = :uid"),
+                    {'uid': usuario_id}
+                ).fetchone()
+                
+                if result:
+                    import json
+                    credentials_dict = json.loads(result[0])
+                    service = get_drive_service(credentials_dict)
+                    eliminar_archivo(service, documento.drive_file_id)
+        
+        # Si está en local, eliminar archivo físico
+        if documento.ubicacion in ['local', 'ambos'] and documento.ruta_archivo:
+            import os
+            ruta_completa = os.path.join(UPLOAD_FOLDER, documento.ruta_archivo)
+            if os.path.exists(ruta_completa):
+                os.remove(ruta_completa)
+        
+        # Eliminar registro de base de datos
+        db.session.delete(documento)
+        db.session.commit()
+        
+        flash('🗑️ Documento eliminado correctamente', 'success')
+        
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Error eliminando documento: {str(e)}', 'danger')
+    
+    return redirect(request.referrer or url_for('main.expediente_documentos', id=documento.expediente_id))
+
+# ============================================
+# GESTIONAR ESPACIO EN GOOGLE DRIVE
+# ============================================
+
+@bp.route('/gestionar-espacio')
+@requiere_login
+def gestionar_espacio():
+    """Muestra alerta de espacio y opciones para liberar"""
+    usuario_id = session.get('usuario_id')
+    if not usuario_id:
+        flash('Error de sesión', 'danger')
+        return redirect(url_for('main.logout'))
+    
+    try:
+        from sqlalchemy import text
+        result = db.session.execute(
+            text("SELECT google_token FROM google_tokens WHERE usuario_id = :uid"),
+            {'uid': usuario_id}
+        ).fetchone()
+        
+        if not result:
+            flash('No tienes Google Drive conectado', 'warning')
+            return redirect(url_for('main.auth_google'))
+        
+        import json
+        credentials_dict = json.loads(result[0])
+        service = get_drive_service(credentials_dict)
+        espacio = obtener_espacio_usado(service)
+        
+        # Obtener documentos que ocupan espacio
+        documentos_drive = Documento.query.filter(
+            Documento.ubicacion.in_(['drive', 'ambos']),
+            Documento.drive_file_id.isnot(None)
+        ).order_by(Documento.fecha_subida.asc()).all()
+        
+        return render_template('gestionar_espacio.html',
+                             espacio=espacio,
+                             documentos=documentos_drive)
+                             
+    except Exception as e:
+        flash(f'Error obteniendo información de Drive: {str(e)}', 'danger')
+        return redirect(url_for('main.index'))
+
+@bp.route('/liberar-espacio', methods=['POST'])
+@requiere_login
+def liberar_espacio():
+    """Mueve documentos de Drive a local o los elimina"""
+    accion = request.form.get('accion')
+    documento_ids = request.form.getlist('documentos[]')
+    
+    if not documento_ids:
+        flash('No seleccionaste documentos', 'warning')
+        return redirect(url_for('main.gestionar_espacio'))
+    
+    usuario_id = session.get('usuario_id')
+    if not usuario_id:
+        flash('Error de sesión', 'danger')
+        return redirect(url_for('main.logout'))
+    
+    try:
+        from sqlalchemy import text
+        result = db.session.execute(
+            text("SELECT google_token FROM google_tokens WHERE usuario_id = :uid"),
+            {'uid': usuario_id}
+        ).fetchone()
+        
+        if not result:
+            flash('Google Drive no conectado', 'danger')
+            return redirect(url_for('main.gestionar_espacio'))
+        
+        import json
+        credentials_dict = json.loads(result[0])
+        service = get_drive_service(credentials_dict)
+        
+        liberados = 0
+        
+        for doc_id in documento_ids:
+            documento = Documento.query.get(doc_id)
+            if not documento or not documento.drive_file_id:
+                continue
+            
+            try:
+                if accion == 'eliminar':
+                    eliminar_archivo(service, documento.drive_file_id)
+                    db.session.delete(documento)
+                    
+                elif accion == 'mover_local':
+                    file_content = descargar_archivo(service, documento.drive_file_id)
+                    
+                    if file_content:
+                        # Guardar en carpeta local - USAR UPLOAD_FOLDER existente
+                        os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+                        
+                        local_filename = f"exp_{documento.expediente_id}_{documento.nombre_archivo}"
+                        local_path = os.path.join(UPLOAD_FOLDER, local_filename)
+                        
+                        with open(local_path, 'wb') as f:
+                            f.write(file_content)
+                        
+                        # Eliminar de Drive
+                        eliminar_archivo(service, documento.drive_file_id)
+                        
+                        # Actualizar registro - USAR ruta_archivo (nombre de tu tabla)
+                        documento.ruta_archivo = local_filename  # ← CORREGIDO
+                        documento.url_drive = None
+                        documento.drive_file_id = None
+                        documento.ubicacion = 'local'
+                
+                liberados += 1
+                
+            except Exception as e:
+                print(f"Error procesando documento {doc_id}: {e}")
+                continue
+        
+        db.session.commit()
+        
+        if accion == 'eliminar':
+            flash(f'🗑️ {liberados} documentos eliminados permanentemente', 'success')
+        else:
+            flash(f'📁 {liberados} documentos movidos a almacenamiento local. Ya NO estarán disponibles desde la web.', 'success')
+        
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Error: {str(e)}', 'danger')
+    
+    return redirect(url_for('main.gestionar_espacio'))
+
 # ============================================
 # FIN DEL ARCHIVO
 # ============================================

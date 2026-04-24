@@ -133,51 +133,25 @@ class Audiencia(db.Model):
     __tablename__ = 'audiencias'
     
     id = db.Column(db.Integer, primary_key=True)
-    
-    # Relación con expediente (solo ForeignKey, la relación backref está en Expediente)
     expediente_id = db.Column(db.Integer, db.ForeignKey('expedientes.id'), nullable=False)
-    
-    # Fecha y hora de la audiencia
     fecha = db.Column(db.Date, nullable=False)
     hora = db.Column(db.Time, nullable=False)
-    
-    # Información de la audiencia
     tipo_audiencia = db.Column(db.String(100), nullable=False, default='audiencia')
-    # tipos: audiencia, conciliacion, juicio, declaracion, diligencia, otros
-    
-    # Ubicación
-    lugar = db.Column(db.String(200))  # Juzgado, sala, dirección
-    sala = db.Column(db.String(100))   # Número de sala
-    
-    # Juez, conciliador o fiscal
-    magistrado = db.Column(db.String(100))  # Nombre del juez/conciliador/fiscal
-    
-    # Link para videollamada (audiencias virtuales)
+    lugar = db.Column(db.String(200))
+    sala = db.Column(db.String(100))
+    magistrado = db.Column(db.String(100))
     link_videollamada = db.Column(db.String(500))
-    
-    # Observaciones
     observaciones = db.Column(db.Text)
-    
-    # Estado de la audiencia
     estado = db.Column(db.String(50), default='programada')
-    # estados: programada, realizada, aplazada, cancelada, pendiente
-    
-    # Recordatorio (días antes)
     recordatorio_dias = db.Column(db.Integer, default=1)
-    
-    # Metadatos
     fecha_registro = db.Column(db.DateTime, default=datetime.now)
     fecha_actualizacion = db.Column(db.DateTime, default=datetime.now, onupdate=datetime.now)
     usuario_registro = db.Column(db.String(100), nullable=False)
-    
-    # ✅ ELIMINADA: La relación backref ya está definida en Expediente
-    # expediente = db.relationship('Expediente', backref='audiencias', lazy=True)
     
     def __repr__(self):
         return f'<Audiencia {self.fecha} {self.hora} - {self.expediente_id}>'
     
     def get_tipo_label(self):
-        """Devuelve etiqueta legible del tipo de audiencia"""
         tipos = {
             'audiencia': '⚖️ Audiencia',
             'conciliacion': '🤝 Conciliación',
@@ -192,7 +166,6 @@ class Audiencia(db.Model):
         return tipos.get(self.tipo_audiencia, '📎 Otro')
     
     def get_estado_label(self):
-        """Devuelve etiqueta legible del estado"""
         estados = {
             'programada': '📅 Programada',
             'realizada': '✅ Realizada',
@@ -203,7 +176,6 @@ class Audiencia(db.Model):
         return estados.get(self.estado, '📅 Programada')
     
     def get_estado_color(self):
-        """Devuelve clase CSS según estado"""
         colores = {
             'programada': 'primary',
             'realizada': 'success',
@@ -214,48 +186,59 @@ class Audiencia(db.Model):
         return colores.get(self.estado, 'primary')
     
     def get_fecha_hora_formateada(self):
-        """Devuelve fecha y hora formateada"""
         return f"{self.fecha.strftime('%d/%m/%Y')} a las {self.hora.strftime('%H:%M')}"
     
     def es_proxima(self):
-        """Verifica si la audiencia es en los próximos 3 días"""
         from datetime import date, timedelta
         hoy = date.today()
         dias_diferencia = (self.fecha - hoy).days
         return 0 <= dias_diferencia <= 3 and self.estado == 'programada'
     
     def es_hoy(self):
-        """Verifica si la audiencia es hoy"""
         from datetime import date
         return self.fecha == date.today() and self.estado == 'programada'
 
 # ============================================
-# MODELO DOCUMENTO - MÓDULO DOCUMENTOS
+# MODELO DOCUMENTO - MÓDULO DOCUMENTOS (CON GOOGLE DRIVE)
 # ============================================
 
 class Documento(db.Model):
-    """Modelo para gestión de documentos de expedientes"""
     __tablename__ = 'documentos'
     
+    # === CAMPOS QUE YA TENÍAS (mantener nombres) ===
     id = db.Column(db.Integer, primary_key=True)
-    expediente_id = db.Column(db.Integer, db.ForeignKey('expedientes.id'), nullable=True)
-    titulo = db.Column(db.String(200), nullable=False)
-    descripcion = db.Column(db.Text, nullable=True)
-    categoria = db.Column(db.String(50), nullable=False, default='otros')
-    nombre_archivo = db.Column(db.String(255), nullable=False)
-    tipo_archivo = db.Column(db.String(50), nullable=False)
-    tamaño_bytes = db.Column(db.Integer, nullable=False)
-    ruta_archivo = db.Column(db.String(500), nullable=False)
-    fecha_documento = db.Column(db.Date, nullable=True)
-    fecha_subida = db.Column(db.DateTime, default=datetime.now)
-    usuario_subida = db.Column(db.String(100), nullable=False)
-    es_publico = db.Column(db.Boolean, default=True)
+    expediente_id = db.Column(db.Integer, db.ForeignKey('expedientes.id'), nullable=False)
+    titulo = db.Column(db.String(255), nullable=False)
+    descripcion = db.Column(db.Text)
+    categoria = db.Column(db.String(50), default='otros')
+    nombre_archivo = db.Column(db.String(255))
+    tipo_archivo = db.Column(db.String(50))
+    tamaño_bytes = db.Column(db.Integer)        # ← tu nombre
+    ruta_archivo = db.Column(db.String(500))      # ← tu nombre
+    fecha_documento = db.Column(db.Date)
+    fecha_subida = db.Column(db.DateTime, default=datetime.utcnow)
+    usuario_subida = db.Column(db.String(100))
+    es_publico = db.Column(db.Boolean, default=False)
     
-    # ✅ CORREGIDO: Eliminado backref duplicado, ya está en Expediente
-    # expediente = db.relationship('Expediente', backref='documentos', lazy=True)
+    # === CAMPOS NUEVOS PARA GOOGLE DRIVE ===
+    url_drive = db.Column(db.String(500))
+    drive_file_id = db.Column(db.String(100))
+    ubicacion = db.Column(db.String(20), default='local')  # 'local', 'drive', 'ambos'
     
-    def __repr__(self):
-        return f'<Documento {self.titulo}>'
+    # Relación
+    expediente = db.relationship('Expediente', backref='documentos')
+    
+    # === MÉTODOS ===
+    def get_tamaño_formateado(self):
+        """Usa tamaño_bytes (tu campo)"""
+        if not self.tamaño_bytes:
+            return '0 B'
+        if self.tamaño_bytes < 1024:
+            return f"{self.tamaño_bytes} B"
+        elif self.tamaño_bytes < 1024 * 1024:
+            return f"{self.tamaño_bytes / 1024:.1f} KB"
+        else:
+            return f"{self.tamaño_bytes / (1024 * 1024):.1f} MB"
     
     def get_tipo_label(self):
         tipos = {
@@ -271,72 +254,46 @@ class Documento(db.Model):
     
     def get_icono(self):
         iconos = {
-            'pdf': '📕',
-            'doc': '📘',
-            'docx': '📘',
-            'xls': '📗',
-            'xlsx': '📗',
-            'jpg': '🖼️',
-            'jpeg': '🖼️',
-            'png': '🖼️',
-            'gif': '🖼️',
-            'mp4': '🎬',
-            'mp3': '🎵',
-            'zip': '📦',
-            'rar': '📦'
+            'pdf': '📕', 'doc': '📘', 'docx': '📘',
+            'xls': '📗', 'xlsx': '📗',
+            'jpg': '🖼️', 'jpeg': '🖼️', 'png': '🖼️', 'gif': '🖼️',
+            'mp4': '🎬', 'mp3': '🎵',
+            'zip': '📦', 'rar': '📦'
         }
-        return iconos.get(self.tipo_archivo.lower(), '📄')
-    
-    def get_tamaño_formateado(self):
-        if self.tamaño_bytes < 1024:
-            return f"{self.tamaño_bytes} B"
-        elif self.tamaño_bytes < 1024 * 1024:
-            return f"{self.tamaño_bytes / 1024:.1f} KB"
-        else:
-            return f"{self.tamaño_bytes / (1024 * 1024):.1f} MB"
+        return iconos.get(self.tipo_archivo.lower() if self.tipo_archivo else '', '📄')
     
     def get_extension(self):
-        return self.tipo_archivo.upper()
+        return self.tipo_archivo.upper() if self.tipo_archivo else 'DESCONOCIDO'
     
+    def get_ubicacion_label(self):
+        if self.ubicacion == 'drive':
+            return '<span class="badge badge-primary"><i class="fab fa-google-drive"></i> Nube</span>'
+        elif self.ubicacion == 'local':
+            return '<span class="badge badge-secondary"><i class="fas fa-desktop"></i> Local</span>'
+        elif self.ubicacion == 'ambos':
+            return '<span class="badge badge-success"><i class="fas fa-cloud"></i> Ambos</span>'
+        return ''
+
 # ============================================
 # MODELO NOTIFICACION - SISTEMA DE ALERTAS
 # ============================================
 
 class Notificacion(db.Model):
-    """Notificaciones del sistema para usuarios"""
     __tablename__ = 'notificaciones'
     
     id = db.Column(db.Integer, primary_key=True)
-    
-    # Tipo de notificación
-    tipo = db.Column(db.String(50), nullable=False)  
-    # tipos: 'audiencia_proxima', 'audiencia_hoy', 'audiencia_manana', 
-    #        'estado_cambiado', 'documento_subido', 'sistema'
-    
-    # Relación con expediente (opcional)
+    tipo = db.Column(db.String(50), nullable=False)
     expediente_id = db.Column(db.Integer, db.ForeignKey('expedientes.id'), nullable=True)
-    
-    # Relación con audiencia (opcional)
     audiencia_id = db.Column(db.Integer, db.ForeignKey('audiencias.id'), nullable=True)
-    
-    # Contenido
     titulo = db.Column(db.String(200), nullable=False)
     mensaje = db.Column(db.Text, nullable=False)
-    
-    # Destinatario (si es null, es para todos)
     usuario_destino = db.Column(db.String(100), nullable=True)
-    
-    # Estado
     leida = db.Column(db.Boolean, default=False)
     fecha_creacion = db.Column(db.DateTime, default=datetime.now)
     fecha_lectura = db.Column(db.DateTime, nullable=True)
-    
-    # Link para redirigir al hacer clic
     link = db.Column(db.String(500), nullable=True)
-    
-    # Icono/Color para la UI
     icono = db.Column(db.String(50), default='🔔')
-    color = db.Column(db.String(20), default='info')  # info, warning, danger, success
+    color = db.Column(db.String(20), default='info')
     
     def __repr__(self):
         return f'<Notificacion {self.tipo}: {self.titulo}>'
@@ -379,7 +336,6 @@ class Usuario(db.Model):
         return f'<Usuario {self.username}>'
     
     def get_modulos_list(self):
-        """Devuelve la lista de módulos permitidos"""
         import json
         try:
             return json.loads(self.modulos) if self.modulos else []
@@ -387,24 +343,20 @@ class Usuario(db.Model):
             return []
     
     def set_modulos_list(self, modulos_list):
-        """Guarda la lista de módulos como JSON string"""
         import json
         self.modulos = json.dumps(modulos_list) if isinstance(modulos_list, list) else '[]'
     
     def check_password(self, password):
-        """Verifica contraseña con bcrypt"""
         import bcrypt
         return bcrypt.checkpw(password.encode('utf-8'), self.password_hash.encode('utf-8'))
     
     def set_password(self, password):
-        """Genera hash bcrypt de la contraseña"""
         import bcrypt
         password_bytes = password.encode('utf-8')
         salt = bcrypt.gensalt(rounds=12)
         self.password_hash = bcrypt.hashpw(password_bytes, salt).decode('utf-8')
     
     def to_dict(self):
-        """Devuelve datos del usuario (sin password)"""
         return {
             'username': self.username,
             'nombre': self.nombre,
@@ -414,4 +366,3 @@ class Usuario(db.Model):
             'activo': self.activo,
             'fecha_registro': self.fecha_registro.strftime('%Y-%m-%d %H:%M') if self.fecha_registro else None
         }
-    

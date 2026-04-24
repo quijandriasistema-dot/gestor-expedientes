@@ -35,8 +35,11 @@
     
     <!-- Acciones -->
     <div style="display: flex; gap: 1rem; margin-bottom: 1.5rem; flex-wrap: wrap;">
-        <a href="{{ url_for('main.subir_documento_expediente', id=expediente.id) }}" class="btn btn-primary btn-lg">
-            ➕ Agregar Documento
+        <a href="{{ url_for('main.subir_documento') }}?expediente_id={{ expediente.id }}" class="btn btn-primary btn-lg">
+            ➕ Agregar Documento (Local)
+        </a>
+        <a href="{{ url_for('main.auth_google') }}" class="btn btn-success btn-lg">
+            <i class="fab fa-google-drive"></i> Subir a Google Drive
         </a>
         <a href="{{ url_for('main.documentos') }}" class="btn btn-secondary btn-lg">
             📁 Todos los Documentos
@@ -50,6 +53,7 @@
             <thead>
                 <tr>
                     <th>📄 Documento</th>
+                    <th>☁️ Ubicación</th>
                     <th>🏷️ Tipo</th>
                     <th>📅 Fecha</th>
                     <th>👤 Subido por</th>
@@ -74,6 +78,21 @@
                             </div>
                         </div>
                     </td>
+                    <td style="text-align: center;">
+                        {% if doc.ubicacion == 'drive' %}
+                            <span class="badge badge-primary" title="En Google Drive">
+                                <i class="fab fa-google-drive"></i> Nube
+                            </span>
+                        {% elif doc.ubicacion == 'local' %}
+                            <span class="badge badge-secondary" title="Solo en oficina">
+                                <i class="fas fa-desktop"></i> Local
+                            </span>
+                        {% elif doc.ubicacion == 'ambos' %}
+                            <span class="badge badge-success" title="En ambos lugares">
+                                <i class="fas fa-cloud"></i> Ambos
+                            </span>
+                        {% endif %}
+                    </td>
                     <td>
                         <span class="badge badge-info">{{ doc.get_tipo_label() }}</span>
                         {% if doc.fecha_documento %}
@@ -82,23 +101,27 @@
                         {% endif %}
                     </td>
                     <td>
-                        {{ doc.fecha_subida.strftime('%d/%m/%Y') }}
+                        {{ doc.fecha_subida.strftime('%d/%m/%Y') if doc.fecha_subida else '-' }}
                     </td>
-                    <td>{{ doc.usuario_subida }}</td>
+                    <td>{{ doc.usuario_subida or '-' }}</td>
                     <td>{{ doc.get_tamaño_formateado() }}</td>
                     <td>
                         <div style="display: flex; gap: 0.5rem;">
-                            <!-- ✅ NUEVO: Botón Visualizar (solo PDF e imágenes) -->
-                            {% if doc.tipo_archivo.lower() in ['pdf', 'jpg', 'jpeg', 'png', 'gif'] %}
-                            <a href="{{ url_for('main.visualizar_documento', id=doc.id) }}" target="_blank" class="btn btn-small btn-success" title="Visualizar">
+                            <!-- Ver (solo si está en Drive) -->
+                            {% if doc.ubicacion in ['drive', 'ambos'] and doc.drive_file_id %}
+                            <a href="{{ url_for('main.ver_documento', id=doc.id) }}" target="_blank" class="btn btn-small btn-success" title="Visualizar en Drive">
                                 👁️ Ver
                             </a>
                             {% endif %}
                             
+                            <!-- Descargar (solo si está en local) -->
+                            {% if doc.ubicacion in ['local', 'ambos'] and doc.ruta_local %}
                             <a href="{{ url_for('main.descargar_documento', id=doc.id) }}" class="btn btn-small btn-primary">
                                 ⬇️ Descargar
                             </a>
+                            {% endif %}
                             
+                            <!-- Eliminar -->
                             {% if rol in ['ADMINISTRADOR', 'DESARROLLADOR'] %}
                             <form method="POST" action="{{ url_for('main.eliminar_documento', id=doc.id) }}" 
                                   onsubmit="return confirm('¿Eliminar este documento?');" style="display: inline;">
@@ -117,9 +140,14 @@
         <div style="font-size: 4rem; margin-bottom: 1rem;">📂</div>
         <h3>No hay documentos en este expediente</h3>
         <p style="color: var(--color-text-light);">Agregue el primer documento.</p>
-        <a href="{{ url_for('main.subir_documento_expediente', id=expediente.id) }}" class="btn btn-primary btn-lg" style="margin-top: 1rem;">
-            ➕ Agregar Documento
-        </a>
+        <div style="display: flex; gap: 1rem; justify-content: center; flex-wrap: wrap;">
+            <a href="{{ url_for('main.subir_documento') }}?expediente_id={{ expediente.id }}" class="btn btn-primary btn-lg">
+                ➕ Agregar Documento Local
+            </a>
+            <a href="{{ url_for('main.auth_google') }}" class="btn btn-success btn-lg">
+                <i class="fab fa-google-drive"></i> Subir a Google Drive
+            </a>
+        </div>
     </div>
     {% endif %}
 </div>

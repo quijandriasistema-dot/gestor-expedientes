@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+
+{% block title %}Ver Documento - {{ documento.titulo }}{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-12">
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb">
+                    <li class="breadcrumb-item"><a href="{{ url_for('main.index') }}">Inicio</a></li>
+                    <li class="breadcrumb-item"><a href="{{ url_for('main.expediente_detalle', id=documento.expediente_id) }}">Expediente</a></li>
+                    <li class="breadcrumb-item active">Ver Documento</li>
+                </ol>
+            </nav>
+            
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">
+                        <i class="fab fa-google-drive text-primary"></i> 
+                        {{ documento.titulo }}
+                    </h5>
+                    <div>
+                        <a href="{{ documento.url_drive }}" target="_blank" class="btn btn-sm btn-outline-primary">
+                            <i class="fas fa-external-link-alt"></i> Abrir en Drive
+                        </a>
+                        <a href="{{ url_for('main.expediente_documentos', id=documento.expediente_id) }}" class="btn btn-sm btn-secondary">
+                            <i class="fas fa-arrow-left"></i> Volver
+                        </a>
+                    </div>
+                </div>
+                <div class="card-body p-0">
+                    <div class="ratio ratio-16x9" style="min-height: 80vh;">
+                        <iframe src="https://drive.google.com/file/d/{{ documento.drive_file_id }}/preview" 
+                                allowfullscreen 
+                                style="border: none;">
+                        </iframe>
+                    </div>
+                </div>
+                <div class="card-footer text-muted">
+                    <small>
+                        <i class="fas fa-file"></i> {{ documento.nombre_archivo }} | 
+                        <i class="fas fa-hdd"></i> {{ documento.get_tamaño_formateado() }} | 
+                        <i class="fas fa-calendar"></i> {{ documento.fecha_subida.strftime('%d/%m/%Y') }}
+                    </small>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
