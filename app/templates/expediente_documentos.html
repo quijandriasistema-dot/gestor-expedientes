@@ -1,5 +1,7 @@
 {% extends "base.html" %}
 
+{% block title %}Documentos del Expediente - Quijandria Abogados{% endblock %}
+
 {% block content %}
 <div class="dashboard">
     <!-- Header -->
@@ -19,7 +21,9 @@
                 <strong>👤 Cliente:</strong> {{ expediente.cliente }}
             </div>
             <div>
-                <a href="{{ url_for('main.ver_expediente', id=expediente.id) }}" class="btn btn-secondary">👁️ Ver Expediente</a>
+                <a href="{{ url_for('main.expediente_detalle', id=expediente.id) }}" class="btn btn-secondary" style="text-decoration: none;">
+                    👁️ Ver Expediente
+                </a>
             </div>
         </div>
     </div>
@@ -35,13 +39,13 @@
     
     <!-- Acciones -->
     <div style="display: flex; gap: 1rem; margin-bottom: 1.5rem; flex-wrap: wrap;">
-        <a href="{{ url_for('main.subir_documento') }}?expediente_id={{ expediente.id }}" class="btn btn-primary btn-lg">
-            ➕ Agregar Documento (Local)
+        <a href="{{ url_for('main.subir_documento_drive', expediente_id=expediente.id) }}" class="btn btn-success btn-lg" style="text-decoration: none;">
+            <span>☁️</span> Subir a Google Drive
         </a>
-        <a href="{{ url_for('main.auth_google') }}" class="btn btn-success btn-lg">
-            <i class="fab fa-google-drive"></i> Subir a Google Drive
+        <a href="{{ url_for('main.archivar_documentos') }}" class="btn btn-warning btn-lg" style="background: #f59e0b; color: white; text-decoration: none;">
+            <span>📦</span> Archivar Documentos
         </a>
-        <a href="{{ url_for('main.documentos') }}" class="btn btn-secondary btn-lg">
+        <a href="{{ url_for('main.documentos') }}" class="btn btn-secondary btn-lg" style="text-decoration: none;">
             📁 Todos los Documentos
         </a>
     </div>
@@ -91,6 +95,13 @@
                             <span class="badge badge-success" title="En ambos lugares">
                                 <i class="fas fa-cloud"></i> Ambos
                             </span>
+                        {% elif doc.ubicacion == 'archivado_local' %}
+                            <span class="badge badge-warning" title="Disponible solo en PC de oficina">
+                                <i class="fas fa-archive"></i> Archivado
+                            </span>
+                            <div style="margin-top: 0.5rem; padding: 0.5rem; background: #fef3c7; border-radius: 4px; font-size: 0.85rem; color: #92400e;">
+                                ⚠️ Solo oficina
+                            </div>
                         {% endif %}
                     </td>
                     <td>
@@ -109,19 +120,19 @@
                         <div style="display: flex; gap: 0.5rem;">
                             <!-- Ver (solo si está en Drive) -->
                             {% if doc.ubicacion in ['drive', 'ambos'] and doc.drive_file_id %}
-                            <a href="{{ url_for('main.ver_documento', id=doc.id) }}" target="_blank" class="btn btn-small btn-success" title="Visualizar en Drive">
+                            <a href="{{ url_for('main.ver_documento', id=doc.id) }}" target="_blank" class="btn btn-small btn-success" title="Visualizar en Drive" style="text-decoration: none;">
                                 👁️ Ver
                             </a>
                             {% endif %}
                             
                             <!-- Descargar (solo si está en local) -->
                             {% if doc.ubicacion in ['local', 'ambos'] and doc.ruta_archivo %}
-                            <a href="{{ url_for('main.descargar_documento', id=doc.id) }}" class="btn btn-small btn-primary">
+                            <a href="{{ url_for('main.descargar_documento', id=doc.id) }}" class="btn btn-small btn-primary" style="text-decoration: none;">
                                 ⬇️ Descargar
                             </a>
                             {% endif %}
                             
-                            <!-- Reemplaza el bloque de eliminar (~línea 108) por esto: -->
+                            <!-- Eliminar -->
                             {% if rol in ['ADMINISTRADOR', 'DESARROLLADOR'] %}
                                 {% if doc.ubicacion == 'drive' %}
                                 <form method="POST" action="{{ url_for('main.eliminar_documento_drive', id=doc.id) }}" 
@@ -146,11 +157,11 @@
         <h3>No hay documentos en este expediente</h3>
         <p style="color: var(--color-text-light);">Agregue el primer documento.</p>
         <div style="display: flex; gap: 1rem; justify-content: center; flex-wrap: wrap;">
-            <a href="{{ url_for('main.subir_documento') }}?expediente_id={{ expediente.id }}" class="btn btn-primary btn-lg">
-                ➕ Agregar Documento Local
+            <a href="{{ url_for('main.subir_documento_drive', expediente_id=expediente.id) }}" class="btn btn-success btn-lg" style="text-decoration: none;">
+                <span>☁️</span> Subir a Google Drive
             </a>
-            <a href="{{ url_for('main.auth_google') }}" class="btn btn-success btn-lg">
-                <i class="fab fa-google-drive"></i> Subir a Google Drive
+            <a href="{{ url_for('main.archivar_documentos') }}" class="btn btn-warning btn-lg" style="background: #f59e0b; color: white; text-decoration: none;">
+                <span>📦</span> Archivar Documentos
             </a>
         </div>
     </div>
