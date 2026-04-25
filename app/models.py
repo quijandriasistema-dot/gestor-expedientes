@@ -205,10 +205,26 @@ class Audiencia(db.Model):
 class Documento(db.Model):
     __tablename__ = 'documentos'
     
-    # === CAMPOS ===
+    # === CAMPOS QUE YA TENÍAS (mantener nombres) ===
     id = db.Column(db.Integer, primary_key=True)
-    # ... todos los campos ...
+    expediente_id = db.Column(db.Integer, db.ForeignKey('expedientes.id'), nullable=False)
+    titulo = db.Column(db.String(255), nullable=False)
+    descripcion = db.Column(db.Text)
+    categoria = db.Column(db.String(50), default='otros')
+    nombre_archivo = db.Column(db.String(255))
+    tipo_archivo = db.Column(db.String(50))
+    tamaño_bytes = db.Column(db.Integer)
+    ruta_archivo = db.Column(db.String(500))
+    fecha_documento = db.Column(db.Date)
+    fecha_subida = db.Column(db.DateTime, default=datetime.utcnow)
+    usuario_subida = db.Column(db.String(100))
+    es_publico = db.Column(db.Boolean, default=False)
     
+    # === CAMPOS NUEVOS PARA GOOGLE DRIVE ===
+    url_drive = db.Column(db.String(500))
+    drive_file_id = db.Column(db.String(100))
+    ubicacion = db.Column(db.String(20), default='local')
+
     # === MÉTODOS ===
     def get_tamaño_formateado(self):
         """Usa tamaño_bytes (tu campo)"""
@@ -246,7 +262,6 @@ class Documento(db.Model):
     def get_extension(self):
         return self.tipo_archivo.upper() if self.tipo_archivo else 'DESCONOCIDO'
     
-    # ✅ ESTO DEBE ESTAR DENTRO DE LA CLASE (indentado)
     def get_ubicacion_label(self):
         if self.ubicacion == 'drive':
             return '<span class="badge badge-primary"><i class="fab fa-google-drive"></i> Nube</span>'
