@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}Documentos del Expediente - Quijandria Abogados{% endblock %}
+{% block title %}Subir a Google Drive - {{ documento.titulo if documento else 'Nuevo Documento' }}{% endblock %}
 
 {% block content %}
 <div class="dashboard">
@@ -13,158 +13,120 @@
         <div class="welcome-text">Sistema de Gestión de Expedientes Legales</div>
     </div>
     
-    <!-- Info del expediente -->
-    <div style="background: #e0f2fe; border-left: 4px solid #0369a1; padding: 1rem; margin-bottom: 1.5rem; border-radius: 4px;">
-        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
-            <div>
-                <strong>📁 Expediente:</strong> {{ expediente.get_identificador_principal() }}<br>
-                <strong>👤 Cliente:</strong> {{ expediente.cliente }}
-            </div>
-            <div>
-                <a href="{{ url_for('main.expediente_detalle', id=expediente.id) }}" class="btn btn-secondary" style="text-decoration: none;">
-                    👁️ Ver Expediente
-                </a>
-            </div>
-        </div>
-    </div>
-    
     <!-- Título -->
     <h1 style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.5rem;">
-        <span>📂</span>
-        <span>Documentos del Expediente</span>
-        <span style="background: var(--color-accent); color: white; padding: 0.25rem 0.75rem; border-radius: 20px; font-size: 0.9rem;">
-            {{ documentos|length }}
-        </span>
+        <span>☁️</span>
+        <span>Subir Nuevo Documento</span>
     </h1>
+    <p style="color: var(--color-text-light); margin-bottom: 1.5rem;">
+        Complete la información y seleccione el archivo a subir a Google Drive.
+    </p>
     
-    <!-- Acciones -->
-    <div style="display: flex; gap: 1rem; margin-bottom: 1.5rem; flex-wrap: wrap;">
-        <a href="{{ url_for('main.subir_documento_drive', expediente_id=expediente.id) }}" class="btn btn-success btn-lg" style="text-decoration: none;">
-            <span>☁️</span> Subir a Google Drive
-        </a>
-        <a href="{{ url_for('main.archivar_documentos') }}" class="btn btn-warning btn-lg" style="background: #f59e0b; color: white; text-decoration: none;">
-            <span>📦</span> Archivar Documentos
-        </a>
-        <a href="{{ url_for('main.documentos') }}" class="btn btn-secondary btn-lg" style="text-decoration: none;">
-            📁 Todos los Documentos
-        </a>
-    </div>
-    
-    <!-- Listado -->
-    {% if documentos %}
-    <div class="table-container">
-        <table class="data-table">
-            <thead>
-                <tr>
-                    <th>📄 Documento</th>
-                    <th>☁️ Ubicación</th>
-                    <th>🏷️ Tipo</th>
-                    <th>📅 Fecha</th>
-                    <th>👤 Subido por</th>
-                    <th>💾 Tamaño</th>
-                    <th>⚙️ Acciones</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for doc in documentos %}
-                <tr>
-                    <td>
-                        <div style="display: flex; align-items: center; gap: 0.5rem;">
-                            <span style="font-size: 1.5rem;">{{ doc.get_icono() }}</span>
-                            <div>
-                                <strong>{{ doc.titulo }}</strong>
-                                <br>
-                                <small style="color: var(--color-text-light);">{{ doc.nombre_archivo }}</small>
-                                {% if doc.descripcion %}
-                                    <br>
-                                    <small style="color: #6b7280;">{{ doc.descripcion[:50] }}{% if doc.descripcion|length > 50 %}...{% endif %}</small>
-                                {% endif %}
-                            </div>
-                        </div>
-                    </td>
-                    <td style="text-align: center;">
-                        {% if doc.ubicacion == 'drive' %}
-                            <span class="badge badge-primary" title="En Google Drive">
-                                <i class="fab fa-google-drive"></i> Nube
-                            </span>
-                        {% elif doc.ubicacion == 'local' %}
-                            <span class="badge badge-secondary" title="Solo en oficina">
-                                <i class="fas fa-desktop"></i> Local
-                            </span>
-                        {% elif doc.ubicacion == 'ambos' %}
-                            <span class="badge badge-success" title="En ambos lugares">
-                                <i class="fas fa-cloud"></i> Ambos
-                            </span>
-                        {% elif doc.ubicacion == 'archivado_local' %}
-                            <span class="badge badge-warning" title="Disponible solo en PC de oficina">
-                                <i class="fas fa-archive"></i> Archivado
-                            </span>
-                            <div style="margin-top: 0.5rem; padding: 0.5rem; background: #fef3c7; border-radius: 4px; font-size: 0.85rem; color: #92400e;">
-                                ⚠️ Solo oficina
-                            </div>
-                        {% endif %}
-                    </td>
-                    <td>
-                        <span class="badge badge-info">{{ doc.get_tipo_label() }}</span>
-                        {% if doc.fecha_documento %}
-                            <br>
-                            <small style="color: #6b7280;">Doc: {{ doc.fecha_documento.strftime('%d/%m/%Y') }}</small>
-                        {% endif %}
-                    </td>
-                    <td>
-                        {{ doc.fecha_subida.strftime('%d/%m/%Y') if doc.fecha_subida else '-' }}
-                    </td>
-                    <td>{{ doc.usuario_subida or '-' }}</td>
-                    <td>{{ doc.get_tamaño_formateado() }}</td>
-                    <td>
-                        <div style="display: flex; gap: 0.5rem;">
-                            <!-- Ver (solo si está en Drive) -->
-                            {% if doc.ubicacion in ['drive', 'ambos'] and doc.drive_file_id %}
-                            <a href="{{ url_for('main.ver_documento', id=doc.id) }}" target="_blank" class="btn btn-small btn-success" title="Visualizar en Drive" style="text-decoration: none;">
-                                👁️ Ver
-                            </a>
-                            {% endif %}
-                            
-                            <!-- Descargar (solo si está en local) -->
-                            {% if doc.ubicacion in ['local', 'ambos'] and doc.ruta_archivo %}
-                            <a href="{{ url_for('main.descargar_documento', id=doc.id) }}" class="btn btn-small btn-primary" style="text-decoration: none;">
-                                ⬇️ Descargar
-                            </a>
-                            {% endif %}
-                            
-                            <!-- Eliminar -->
-                            {% if rol in ['ADMINISTRADOR', 'DESARROLLADOR'] %}
-                                {% if doc.ubicacion == 'drive' %}
-                                <form method="POST" action="{{ url_for('main.eliminar_documento_drive', id=doc.id) }}" 
-                                    onsubmit="return confirm('¿Eliminar este documento de Google Drive?');" style="display: inline;">
-                                {% else %}
-                                <form method="POST" action="{{ url_for('main.eliminar_documento', id=doc.id) }}" 
-                                    onsubmit="return confirm('¿Eliminar este documento?');" style="display: inline;">
-                                {% endif %}
-                                    <button type="submit" class="btn btn-small btn-danger">🗑️</button>
-                                </form>
-                            {% endif %}
-                        </div>
-                    </td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-    </div>
-    {% else %}
-    <div style="text-align: center; padding: 3rem; background: white; border-radius: 12px; border: 2px dashed #e5e7eb;">
-        <div style="font-size: 4rem; margin-bottom: 1rem;">📂</div>
-        <h3>No hay documentos en este expediente</h3>
-        <p style="color: var(--color-text-light);">Agregue el primer documento.</p>
-        <div style="display: flex; gap: 1rem; justify-content: center; flex-wrap: wrap;">
-            <a href="{{ url_for('main.subir_documento_drive', expediente_id=expediente.id) }}" class="btn btn-success btn-lg" style="text-decoration: none;">
-                <span>☁️</span> Subir a Google Drive
-            </a>
-            <a href="{{ url_for('main.archivar_documentos') }}" class="btn btn-warning btn-lg" style="background: #f59e0b; color: white; text-decoration: none;">
-                <span>📦</span> Archivar Documentos
-            </a>
-        </div>
+    <!-- Información si viene de un expediente -->
+    {% if expediente %}
+    <div style="background: #e0f2fe; border-left: 4px solid #0369a1; padding: 1rem; margin-bottom: 1.5rem; border-radius: 4px;">
+        <strong>📁 Expediente seleccionado:</strong> {{ expediente.get_identificador_principal() }} - {{ expediente.cliente }}
     </div>
     {% endif %}
+    
+    <!-- Formulario GOOGLE DRIVE (único) -->
+    <div class="form-container">
+        <form method="POST" action="{{ url_for('main.subir_documento_drive') }}" enctype="multipart/form-data">
+            {% if expediente %}
+                <input type="hidden" name="expediente_id" value="{{ expediente.id }}">
+            {% endif %}
+            
+            <!-- Sección 1: Expediente relacionado -->
+            <div class="form-section">
+                <h3><span>📁</span> Expediente Relacionado</h3>
+                <div class="form-row">
+                    <div class="form-col-2">
+                        <div class="form-group">
+                            <label>Expediente</label>
+                            {% if expediente %}
+                                <input type="text" class="form-control" value="{{ expediente.get_identificador_principal() }} - {{ expediente.cliente }}" disabled>
+                                <input type="hidden" name="expediente_id" value="{{ expediente.id }}">
+                            {% else %}
+                                <select name="expediente_id" class="form-control" required>
+                                    <option value="">Seleccione un expediente...</option>
+                                    {% for exp in expedientes %}
+                                    <option value="{{ exp.id }}">{{ exp.get_identificador_principal() }} - {{ exp.cliente }}</option>
+                                    {% endfor %}
+                                </select>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Sección 2: Información del documento -->
+            <div class="form-section">
+                <h3><span>📝</span> Información del Documento</h3>
+                <div class="form-row">
+                    <div class="form-col-2">
+                        <div class="form-group">
+                            <label>Título *</label>
+                            <input type="text" name="titulo" class="form-control" placeholder="Ej: Escrito de Demanda, Resolución N° 123..." required>
+                        </div>
+                    </div>
+                    <div class="form-col-2">
+                        <div class="form-group">
+                            <label>Categoría</label>
+                            <select name="categoria" class="form-control">
+                                <option value="escrito">📝 Escrito</option>
+                                <option value="resolucion">⚖️ Resolución</option>
+                                <option value="contrato">📄 Contrato</option>
+                                <option value="evidencia">📷 Evidencia</option>
+                                <option value="poder">✍️ Poder</option>
+                                <option value="notificacion">📬 Notificación</option>
+                                <option value="otros" selected>📎 Otros</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-col-2">
+                        <div class="form-group">
+                            <label>Fecha del Documento</label>
+                            <input type="date" name="fecha_documento" class="form-control">
+                        </div>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Descripción</label>
+                    <textarea name="descripcion" class="form-control" rows="3" placeholder="Descripción o observaciones..."></textarea>
+                </div>
+            </div>
+            
+            <!-- Sección 3: Archivo -->
+            <div class="form-section">
+                <h3><span>☁️</span> Archivo para Google Drive</h3>
+                <div class="form-group">
+                    <label>Archivo *</label>
+                    <input type="file" name="archivo" class="form-control" accept=".pdf,.jpg,.jpeg,.png,.doc,.docx,.xls,.xlsx" required>
+                    <div style="margin-top: 0.5rem; padding: 0.75rem; background: #e8f5e9; border-radius: 6px; border-left: 3px solid #4caf50;">
+                        <small style="color: #2e7d32;">
+                            <strong>☁️ Se subirá a Google Drive.</strong><br>
+                            <strong>Formatos recomendados:</strong> PDF, JPG, PNG, Word, Excel<br>
+                            <strong>Límite:</strong> 15 GB total en tu cuenta de Google Drive.<br>
+                            <strong>✅ Ventaja:</strong> Accesible desde cualquier lugar con internet.
+                        </small>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Botones -->
+            <div class="form-actions">
+                <button type="submit" class="btn btn-success btn-lg">
+                    <span>☁️</span> Subir a Google Drive
+                </button>
+                {% if expediente %}
+                    <a href="{{ url_for('main.expediente_documentos', id=expediente.id) }}" class="btn btn-secondary btn-lg" style="text-decoration: none;">❌ Cancelar</a>
+                {% else %}
+                    <a href="{{ url_for('main.documentos') }}" class="btn btn-secondary btn-lg" style="text-decoration: none;">❌ Cancelar</a>
+                {% endif %}
+            </div>
+        </form>
+    </div>
 </div>
 {% endblock %}

@@ -21,9 +21,11 @@
                         {{ documento.titulo }}
                     </h5>
                     <div>
+                        {% if documento.url_drive %}
                         <a href="{{ documento.url_drive }}" target="_blank" class="btn btn-sm btn-outline-primary">
                             <i class="fas fa-external-link-alt"></i> Abrir en Drive
                         </a>
+                        {% endif %}
                         <a href="{{ url_for('main.expediente_documentos', id=documento.expediente_id) }}" class="btn btn-sm btn-secondary">
                             <i class="fas fa-arrow-left"></i> Volver
                         </a>
@@ -31,11 +33,21 @@
                 </div>
                 <div class="card-body p-0">
                     <div class="ratio ratio-16x9" style="min-height: 80vh;">
-                        <!-- ✅ IFRAME CORREGIDO: todos los atributos dentro de la etiqueta -->
+                        {% if documento.drive_file_id %}
                         <iframe src="https://drive.google.com/file/d/{{ documento.drive_file_id }}/preview" 
                                 allowfullscreen 
                                 style="border: none; width: 100%; height: 100%;">
                         </iframe>
+                        {% else %}
+                        <div style="display: flex; align-items: center; justify-content: center; height: 100%; flex-direction: column;">
+                            <div style="font-size: 4rem; margin-bottom: 1rem;">📁</div>
+                            <h4>Documento no disponible en la nube</h4>
+                            <p style="color: #6b7280;">Este documento ha sido archivado o eliminado de Google Drive.</p>
+                            <a href="{{ url_for('main.expediente_documentos', id=documento.expediente_id) }}" class="btn btn-secondary">
+                                Volver a documentos
+                            </a>
+                        </div>
+                        {% endif %}
                     </div>
                 </div>
                 <div class="card-footer text-muted">

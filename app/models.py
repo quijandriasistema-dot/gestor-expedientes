@@ -269,6 +269,10 @@ class Documento(db.Model):
             return '<span class="badge badge-secondary"><i class="fas fa-desktop"></i> Local</span>'
         elif self.ubicacion == 'ambos':
             return '<span class="badge badge-success"><i class="fas fa-cloud"></i> Ambos</span>'
+        elif self.ubicacion == 'archivado_local':
+            return '<span class="badge badge-warning" title="Disponible solo en PC de oficina"><i class="fas fa-archive"></i> Archivado</span>'
+        elif self.ubicacion == 'eliminado':
+            return '<span class="badge badge-danger"><i class="fas fa-trash"></i> Eliminado</span>'
         return ''
 
 # ============================================
@@ -363,3 +367,5 @@ class Usuario(db.Model):
             'activo': self.activo,
             'fecha_registro': self.fecha_registro.strftime('%Y-%m-%d %H:%M') if self.fecha_registro else None
         }
+    
+get_ubicacion_label

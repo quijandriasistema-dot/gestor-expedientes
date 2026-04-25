@@ -1,98 +1,106 @@
 {% extends "base.html" %}
 
-{% block title %}Gestionar Espacio - Google Drive{% endblock %}
+{% block title %}Gestionar Espacio - Quijandria Abogados{% endblock %}
 
 {% block content %}
-<div class="container mt-4">
-    <div class="row">
-        <div class="col-12">
-            <h2><i class="fab fa-google-drive"></i> Gestión de Espacio en Google Drive</h2>
-            
-            <!-- Alerta de espacio -->
-            <div class="alert alert-{% if espacio.porcentaje >= 80 %}danger{% elif espacio.porcentaje >= 60 %}warning{% else %}info{% endif %}">
-                <h5><i class="fas fa-hdd"></i> Uso de Almacenamiento</h5>
-                <div class="progress mb-2" style="height: 25px;">
-                    <div class="progress-bar {% if espacio.porcentaje >= 80 %}bg-danger{% elif espacio.porcentaje >= 60 %}bg-warning{% else %}bg-success{% endif %}" 
-                         role="progressbar" 
-                         style="width: {{ espacio.porcentaje }}%">
-                        {{ "%.1f"|format(espacio.porcentaje) }}%
-                    </div>
-                </div>
-                <p class="mb-0">
-                    <strong>{{ "%.2f"|format(espacio.usado_gb) }} GB</strong> usados de 
-                    <strong>{{ "%.0f"|format(espacio.limite_gb) }} GB</strong> disponibles
-                </p>
-                {% if espacio.porcentaje >= 80 %}
-                <hr>
-                <p class="mb-0 text-danger"><i class="fas fa-exclamation-triangle"></i> 
-                    Estás al <strong>{{ "%.1f"|format(espacio.porcentaje) }}%</strong>. Debes liberar espacio para seguir subiendo documentos.
-                </p>
-                {% endif %}
-            </div>
-            
-            <!-- Documentos en Drive -->
-            <div class="card">
-                <div class="card-header">
-                    <h5 class="mb-0"><i class="fas fa-file-alt"></i> Documentos en Google Drive</h5>
-                </div>
-                <div class="card-body">
-                    {% if documentos %}
-                    <form method="POST" action="{{ url_for('main.liberar_espacio') }}">
-                        <div class="table-responsive">
-                            <table class="table table-hover">
-                                <thead>
-                                    <tr>
-                                        <th><input type="checkbox" id="selectAll"></th>
-                                        <th>Documento</th>
-                                        <th>Expediente</th>
-                                        <th>Tamaño</th>
-                                        <th>Fecha</th>
-                                        <th>Acciones</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {% for doc in documentos %}
-                                    <tr>
-                                        <td><input type="checkbox" name="documentos[]" value="{{ doc.id }}"></td>
-                                        <td>
-                                            <i class="fas fa-file-pdf text-danger"></i> {{ doc.titulo }}
-                                        </td>
-                                        <td>#{{ doc.expediente_id }}</td>
-                                        <td>{{ doc.get_tamaño_formateado() }}</td>
-                                        <td>{{ doc.fecha_subida.strftime('%d/%m/%Y') }}</td>
-                                        <td>
-                                            <a href="{{ url_for('main.ver_documento', id=doc.id) }}" class="btn btn-sm btn-info" target="_blank">
-                                                <i class="fas fa-eye"></i>
-                                            </a>
-                                        </td>
-                                    </tr>
-                                    {% endfor %}
-                                </tbody>
-                            </table>
-                        </div>
-                        
-                        <div class="mt-3">
-                            <button type="submit" name="accion" value="mover_local" class="btn btn-warning">
-                                <i class="fas fa-download"></i> Mover seleccionados a Local
-                            </button>
-                            <button type="submit" name="accion" value="eliminar" class="btn btn-danger" 
-                                    onclick="return confirm('¿Eliminar permanentemente? Esta acción no se puede deshacer.')">
-                                <i class="fas fa-trash"></i> Eliminar seleccionados
-                            </button>
-                        </div>
-                    </form>
-                    {% else %}
-                    <p class="text-muted">No hay documentos en Google Drive.</p>
-                    {% endif %}
-                </div>
-            </div>
+<div class="dashboard">
+    <div class="dashboard-header">
+        <div class="studio-display">
+            <span class="scales-icon">⚖️</span>
+            <div class="studio-name-main">Quijandria Abogados</div>
+        </div>
+        <div class="welcome-text">Sistema de Gestión de Expedientes Legales</div>
+    </div>
+    
+    <h1 style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.5rem;">
+        <span>💾</span>
+        <span>Gestionar Espacio en Google Drive</span>
+    </h1>
+    
+    <!-- Info de espacio -->
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 2rem;">
+        <div style="background: #e0f2fe; border-radius: 8px; padding: 1.5rem; text-align: center;">
+            <div style="font-size: 2rem; font-weight: 700; color: #0369a1;">{{ "%.1f"|format(espacio.usado_gb) }} GB</div>
+            <div style="color: #64748b; font-size: 0.9rem;">Usado</div>
+        </div>
+        <div style="background: #f0fdf4; border-radius: 8px; padding: 1.5rem; text-align: center;">
+            <div style="font-size: 2rem; font-weight: 700; color: #15803d;">{{ "%.1f"|format(espacio.total_gb) }} GB</div>
+            <div style="color: #64748b; font-size: 0.9rem;">Total</div>
+        </div>
+        <div style="background: #fef3c7; border-radius: 8px; padding: 1.5rem; text-align: center;">
+            <div style="font-size: 2rem; font-weight: 700; color: #b45309;">{{ "%.1f"|format(espacio.porcentaje) }}%</div>
+            <div style="color: #64748b; font-size: 0.9rem;">Ocupado</div>
         </div>
     </div>
+    
+    <!-- Barra de progreso -->
+    <div style="background: #e2e8f0; border-radius: 999px; height: 2rem; margin-bottom: 2rem; overflow: hidden;">
+        <div style="background: {% if espacio.porcentaje >= 80 %}#ef4444{% elif espacio.porcentaje >= 60 %}#f59e0b{% else %}#22c55e{% endif %}; 
+                    height: 100%; width: {{ espacio.porcentaje }}%; 
+                    display: flex; align-items: center; justify-content: center; color: white; font-weight: 600;">
+            {{ "%.1f"|format(espacio.porcentaje) }}%
+        </div>
+    </div>
+    
+    {% if espacio.porcentaje >= 80 %}
+    <div style="background: #fee2e2; border: 2px solid #ef4444; border-radius: 8px; padding: 1.5rem; margin-bottom: 2rem;">
+        <h3 style="color: #991b1b; margin-bottom: 0.75rem;">⚠️ Espacio crítico</h3>
+        <p style="color: #7f1d1d; margin-bottom: 1rem;">
+            Google Drive está al <strong>{{ "%.1f"|format(espacio.porcentaje) }}%</strong>. Debe archivar documentos para liberar espacio.
+        </p>
+        <a href="{{ url_for('main.archivar_documentos') }}" class="btn btn-warning btn-lg" style="background: #f59e0b; color: white; text-decoration: none; display: inline-block;">
+            📦 Archivar Documentos Ahora
+        </a>
+    </div>
+    {% endif %}
+    
+    <!-- Documentos en Drive -->
+    <div style="background: white; border-radius: 8px; padding: 1.5rem; border: 1px solid #e2e8f0;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+            <h3 style="color: var(--color-primary);">📋 Documentos en Google Drive</h3>
+            <a href="{{ url_for('main.archivar_documentos') }}" class="btn btn-warning" style="background: #f59e0b; color: white; text-decoration: none;">
+                📦 Archivar Documentos
+            </a>
+        </div>
+        
+        {% if documentos %}
+        <div style="overflow-x: auto;">
+            <table class="table" style="width: 100%;">
+                <thead style="background: #f8fafc;">
+                    <tr>
+                        <th>Documento</th>
+                        <th>Expediente</th>
+                        <th>Fecha</th>
+                        <th>Tamaño</th>
+                        <th>Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for doc in documentos %}
+                    <tr>
+                        <td>
+                            <strong>{{ doc.titulo }}</strong><br>
+                            <small style="color: #64748b;">{{ doc.nombre_archivo }}</small>
+                        </td>
+                        <td>{{ doc.expediente.get_identificador_principal() if doc.expediente else 'N/A' }}</td>
+                        <td>{{ doc.fecha_subida.strftime('%d/%m/%Y') if doc.fecha_subida else 'N/A' }}</td>
+                        <td>{{ doc.get_tamaño_formateado() }}</td>
+                        <td>
+                            <a href="{{ url_for('main.ver_documento', id=doc.id) }}" class="btn btn-sm btn-success" style="text-decoration: none;">
+                                👁️ Ver
+                            </a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div style="text-align: center; padding: 2rem; color: #64748b;">
+            <p style="font-size: 3rem; margin-bottom: 1rem;">☁️</p>
+            <p>No hay documentos en Google Drive.</p>
+        </div>
+        {% endif %}
+    </div>
 </div>
-
-<script>
-document.getElementById('selectAll').addEventListener('change', function() {
-    document.querySelectorAll('input[name="documentos[]"]').forEach(cb => cb.checked = this.checked);
-});
-</script>
 {% endblock %}

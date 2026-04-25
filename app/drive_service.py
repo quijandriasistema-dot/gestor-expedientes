@@ -84,6 +84,7 @@ def exchange_code(code, code_verifier):
     
     credentials = flow.credentials
     
+    # Asegurar que devolvemos un dict serializable
     return {
         'token': credentials.token,
         'refresh_token': credentials.refresh_token,

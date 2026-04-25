@@ -3296,6 +3296,153 @@ def liberar_espacio():
     return redirect(url_for('main.gestionar_espacio'))
 
 # ============================================
-# FIN DEL ARCHIVO
+# ARCHIVAR DOCUMENTOS - LIBERAR ESPACIO DE DRIVE
 # ============================================
 
+@bp.route('/archivar-documentos', methods=['GET', 'POST'])
+@requiere_login
+def archivar_documentos():
+    """Muestra formulario para archivar documentos y generar paquete ZIP"""
+    
+    # Obtener documentos que están en Drive
+    documentos_drive = Documento.query.filter(
+        Documento.ubicacion == 'drive',
+        Documento.drive_file_id.isnot(None)
+    ).order_by(Documento.fecha_subida.desc()).all()
+    
+    if request.method == 'POST':
+        # Verificar confirmación
+        if not request.form.get('confirmar'):
+            flash('Debe confirmar que ha leído la advertencia.', 'warning')
+            return redirect(url_for('main.archivar_documentos'))
+        
+        tipo_periodo = request.form.get('tipo_periodo', 'mes')
+        carpeta_destino = request.form.get('carpeta_destino', 'Archivos_Expedientes')
+        
+        # Calcular fechas según período
+        from datetime import datetime, timedelta
+        hoy = datetime.now()
+        
+        if tipo_periodo == 'dia':
+            fecha_str = request.form.get('fecha', hoy.strftime('%Y-%m-%d'))
+            fecha_inicio = datetime.strptime(fecha_str, '%Y-%m-%d')
+            fecha_fin = fecha_inicio + timedelta(days=1)
+            nombre_paquete = f"expedientes_{fecha_str}"
+            
+        elif tipo_periodo == 'semana':
+            semana_str = request.form.get('semana', hoy.strftime('%Y-W%W'))
+            año, semana = semana_str.split('-W')
+            fecha_inicio = datetime.strptime(f'{año}-{semana}-1', '%Y-%W-%w')
+            fecha_fin = fecha_inicio + timedelta(days=7)
+            nombre_paquete = f"expedientes_semana_{semana_str}"
+            
+        elif tipo_periodo == 'mes':
+            mes_str = request.form.get('mes', hoy.strftime('%Y-%m'))
+            año, mes = mes_str.split('-')
+            fecha_inicio = datetime(int(año), int(mes), 1)
+            if int(mes) == 12:
+                fecha_fin = datetime(int(año) + 1, 1, 1)
+            else:
+                fecha_fin = datetime(int(año), int(mes) + 1, 1)
+            nombre_paquete = f"expedientes_{mes_str}"
+            
+        elif tipo_periodo == 'año':
+            año = int(request.form.get('año', hoy.year))
+            fecha_inicio = datetime(año, 1, 1)
+            fecha_fin = datetime(año + 1, 1, 1)
+            nombre_paquete = f"expedientes_{año}"
+        
+        # Filtrar documentos del período
+        documentos_archivar = Documento.query.filter(
+            Documento.ubicacion == 'drive',
+            Documento.drive_file_id.isnot(None),
+            Documento.fecha_subida >= fecha_inicio,
+            Documento.fecha_subida < fecha_fin
+        ).all()
+        
+        if not documentos_archivar:
+            flash('No hay documentos en ese período para archivar.', 'info')
+            return redirect(url_for('main.archivar_documentos'))
+        
+        # Obtener token de Google
+        usuario_id = session.get('usuario_id')
+        try:
+            from sqlalchemy import text
+            result = db.session.execute(
+                text("SELECT google_token FROM google_tokens WHERE usuario_id = :uid"),
+                {'uid': usuario_id}
+            ).fetchone()
+            
+            if not result:
+                flash('Google Drive no conectado.', 'danger')
+                return redirect(url_for('main.auth_google'))
+            
+            import json
+            token_data = result[0]
+            if isinstance(token_data, dict):
+                credentials_dict = token_data
+            else:
+                credentials_dict = json.loads(token_data)
+            
+            service = get_drive_service(credentials_dict)
+            
+        except Exception as e:
+            flash(f'Error conectando Drive: {str(e)}', 'danger')
+            return redirect(url_for('main.archivar_documentos'))
+        
+        # Crear ZIP en memoria
+        import io
+        import zipfile
+        from flask import send_file
+        
+        zip_buffer = io.BytesIO()
+        archivados = 0
+        
+        with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
+            for doc in documentos_archivar:
+                try:
+                    # Descargar de Drive
+                    file_content = descargar_archivo(service, doc.drive_file_id)
+                    
+                    if file_content:
+                        # Agregar al ZIP
+                        zip_file.writestr(doc.nombre_archivo, file_content)
+                        
+                        # Eliminar de Drive
+                        eliminar_archivo(service, doc.drive_file_id)
+                        
+                        # Marcar como archivado local
+                        doc.ubicacion = 'archivado_local'
+                        doc.url_drive = None
+                        doc.drive_file_id = None
+                        
+                        archivados += 1
+                        
+                except Exception as e:
+                    print(f"Error archivando {doc.id}: {e}")
+                    continue
+        
+        db.session.commit()
+        
+        # Preparar ZIP para descarga
+        zip_buffer.seek(0)
+        
+        flash(f'📦 {archivados} documentos archivados. El ZIP se descargará ahora.', 'success')
+        
+        return send_file(
+            zip_buffer,
+            mimetype='application/zip',
+            as_attachment=True,
+            download_name=f'{nombre_paquete}.zip'
+        )
+    
+    # GET: Mostrar formulario
+    return render_template('archivar_documentos.html',
+                         title='Archivar Documentos',
+                         documentos_drive=documentos_drive,
+                         fecha_hoy=datetime.now().strftime('%Y%m%d'),
+                         rol=session.get('rol', 'USUARIO'))
+
+# ============================================
+# FIN DEL ARCHIVO
+# ============================================
