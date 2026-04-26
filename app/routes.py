@@ -2886,9 +2886,9 @@ def oauth2callback():
 @bp.route('/subir-documento-drive', methods=['GET', 'POST'])
 @requiere_login
 def subir_documento_drive():
-    """Sube documento a Google Drive"""
+    """Sube documento a Google Drive (único método de subida)"""
     
-    # Si es GET, mostrar formulario
+    # GET: Mostrar formulario
     if request.method == 'GET':
         form = DocumentoForm()
         form.expediente_id.choices = get_expedientes_choices()
@@ -2899,28 +2899,20 @@ def subir_documento_drive():
         if expediente_id:
             expediente = Expediente.query.get(expediente_id)
         
-        # ← CORREGIDO: Agregar lista de expedientes para el select
-        expedientes = Expediente.query.order_by(Expediente.fecha_registro.desc()).all()
-        
         return render_template('subir_documento.html',
                              title='Subir a Google Drive',
                              form=form,
                              expediente=expediente,
-                             expedientes=expedientes,  # ← CORREGIDO
                              rol=session.get('rol', 'USUARIO'),
                              modo_drive=True)
     
-    # POST: Procesar subida
+    # POST: Procesar subida a Drive
     if 'archivo' not in request.files:
         flash('No se seleccionó archivo', 'danger')
         return redirect(request.referrer or url_for('main.documentos'))
     
     archivo = request.files['archivo']
     expediente_id = request.form.get('expediente_id', type=int)
-    
-    # ← CORREGIDO: Si expediente_id es 0, convertir a None
-    if expediente_id == 0:
-        expediente_id = None
     
     if archivo.filename == '':
         flash('Nombre de archivo vacío', 'danger')
@@ -2943,15 +2935,8 @@ def subir_documento_drive():
             flash('❌ Debes conectar Google Drive primero. Haz clic en "Subir a Google Drive" para autorizar.', 'warning')
             return redirect(url_for('main.auth_google'))
         
-        # ← FIX COMPLETO: Manejar si Supabase devuelve dict o string
         import json
-        token_data = result[0]
-        
-        if isinstance(token_data, dict):
-            credentials_dict = token_data  # Ya es dict, usar directo
-        else:
-            credentials_dict = json.loads(token_data)  # Es string, parsear
-        
+        credentials_dict = json.loads(result[0])
         service = get_drive_service(credentials_dict)
         
         # Verificar espacio antes de subir
@@ -2989,7 +2974,7 @@ def subir_documento_drive():
             fecha_documento=fecha_doc,
             usuario_subida=session.get('nombre', 'Sistema'),
             tipo_archivo=archivo.filename.split('.')[-1].lower(),
-            tamaño_bytes=len(file_content)  # ← SIN COMA
+            tamaño_bytes=len(file_content)
         )
         
         db.session.add(nuevo_documento)
