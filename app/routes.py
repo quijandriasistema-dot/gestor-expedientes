@@ -1564,22 +1564,11 @@ def eliminar_audiencia(id):
 # ============================================
 
 import os
-import time
 from werkzeug.utils import secure_filename
-from flask import send_from_directory
 
-# Configuración de uploads
-UPLOAD_FOLDER = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'uploads', 'documentos')
-ALLOWED_EXTENSIONS = {'pdf', 'doc', 'docx', 'xls', 'xlsx', 'jpg', 'jpeg', 'png', 'gif', 'mp4', 'mp3', 'zip', 'rar', 'txt'}
-
-try:
-    os.makedirs(UPLOAD_FOLDER, exist_ok=True)
-except OSError:
-    pass  # En Vercel (serverless) no se puede escribir en disco
-
-
-def allowed_file(filename):
-    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+# ============================================
+# CONFIGURACIÓN: Solo Google Drive (sin almacenamiento local)
+# ============================================
 
 
 def get_expedientes_choices():
@@ -1662,16 +1651,17 @@ def subir_documento():
                 timestamp = int(time.time())
                 nombre_unico = f"{timestamp}_{filename_original}"
 
-                os.makedirs(UPLOAD_FOLDER, exist_ok=True)
-                
-                ruta_archivo = os.path.join(UPLOAD_FOLDER, nombre_unico)
-                archivo.save(ruta_archivo)
-
-                tamaño = os.path.getsize(ruta_archivo)
+                # Leer archivo en memoria para subir a Drive
+                file_content = archivo.read()
+                tamaño = len(file_content)
 
                 expediente_id = form.expediente_id.data
                 if expediente_id == 0:
                     expediente_id = None
+
+                # Subir a Google Drive
+                resultado = subir_archivo(service, file_content, archivo.filename, 
+                                         archivo.content_type or 'application/octet-stream')
 
                 nuevo_documento = Documento(
                     expediente_id=expediente_id,
@@ -1681,7 +1671,9 @@ def subir_documento():
                     nombre_archivo=filename_original,
                     tipo_archivo=extension,
                     tamaño_bytes=tamaño,
-                    ruta_archivo=nombre_unico,
+                    url_drive=resultado['url'],
+                    drive_file_id=resultado['id'],
+                    ubicacion='drive',
                     fecha_documento=form.fecha_documento.data,
                     usuario_subida=session.get('nombre', 'Sistema'),
                     ubicacion='local'
@@ -1711,49 +1703,17 @@ def subir_documento():
                          rol=session.get('rol', 'USUARIO'))
 
 
-@bp.route('/documento/<int:id>/descargar')
-@requiere_login
-@no_cache
-def descargar_documento(id):
-    """Descargar un documento"""
-    documento = Documento.query.get_or_404(id)
-
-    try:
-        return send_from_directory(UPLOAD_FOLDER, 
-                                   documento.ruta_archivo,
-                                   as_attachment=True,
-                                   download_name=documento.nombre_archivo)
-    except Exception as e:
-        flash(f'Error al descargar: {str(e)}', 'error')
-        return redirect(url_for('main.documentos'))
-
-
-@bp.route('/documento/<int:id>/visualizar')
-@requiere_login
-@no_cache
-def visualizar_documento(id):
-    """Visualizar un documento en el navegador (PDF e imágenes)"""
-    documento = Documento.query.get_or_404(id)
-
-    tipos_permitidos = ['pdf', 'jpg', 'jpeg', 'png', 'gif']
-    if documento.tipo_archivo.lower() not in tipos_permitidos:
-        flash('Este tipo de archivo no se puede visualizar en el navegador. Use descargar.', 'warning')
-        return redirect(url_for('main.descargar_documento', id=id))
-
-    try:
-        return send_from_directory(UPLOAD_FOLDER,
-                                   documento.ruta_archivo,
-                                   mimetype=f'application/{documento.tipo_archivo.lower()}' if documento.tipo_archivo.lower() == 'pdf' else f'image/{documento.tipo_archivo.lower()}')
-    except Exception as e:
-        flash(f'Error al visualizar: {str(e)}', 'error')
-        return redirect(url_for('main.documentos'))
+# NOTA: Las funciones de descarga y visualización local fueron eliminadas.
+# Todos los documentos se almacenan en Google Drive.
+# Para ver un documento, usar /documento/<int:id>/ver (abre vista de Drive)
+# Para descargar, usar el enlace directo de Google Drive.
 
 
 @bp.route('/documento/<int:id>/eliminar', methods=['POST'])
 @requiere_login
 @no_cache
 def eliminar_documento(id):
-    """Eliminar un documento"""
+    """Eliminar un documento (solo registros en BD, archivos están en Drive)"""
     if session.get('rol') not in ['ADMINISTRADOR', 'DESARROLLADOR']:
         flash('No tiene permisos para eliminar documentos', 'error')
         return redirect(url_for('main.documentos'))
@@ -1762,10 +1722,25 @@ def eliminar_documento(id):
     expediente_id = documento.expediente_id
 
     try:
-        # Eliminar archivo físico
-        ruta_completa = os.path.join(UPLOAD_FOLDER, documento.ruta_archivo)
-        if os.path.exists(ruta_completa):
-            os.remove(ruta_completa)
+        # Si tiene archivo en Drive, eliminarlo también
+        if documento.drive_file_id:
+            usuario_id = session.get('usuario_id')
+            if usuario_id:
+                from sqlalchemy import text
+                result = db.session.execute(
+                    text("SELECT google_token FROM google_tokens WHERE usuario_id = :uid"),
+                    {'uid': usuario_id}
+                ).fetchone()
+
+                if result:
+                    import json
+                    token_data = result[0]
+                    if isinstance(token_data, dict):
+                        credentials_dict = token_data
+                    else:
+                        credentials_dict = json.loads(token_data)
+                    service = get_drive_service(credentials_dict)
+                    eliminar_archivo(service, documento.drive_file_id)
 
         # Eliminar registro de base de datos
         db.session.delete(documento)
@@ -3147,11 +3122,6 @@ def eliminar_documento_drive(id):
                     eliminar_archivo(service, documento.drive_file_id)
         
         # Si está en local, eliminar archivo físico
-        if documento.ubicacion in ['local', 'ambos'] and documento.ruta_archivo:
-            import os
-            ruta_completa = os.path.join(UPLOAD_FOLDER, documento.ruta_archivo)
-            if os.path.exists(ruta_completa):
-                os.remove(ruta_completa)
         
         # Eliminar registro de base de datos
         db.session.delete(documento)
@@ -3255,28 +3225,6 @@ def liberar_espacio():
                     eliminar_archivo(service, documento.drive_file_id)
                     db.session.delete(documento)
                     
-                elif accion == 'mover_local':
-                    file_content = descargar_archivo(service, documento.drive_file_id)
-                    
-                    if file_content:
-                        # Guardar en carpeta local
-                        os.makedirs(UPLOAD_FOLDER, exist_ok=True)
-                        
-                        local_filename = f"exp_{documento.expediente_id}_{documento.nombre_archivo}"
-                        local_path = os.path.join(UPLOAD_FOLDER, local_filename)
-                        
-                        with open(local_path, 'wb') as f:
-                            f.write(file_content)
-                        
-                        # Eliminar de Drive
-                        eliminar_archivo(service, documento.drive_file_id)
-                        
-                        # Actualizar registro
-                        documento.ruta_archivo = local_filename
-                        documento.url_drive = None
-                        documento.drive_file_id = None
-                        documento.ubicacion = 'local'
-                
                 liberados += 1
                 
             except Exception as e:
@@ -3287,8 +3235,8 @@ def liberar_espacio():
         
         if accion == 'eliminar':
             flash(f'🗑️ {liberados} documentos eliminados permanentemente', 'success')
-        else:
-            flash(f'📁 {liberados} documentos movidos a almacenamiento local. Ya NO estarán disponibles desde la web.', 'success')
+        pass  # Solo eliminación disponible
+
         
     except Exception as e:
         db.session.rollback()
@@ -3444,6 +3392,20 @@ def archivar_documentos():
                          fecha_hoy=datetime.now().strftime('%Y%m%d'),
                          rol=session.get('rol', 'USUARIO'))
 
+# ============================================
+# NOTA SOBRE DOCUMENTOS (v1.1+)
+# ============================================
+# Desde la versión 1.1, TODOS los documentos se almacenan
+# exclusivamente en Google Drive. El almacenamiento local fue
+# eliminado completamente.
+#
+# Flujo de documentos:
+#   1. Subida: /subir-documento-drive → Google Drive
+#   2. Visualización: /documento/<id>/ver → iframe de Drive
+#   3. Eliminación: /documento/<id>/eliminar-drive → Drive + BD
+#   4. Limpieza: /archivar-documentos o /liberar-espacio → elimina de Drive
+#
+# No hay descarga directa ni visualización local.
 # ============================================
 # FIN DEL ARCHIVO
 # ============================================
