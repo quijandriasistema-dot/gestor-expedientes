@@ -294,13 +294,16 @@
             </a>
         </div>
 
-        <div class="documentos-preview">
-            <a href="{{ url_for('main.subir_documento') }}?expediente_id={{ expediente.id }}" class="btn btn-secondary">
-                <span>➕</span> Adjuntar documento
+        <div class="documentos-preview" style="display: flex; gap: 1rem; flex-wrap: wrap;">
+            <!-- ✅ CORREGIDO: Link a subir_documento_drive (no subir_documento local) -->
+            <a href="{{ url_for('main.subir_documento_drive', expediente_id=expediente.id) }}" class="btn btn-success" style="text-decoration: none;">
+                <span>☁️</span> Subir a Google Drive
+            </a>
+            <a href="{{ url_for('main.archivar_documentos') }}" class="btn btn-warning" style="background: #f59e0b; color: white; text-decoration: none;">
+                <span>📦</span> Archivar Documentos
             </a>
         </div>
     </div>
-</div>
 {% endblock %}
 
 {% block extra_css %}

@@ -3,62 +3,72 @@
 {% block title %}Ver Documento - {{ documento.titulo }}{% endblock %}
 
 {% block content %}
-<div class="container mt-4">
-    <div class="row">
-        <div class="col-12">
-            <nav aria-label="breadcrumb">
-                <ol class="breadcrumb">
-                    <li class="breadcrumb-item"><a href="{{ url_for('main.index') }}">Inicio</a></li>
-                    <li class="breadcrumb-item"><a href="{{ url_for('main.expediente_detalle', id=documento.expediente_id) }}">Expediente</a></li>
-                    <li class="breadcrumb-item active">Ver Documento</li>
-                </ol>
-            </nav>
-            
-            <div class="card">
-                <div class="card-header d-flex justify-content-between align-items-center">
-                    <h5 class="mb-0">
-                        <i class="fab fa-google-drive text-primary"></i> 
-                        {{ documento.titulo }}
-                    </h5>
-                    <div>
-                        {% if documento.url_drive %}
-                        <a href="{{ documento.url_drive }}" target="_blank" class="btn btn-sm btn-outline-primary">
-                            <i class="fas fa-external-link-alt"></i> Abrir en Drive
-                        </a>
-                        {% endif %}
-                        <a href="{{ url_for('main.expediente_documentos', id=documento.expediente_id) }}" class="btn btn-sm btn-secondary">
-                            <i class="fas fa-arrow-left"></i> Volver
-                        </a>
-                    </div>
-                </div>
-                <div class="card-body p-0">
-                    <div class="ratio ratio-16x9" style="min-height: 80vh;">
-                        {% if documento.drive_file_id %}
-                        <iframe src="https://drive.google.com/file/d/{{ documento.drive_file_id }}/preview" 
-                                allowfullscreen 
-                                style="border: none; width: 100%; height: 100%;">
-                        </iframe>
-                        {% else %}
-                        <div style="display: flex; align-items: center; justify-content: center; height: 100%; flex-direction: column;">
-                            <div style="font-size: 4rem; margin-bottom: 1rem;">📁</div>
-                            <h4>Documento no disponible en la nube</h4>
-                            <p style="color: #6b7280;">Este documento ha sido archivado o eliminado de Google Drive.</p>
-                            <a href="{{ url_for('main.expediente_documentos', id=documento.expediente_id) }}" class="btn btn-secondary">
-                                Volver a documentos
-                            </a>
-                        </div>
-                        {% endif %}
-                    </div>
-                </div>
-                <div class="card-footer text-muted">
-                    <small>
-                        <i class="fas fa-file"></i> {{ documento.nombre_archivo }} | 
-                        <i class="fas fa-hdd"></i> {{ documento.get_tamaño_formateado() }} | 
-                        <i class="fas fa-calendar"></i> {{ documento.fecha_subida.strftime('%d/%m/%Y') }}
-                    </small>
-                </div>
-            </div>
+<div class="dashboard">
+    <!-- Header -->
+    <div class="dashboard-header">
+        <div class="studio-display">
+            <span class="scales-icon">⚖️</span>
+            <div class="studio-name-main">Quijandria Abogados</div>
         </div>
+        <div class="welcome-text">Sistema de Gestión de Expedientes Legales</div>
+    </div>
+    
+    <!-- Breadcrumb -->
+    <div style="margin-bottom: 1rem;">
+        <a href="{{ url_for('main.index') }}" style="color: var(--color-primary); text-decoration: none;">Inicio</a>
+        <span style="color: #94a3b8;"> / </span>
+        <a href="{{ url_for('main.expediente_detalle', id=documento.expediente_id) }}" style="color: var(--color-primary); text-decoration: none;">Expediente</a>
+        <span style="color: #94a3b8;"> / </span>
+        <span style="color: #64748b;">Ver Documento</span>
+    </div>
+    
+    <!-- Título y acciones -->
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 1rem;">
+        <h1 style="display: flex; align-items: center; gap: 0.75rem; margin: 0;">
+            <span>📄</span>
+            <span>{{ documento.titulo }}</span>
+        </h1>
+        <div style="display: flex; gap: 0.5rem;">
+            {% if documento.url_drive %}
+            <a href="{{ documento.url_drive }}" target="_blank" class="btn btn-primary" style="text-decoration: none;">
+                <span>🔗</span> Abrir en Drive
+            </a>
+            {% endif %}
+            <a href="{{ url_for('main.expediente_documentos', id=documento.expediente_id) }}" class="btn btn-secondary" style="text-decoration: none;">
+                <span>←</span> Volver
+            </a>
+        </div>
+    </div>
+    
+    <!-- Info del documento -->
+    <div style="background: #e0f2fe; border-left: 4px solid #0369a1; padding: 1rem; margin-bottom: 1.5rem; border-radius: 4px;">
+        <div style="display: flex; gap: 2rem; flex-wrap: wrap; font-size: 0.9rem;">
+            <span><strong>📁 Archivo:</strong> {{ documento.nombre_archivo }}</span>
+            <span><strong>💾 Tamaño:</strong> {{ documento.get_tamaño_formateado() }}</span>
+            <span><strong>📅 Fecha:</strong> {{ documento.fecha_subida.strftime('%d/%m/%Y') if documento.fecha_subida else 'N/A' }}</span>
+            <span><strong>☁️ Ubicación:</strong> {{ documento.get_ubicacion_label()|safe }}</span>
+        </div>
+    </div>
+    
+    <!-- VISOR DEL DOCUMENTO -->
+    <div style="background: white; border-radius: 12px; border: 1px solid #e2e8f0; overflow: hidden;">
+        {% if documento.drive_file_id %}
+        <!-- ✅ IFRAME CORREGIDO - Sin espacios extra, atributos dentro del tag -->
+        <iframe 
+            src="https://drive.google.com/file/d/{{ documento.drive_file_id }}/preview" 
+            style="border: none; width: 100%; height: 85vh;" 
+            allowfullscreen>
+        </iframe>
+        {% else %}
+        <div style="display: flex; align-items: center; justify-content: center; height: 50vh; flex-direction: column; text-align: center; padding: 2rem;">
+            <div style="font-size: 4rem; margin-bottom: 1rem;">📁</div>
+            <h3 style="color: #374151; margin-bottom: 0.5rem;">Documento no disponible en la nube</h3>
+            <p style="color: #6b7280; margin-bottom: 1.5rem;">Este documento ha sido archivado o eliminado de Google Drive.</p>
+            <a href="{{ url_for('main.expediente_documentos', id=documento.expediente_id) }}" class="btn btn-secondary" style="text-decoration: none;">
+                Volver a documentos
+            </a>
+        </div>
+        {% endif %}
     </div>
 </div>
 {% endblock %}
