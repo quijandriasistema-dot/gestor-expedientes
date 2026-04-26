@@ -3105,16 +3105,17 @@ def subir_documento_drive():
 @bp.route('/documento/<int:id>/ver')
 @requiere_login
 def ver_documento(id):
-    """Muestra documento desde Google Drive en viewer embebido"""
     documento = Documento.query.get_or_404(id)
     
-    if documento.ubicacion == 'local':
-        flash('📁 Este documento solo está disponible en la oficina (almacenamiento local)', 'info')
-        return redirect(request.referrer or url_for('main.expediente_documentos', id=documento.expediente_id))
+    # Si es local o archivado, mostrar mensaje
+    if documento.ubicacion in ['local', 'archivado_local']:
+        flash('📁 Este documento solo está disponible en la oficina.', 'info')
+        return redirect(url_for('main.expediente_documentos', id=documento.expediente_id))
     
+    # Si no tiene drive_file_id, mostrar error amigable
     if not documento.drive_file_id:
-        flash('Documento no disponible en la nube', 'danger')
-        return redirect(request.referrer or url_for('main.expediente_documentos', id=documento.expediente_id))
+        flash('❌ Este documento no tiene vista previa disponible. El archivo puede haber sido eliminado de Drive.', 'warning')
+        return redirect(url_for('main.expediente_documentos', id=documento.expediente_id))
     
     return render_template('ver_documento.html', documento=documento)
 
