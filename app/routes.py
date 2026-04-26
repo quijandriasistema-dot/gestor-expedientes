@@ -1675,8 +1675,7 @@ def subir_documento():
                     drive_file_id=resultado['id'],
                     ubicacion='drive',
                     fecha_documento=form.fecha_documento.data,
-                    usuario_subida=session.get('nombre', 'Sistema'),
-                    ubicacion='local'
+                    usuario_subida=session.get('nombre', 'Sistema')
                 )
 
                 db.session.add(nuevo_documento)
