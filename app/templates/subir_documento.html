@@ -120,11 +120,8 @@
                 <button type="submit" class="btn btn-success btn-lg">
                     <span>☁️</span> Subir a Google Drive
                 </button>
-                {% if expediente %}
-                    <a href="{{ url_for('main.expediente_documentos', id=expediente.id) }}" class="btn btn-secondary btn-lg" style="text-decoration: none;">❌ Cancelar</a>
-                {% else %}
-                    <a href="{{ url_for('main.documentos') }}" class="btn btn-secondary btn-lg" style="text-decoration: none;">❌ Cancelar</a>
-                {% endif %}
+                <!-- ✅ CORREGIDO: Vuelve a la página anterior siempre -->
+                <a href="{{ request.referrer or url_for('main.index') }}" class="btn btn-secondary btn-lg" style="text-decoration: none;">❌ Cancelar</a>
             </div>
         </form>
     </div>
