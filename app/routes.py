@@ -1627,79 +1627,13 @@ def documentos():
 @requiere_login
 @no_cache
 def subir_documento():
-    """Formulario para subir nuevo documento"""
+    """Redirige a subida en Google Drive (único método disponible)"""
     if not puede_ver_modulo('documentos'):
         flash('No tiene permisos para subir documentos', 'error')
         return redirect(url_for('main.index'))
 
-    # En Vercel: redirigir a subir-documento-drive (Google Drive)
-    if os.environ.get('VERCEL') == '1' or os.environ.get('VERCEL_ENV') is not None:
-        flash('En la versión web, los documentos se suben a Google Drive.', 'info')
-        return redirect(url_for('main.subir_documento_drive'))
-
-    form = DocumentoForm()
-    form.expediente_id.choices = get_expedientes_choices()
-
-    if form.validate_on_submit():
-        try:
-            archivo = form.archivo.data
-
-            if archivo and allowed_file(archivo.filename):
-                filename_original = secure_filename(archivo.filename)
-                extension = filename_original.rsplit('.', 1)[1].lower()
-
-                timestamp = int(time.time())
-                nombre_unico = f"{timestamp}_{filename_original}"
-
-                # Leer archivo en memoria para subir a Drive
-                file_content = archivo.read()
-                tamaño = len(file_content)
-
-                expediente_id = form.expediente_id.data
-                if expediente_id == 0:
-                    expediente_id = None
-
-                # Subir a Google Drive
-                resultado = subir_archivo(service, file_content, archivo.filename, 
-                                         archivo.content_type or 'application/octet-stream')
-
-                nuevo_documento = Documento(
-                    expediente_id=expediente_id,
-                    titulo=form.titulo.data,
-                    descripcion=form.descripcion.data,
-                    categoria=form.categoria.data,
-                    nombre_archivo=filename_original,
-                    tipo_archivo=extension,
-                    tamaño_bytes=tamaño,
-                    url_drive=resultado['url'],
-                    drive_file_id=resultado['id'],
-                    ubicacion='drive',
-                    fecha_documento=form.fecha_documento.data,
-                    usuario_subida=session.get('nombre', 'Sistema')
-                )
-
-                db.session.add(nuevo_documento)
-                db.session.commit()
-
-                flash(f'📄 Documento "{form.titulo.data}" subido correctamente ({nuevo_documento.get_tamaño_formateado()})', 'success')
-
-                if expediente_id:
-                    return redirect(url_for('main.expediente_documentos', id=expediente_id))
-                else:
-                    return redirect(url_for('main.documentos'))
-            else:
-                flash('❌ Tipo de archivo no permitido', 'error')
-
-        except Exception as e:
-            db.session.rollback()
-            flash(f'Error al subir documento: {str(e)}', 'error')
-            import traceback
-            traceback.print_exc()
-
-    return render_template('subir_documento.html',
-                         title='Subir Documento',
-                         form=form,
-                         rol=session.get('rol', 'USUARIO'))
+    # Todo va a Google Drive — redirigir siempre
+    return redirect(url_for('main.subir_documento_drive'))
 
 
 # NOTA: Las funciones de descarga y visualización local fueron eliminadas.
@@ -3055,8 +2989,7 @@ def subir_documento_drive():
             fecha_documento=fecha_doc,
             usuario_subida=session.get('nombre', 'Sistema'),
             tipo_archivo=archivo.filename.split('.')[-1].lower(),
-            tamaño_bytes=len(file_content),
-        # ruta_archivo=''  # ← Ya no es necesario, puede ser null
+            tamaño_bytes=len(file_content)  # ← SIN COMA
         )
         
         db.session.add(nuevo_documento)
@@ -3100,12 +3033,12 @@ def ver_documento(id):
 @bp.route('/documento/<int:id>/eliminar-drive', methods=['POST'])
 @requiere_login
 def eliminar_documento_drive(id):
-    """Elimina documento de Drive y/o local"""
+    """Elimina documento de Google Drive"""
     documento = Documento.query.get_or_404(id)
     
     try:
-        # Si está en Drive, eliminar de Drive primero
-        if documento.ubicacion in ['drive', 'ambos'] and documento.drive_file_id:
+        # Eliminar de Google Drive
+        if documento.drive_file_id:
             usuario_id = session.get('usuario_id')
             if usuario_id:
                 from sqlalchemy import text
@@ -3119,8 +3052,6 @@ def eliminar_documento_drive(id):
                     credentials_dict = json.loads(result[0])
                     service = get_drive_service(credentials_dict)
                     eliminar_archivo(service, documento.drive_file_id)
-        
-        # Si está en local, eliminar archivo físico
         
         # Eliminar registro de base de datos
         db.session.delete(documento)
@@ -3408,3 +3339,5 @@ def archivar_documentos():
 # ============================================
 # FIN DEL ARCHIVO
 # ============================================
+
+subir_documento_drive
