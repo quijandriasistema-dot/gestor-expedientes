@@ -3078,6 +3078,7 @@ def subir_documento_drive():
 
 @bp.route('/documento/<int:id>/ver')
 @requiere_login
+@no_cache
 def ver_documento(id):
     documento = Documento.query.get_or_404(id)
     

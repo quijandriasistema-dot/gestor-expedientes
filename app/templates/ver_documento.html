@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}Ver Documento - {{ documento.titulo }}{% endblock %}
+{% block title %}Ver Documento - {{ documento.titulo if documento else 'Documento' }}{% endblock %}
 
 {% block content %}
 <div class="dashboard">
@@ -12,21 +12,24 @@
         </div>
         <div class="welcome-text">Sistema de Gestión de Expedientes Legales</div>
     </div>
-    
+
     <!-- Breadcrumb -->
     <div style="margin-bottom: 1rem;">
         <a href="{{ url_for('main.index') }}" style="color: var(--color-primary); text-decoration: none;">Inicio</a>
         <span style="color: #94a3b8;"> / </span>
-        <a href="{{ url_for('main.expediente_detalle', id=documento.expediente_id) }}" style="color: var(--color-primary); text-decoration: none;">Expediente</a>
+        {% if documento and documento.expediente_id %}
+        <a href="{{ url_for('main.ver_expediente', id=documento.expediente_id) }}" style="color: var(--color-primary); text-decoration: none;">Expediente</a>
         <span style="color: #94a3b8;"> / </span>
+        {% endif %}
         <span style="color: #64748b;">Ver Documento</span>
     </div>
-    
+
+    {% if documento %}
     <!-- Título y acciones -->
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 1rem;">
         <h1 style="display: flex; align-items: center; gap: 0.75rem; margin: 0;">
             <span>📄</span>
-            <span>{{ documento.titulo }}</span>
+            <span>{{ documento.titulo or 'Sin título' }}</span>
         </h1>
         <div style="display: flex; gap: 0.5rem;">
             {% if documento.url_drive %}
@@ -34,27 +37,26 @@
                 <span>🔗</span> Abrir en Drive
             </a>
             {% endif %}
-            <a href="{{ request.referrer or url_for('main.expediente_documentos', id=documento.expediente_id) }}" class="btn btn-secondary" style="text-decoration: none;">
+            <a href="{{ request.referrer or url_for('main.documentos') }}" class="btn btn-secondary" style="text-decoration: none;">
                 <span>←</span> Volver
             </a>
         </div>
     </div>
-    
+
     <!-- Info del documento -->
     <div style="background: #e0f2fe; border-left: 4px solid #0369a1; padding: 1rem; margin-bottom: 1.5rem; border-radius: 4px;">
         <div style="display: flex; gap: 2rem; flex-wrap: wrap; font-size: 0.9rem;">
-            <span><strong>📁 Archivo:</strong> {{ documento.nombre_archivo }}</span>
-            <span><strong>💾 Tamaño:</strong> {{ documento.get_tamaño_formateado() }}</span>
+            <span><strong>📁 Archivo:</strong> {{ documento.nombre_archivo or 'N/A' }}</span>
+            <span><strong>💾 Tamaño:</strong> {{ documento.get_tamaño_formateado() if documento.get_tamaño_formateado else 'N/A' }}</span>
             <span><strong>📅 Fecha:</strong> {{ documento.fecha_subida.strftime('%d/%m/%Y') if documento.fecha_subida else 'N/A' }}</span>
-            <span><strong>☁️ Ubicación:</strong> {{ documento.get_ubicacion_label()|safe }}</span>
+            <span><strong>☁️ Ubicación:</strong> {{ documento.get_ubicacion_label()|safe if documento.get_ubicacion_label else 'N/A' }}</span>
             <span><strong>🔑 Drive ID:</strong> {{ documento.drive_file_id or 'NO TIENE' }}</span>
         </div>
     </div>
-    
+
     <!-- VISOR DEL DOCUMENTO -->
     <div style="background: white; border-radius: 12px; border: 1px solid #e2e8f0; overflow: hidden;">
         {% if documento.drive_file_id %}
-        <!-- ✅ IFRAME CORREGIDO - Sin espacios extra -->
         <iframe 
             src="https://drive.google.com/file/d/{{ documento.drive_file_id }}/preview" 
             style="border: none; width: 100%; height: 85vh;" 
@@ -71,11 +73,17 @@
                 Este documento no tiene ID de Google Drive asignado.
                 {% endif %}
             </p>
-            <a href="{{ url_for('main.expediente_documentos', id=documento.expediente_id) }}" class="btn btn-secondary" style="text-decoration: none;">
+            <a href="{{ url_for('main.documentos') }}" class="btn btn-secondary" style="text-decoration: none;">
                 Volver a documentos
             </a>
         </div>
         {% endif %}
     </div>
+    {% else %}
+    <div style="text-align: center; padding: 3rem;">
+        <h3>Documento no encontrado</h3>
+        <a href="{{ url_for('main.documentos') }}" class="btn btn-secondary">Volver</a>
+    </div>
+    {% endif %}
 </div>
 {% endblock %}
