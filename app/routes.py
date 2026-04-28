@@ -3298,10 +3298,6 @@ def liberar_espacio():
 # ARCHIVAR DOCUMENTOS - LIBERAR ESPACIO DE DRIVE
 # ============================================
 
-# ============================================
-# ARCHIVAR DOCUMENTOS - LIBERAR ESPACIO DE DRIVE
-# ============================================
-
 @bp.route('/archivar-documentos', methods=['GET', 'POST'])
 @requiere_login
 @no_cache
@@ -3327,7 +3323,7 @@ def archivar_documentos():
         carpeta_destino = request.form.get('carpeta_destino', 'Archivos_Expedientes')
         
         # Calcular fechas según período
-        from datetime import datetime, timedelta
+        # NOTA: datetime y timedelta ya están importados arriba en routes.py
         hoy = datetime.now()
         
         if tipo_periodo == 'dia':
