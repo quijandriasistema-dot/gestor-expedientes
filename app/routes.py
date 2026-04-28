@@ -3323,37 +3323,85 @@ def archivar_documentos():
         carpeta_destino = request.form.get('carpeta_destino', 'Archivos_Expedientes')
         
         # Calcular fechas según período
-        # NOTA: datetime y timedelta ya están importados arriba en routes.py
         hoy = datetime.now()
+        fecha_inicio = None
+        fecha_fin = None
+        nombre_paquete = ""
         
-        if tipo_periodo == 'dia':
-            fecha_str = request.form.get('fecha', hoy.strftime('%Y-%m-%d'))
-            fecha_inicio = datetime.strptime(fecha_str, '%Y-%m-%d')
-            fecha_fin = fecha_inicio + timedelta(days=1)
-            nombre_paquete = f"expedientes_{fecha_str}"
-            
-        elif tipo_periodo == 'semana':
-            semana_str = request.form.get('semana', hoy.strftime('%Y-W%W'))
-            año, semana = semana_str.split('-W')
-            fecha_inicio = datetime.strptime(f'{año}-{semana}-1', '%Y-%W-%w')
-            fecha_fin = fecha_inicio + timedelta(days=7)
-            nombre_paquete = f"expedientes_semana_{semana_str}"
-            
-        elif tipo_periodo == 'mes':
-            mes_str = request.form.get('mes', hoy.strftime('%Y-%m'))
-            año, mes = mes_str.split('-')
-            fecha_inicio = datetime(int(año), int(mes), 1)
-            if int(mes) == 12:
-                fecha_fin = datetime(int(año) + 1, 1, 1)
+        try:
+            if tipo_periodo == 'dia':
+                fecha_str = request.form.get('fecha', '').strip()
+                if not fecha_str:
+                    fecha_str = hoy.strftime('%Y-%m-%d')
+                fecha_inicio = datetime.strptime(fecha_str, '%Y-%m-%d')
+                fecha_fin = fecha_inicio + timedelta(days=1)
+                nombre_paquete = f"expedientes_{fecha_str}"
+                
+            elif tipo_periodo == 'semana':
+                semana_str = request.form.get('semana', '').strip()
+                # Validar formato: debe ser YYYY-WXX
+                if not semana_str or '-W' not in semana_str:
+                    # Usar semana actual como fallback
+                    semana_str = hoy.strftime('%Y-W%W')
+                
+                partes = semana_str.split('-W')
+                if len(partes) != 2:
+                    flash('Formato de semana inválido. Use el selector de semana del navegador.', 'error')
+                    return redirect(url_for('main.archivar_documentos'))
+                
+                año = int(partes[0])
+                semana = int(partes[1])
+                
+                # Calcular el primer día de la semana (lunes)
+                # Usar el método ISO: el primer día de la semana 1 es el que tiene el primer jueves
+                fecha_inicio = datetime.strptime(f'{año}-W{semana:02d}-1', '%G-W%V-%u')
+                fecha_fin = fecha_inicio + timedelta(days=7)
+                nombre_paquete = f"expedientes_semana_{año}_W{semana:02d}"
+                
+            elif tipo_periodo == 'mes':
+                mes_str = request.form.get('mes', '').strip()
+                if not mes_str:
+                    mes_str = hoy.strftime('%Y-%m')
+                
+                partes = mes_str.split('-')
+                if len(partes) != 2:
+                    flash('Formato de mes inválido.', 'error')
+                    return redirect(url_for('main.archivar_documentos'))
+                
+                año = int(partes[0])
+                mes = int(partes[1])
+                fecha_inicio = datetime(año, mes, 1)
+                if mes == 12:
+                    fecha_fin = datetime(año + 1, 1, 1)
+                else:
+                    fecha_fin = datetime(año, mes + 1, 1)
+                nombre_paquete = f"expedientes_{mes_str}"
+                
+            elif tipo_periodo == 'año':
+                año_str = request.form.get('año', '').strip()
+                if not año_str:
+                    año = hoy.year
+                else:
+                    try:
+                        año = int(año_str)
+                    except ValueError:
+                        flash('Año inválido.', 'error')
+                        return redirect(url_for('main.archivar_documentos'))
+                
+                fecha_inicio = datetime(año, 1, 1)
+                fecha_fin = datetime(año + 1, 1, 1)
+                nombre_paquete = f"expedientes_{año}"
+                
             else:
-                fecha_fin = datetime(int(año), int(mes) + 1, 1)
-            nombre_paquete = f"expedientes_{mes_str}"
-            
-        elif tipo_periodo == 'año':
-            año = int(request.form.get('año', hoy.year))
-            fecha_inicio = datetime(año, 1, 1)
-            fecha_fin = datetime(año + 1, 1, 1)
-            nombre_paquete = f"expedientes_{año}"
+                flash('Tipo de período no válido.', 'error')
+                return redirect(url_for('main.archivar_documentos'))
+                
+        except ValueError as e:
+            flash(f'Error en la fecha seleccionada: {str(e)}', 'error')
+            return redirect(url_for('main.archivar_documentos'))
+        except Exception as e:
+            flash(f'Error procesando el período: {str(e)}', 'error')
+            return redirect(url_for('main.archivar_documentos'))
         
         # Filtrar documentos del período
         documentos_archivar = Documento.query.filter(
@@ -3396,7 +3444,6 @@ def archivar_documentos():
         # Crear ZIP en memoria
         import io
         import zipfile
-        from flask import send_file
         
         zip_buffer = io.BytesIO()
         archivados = 0
