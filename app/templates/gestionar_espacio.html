@@ -34,7 +34,36 @@
                 <span><strong>☁️ Espacio usado:</strong> {{ "%.1f"|format(espacio.usado_gb) }} GB</span>
                 <span><strong>📊 Total:</strong> {{ "%.1f"|format(espacio.total_gb) }} GB</span>
             </div>
-            ...
+            
+            <!-- Barra de progreso -->
+            <div style="background: #e2e8f0; border-radius: 8px; height: 24px; overflow: hidden; margin-bottom: 0.5rem;">
+                <div style="width: {{ espacio.porcentaje }}%; 
+                            background: {% if espacio.porcentaje >= 80 %}#dc2626{% elif espacio.porcentaje >= 60 %}#f59e0b{% else %}#10b981{% endif %}; 
+                            height: 100%; 
+                            border-radius: 8px;
+                            transition: width 0.3s ease;">
+                </div>
+            </div>
+            
+            <div style="display: flex; justify-content: space-between; font-size: 0.875rem;">
+                <span style="color: #64748b;">{{ "%.1f"|format(espacio.porcentaje) }}% usado</span>
+                <span style="color: #64748b;">{{ "%.1f"|format(espacio.libre_gb) }} GB libres</span>
+            </div>
+
+            {% if espacio.porcentaje >= 80 %}
+            <!-- Alerta crítica -->
+            <div style="background: #fef2f2; border: 2px solid #dc2626; border-radius: 12px; padding: 1.5rem; margin-top: 1rem; text-align: center;">
+                <div style="font-size: 3rem; margin-bottom: 0.5rem;">🚨</div>
+                <h2 style="color: #dc2626; margin-bottom: 0.5rem;">¡Alerta de Espacio!</h2>
+                <p style="color: #7f1d1d; margin-bottom: 1rem;">
+                    Google Drive está al <strong>{{ "%.1f"|format(espacio.porcentaje) }}%</strong> de su capacidad.
+                    Debe liberar espacio lo antes posible.
+                </p>
+                <a href="{{ url_for('main.archivar_documentos') }}" class="btn btn-warning btn-lg" style="background: #f59e0b; color: white; text-decoration: none;">
+                    📦 Archivar Documentos por Período
+                </a>
+            </div>
+            {% endif %}
         </div>
     {% else %}
         <div style="background: #fef3c7; border-left: 4px solid #f59e0b; padding: 1rem; margin-bottom: 1.5rem; border-radius: 4px;">
@@ -44,24 +73,6 @@
                 🔗 Conectar Google Drive
             </a>
         </div>
-    {% endif %}
-        </div>
-    </div>
-
-    {% if espacio.porcentaje >= 80 %}
-    <!-- Alerta crítica -->
-    <div style="background: #fef2f2; border: 2px solid #dc2626; border-radius: 12px; padding: 1.5rem; margin-bottom: 1.5rem; text-align: center;">
-        <div style="font-size: 3rem; margin-bottom: 0.5rem;">🚨</div>
-        <h2 style="color: #dc2626; margin-bottom: 0.5rem;">¡Alerta de Espacio!</h2>
-        <p style="color: #7f1d1d; margin-bottom: 1rem;">
-            Google Drive está al <strong>{{ "%.1f"|format(espacio.porcentaje) }}%</strong> de su capacidad.
-            Debe liberar espacio lo antes posible.
-        </p>
-        <a href="{{ url_for('main.archivar_documentos') }}" class="btn btn-warning btn-lg" style="background: #f59e0b; color: white; text-decoration: none;">
-            📦 Archivar Documentos por Período
-        </a>
-    </div>
-    {% endif %}
     {% endif %}
 
     <!-- Documentos en Drive -->
