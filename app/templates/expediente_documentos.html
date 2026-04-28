@@ -21,7 +21,7 @@
                 <strong>👤 Cliente:</strong> {{ expediente.cliente }}
             </div>
             <div>
-                <a href="{{ url_for('main.expediente_detalle', id=expediente.id) }}" class="btn btn-secondary" style="text-decoration: none;">
+                <a href="{{ url_for('main.ver_expediente', id=expediente.id) }}" class="btn btn-secondary" style="text-decoration: none;">
                     👁️ Ver Expediente
                 </a>
             </div>
