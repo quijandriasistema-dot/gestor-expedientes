@@ -142,19 +142,45 @@ def eliminar_archivo(service, file_id):
     return True
 
 def obtener_espacio_usado(service):
-    """Obtiene información de espacio en Drive"""
-    about = service.about().get(fields='storageQuota').execute()
-    quota = about['storageQuota']
-    
-    usado = int(quota.get('usage', 0))
-    total = int(quota.get('limit', 15 * 1024**3))  # 15GB default
-    
-    return {
-        'usado_bytes': usado,
-        'total_bytes': total,
-        'libre_bytes': total - usado,
-        'porcentaje': (usado / total) * 100 if total > 0 else 0
-    }
+    """
+    Obtiene información del espacio usado en Google Drive.
+    Devuelve dict con: usado_gb, total_gb, libre_gb, porcentaje
+    """
+    try:
+        # Llamar a la API About para obtener storageQuota
+        about = service.about().get(fields="storageQuota").execute()
+        quota = about.get('storageQuota', {})
+        
+        # Los valores vienen en bytes (strings), convertir a int
+        usage = int(quota.get('usage', 0))  # bytes usados
+        limit = int(quota.get('limit', 1))   # bytes totales (evitar div/0)
+        
+        # Convertir a GB
+        usado_gb = usage / (1024 ** 3)
+        total_gb = limit / (1024 ** 3)
+        libre_gb = total_gb - usado_gb
+        porcentaje = (usage / limit) * 100 if limit > 0 else 0
+        
+        return {
+            'usado_gb': round(usado_gb, 2),
+            'total_gb': round(total_gb, 2),
+            'libre_gb': round(libre_gb, 2),
+            'porcentaje': round(porcentaje, 1),
+            'usage_bytes': usage,
+            'limit_bytes': limit
+        }
+        
+    except Exception as e:
+        print(f"Error obteniendo espacio Drive: {e}")
+        # Valores por defecto si falla
+        return {
+            'usado_gb': 0.0,
+            'total_gb': 15.0,  # Google Drive free default
+            'libre_gb': 15.0,
+            'porcentaje': 0.0,
+            'usage_bytes': 0,
+            'limit_bytes': 16106127360  # 15GB en bytes
+        }
 
 def descargar_archivo(service, file_id):
     """Descarga archivo de Google Drive"""

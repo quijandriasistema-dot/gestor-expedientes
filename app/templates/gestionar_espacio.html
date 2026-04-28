@@ -28,25 +28,23 @@
     </h1>
 
     {% if espacio %}
-    <!-- Barra de espacio -->
-    <div style="background: white; border-radius: 12px; padding: 1.5rem; margin-bottom: 1.5rem; border: 1px solid #e2e8f0;">
-        <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
-            <span><strong>☁️ Espacio usado:</strong> {{ "%.1f"|format(espacio.usado_gb) }} GB</span>
-            <span><strong>📊 Total:</strong> {{ "%.1f"|format(espacio.total_gb) }} GB</span>
-        </div>
-        <div style="background: #e2e8f0; border-radius: 10px; height: 24px; overflow: hidden;">
-            <div style="width: {{ espacio.porcentaje }}%; 
-                        height: 100%; 
-                        background: {% if espacio.porcentaje >= 90 %}#dc2626{% elif espacio.porcentaje >= 80 %}#f59e0b{% else %}#10b981{% endif %}; 
-                        border-radius: 10px; 
-                        transition: width 0.3s;">
+        <!-- Barra de espacio -->
+        <div style="background: white; border-radius: 12px; padding: 1.5rem; margin-bottom: 1.5rem; border: 1px solid #e2e8f0;">
+            <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
+                <span><strong>☁️ Espacio usado:</strong> {{ "%.1f"|format(espacio.usado_gb) }} GB</span>
+                <span><strong>📊 Total:</strong> {{ "%.1f"|format(espacio.total_gb) }} GB</span>
             </div>
+            ...
         </div>
-        <div style="text-align: center; margin-top: 0.5rem; font-weight: bold; color: {% if espacio.porcentaje >= 90 %}#dc2626{% elif espacio.porcentaje >= 80 %}#f59e0b{% else %}#10b981{% endif %};">
-            {{ "%.1f"|format(espacio.porcentaje) }}% usado
-            {% if espacio.porcentaje >= 80 %}
-            <span style="margin-left: 0.5rem;">⚠️ ¡Espacio crítico!</span>
-            {% endif %}
+    {% else %}
+        <div style="background: #fef3c7; border-left: 4px solid #f59e0b; padding: 1rem; margin-bottom: 1.5rem; border-radius: 4px;">
+            <strong>⚠️ No se pudo obtener información del espacio.</strong><br>
+            Verifique que Google Drive esté conectado o intente reconectar.
+            <a href="{{ url_for('main.auth_google') }}" class="btn btn-primary" style="margin-top: 0.5rem;">
+                🔗 Conectar Google Drive
+            </a>
+        </div>
+    {% endif %}
         </div>
     </div>
 
