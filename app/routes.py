@@ -3148,11 +3148,16 @@ def eliminar_documento_drive(id):
                 
                 if result:
                     import json
-                    credentials_dict = json.loads(result[0])
+                    token_data = result[0]
+                    
+                    # ← CORREGIDO: Manejar si es dict o string
+                    if isinstance(token_data, dict):
+                        credentials_dict = token_data
+                    else:
+                        credentials_dict = json.loads(token_data)
+                    
                     service = get_drive_service(credentials_dict)
                     eliminar_archivo(service, documento.drive_file_id)
-        
-        # Si está en local, eliminar archivo físico
         
         # Eliminar registro de base de datos
         db.session.delete(documento)
@@ -3251,7 +3256,11 @@ def liberar_espacio():
             return redirect(url_for('main.gestionar_espacio'))
         
         import json
-        credentials_dict = json.loads(result[0])
+        token_data = result[0]
+        if isinstance(token_data, dict):
+            credentials_dict = token_data
+        else:
+            credentials_dict = json.loads(token_data)
         service = get_drive_service(credentials_dict)
         
         liberados = 0
