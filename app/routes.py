@@ -3298,6 +3298,10 @@ def liberar_espacio():
 # ARCHIVAR DOCUMENTOS - LIBERAR ESPACIO DE DRIVE
 # ============================================
 
+# ============================================
+# ARCHIVAR DOCUMENTOS - LIBERAR ESPACIO DE DRIVE
+# ============================================
+
 @bp.route('/archivar-documentos', methods=['GET', 'POST'])
 @requiere_login
 @no_cache
@@ -3306,7 +3310,6 @@ def archivar_documentos():
     if session.get('rol') not in ['ADMINISTRADOR', 'DESARROLLADOR']:
         flash('No tiene permisos para esta acción', 'error')
         return redirect(url_for('main.index'))
-    """Muestra formulario para archivar documentos y generar paquete ZIP"""
     
     # Obtener documentos que están en Drive
     documentos_drive = Documento.query.filter(
