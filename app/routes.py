@@ -27,8 +27,16 @@ bp = Blueprint('main', __name__)
 # CONFIGURACIÓN DE USUARIOS - SUPABASE (tabla: usuario)
 # ============================================
 
+# ============================================
+# CONFIGURACIÓN DE USUARIOS - SUPABASE (tabla: usuario)
+# ============================================
+
+# ← ELIMINADO: No cargar usuarios al inicio en serverless
+# En Vercel no hay app context al importar el módulo
+USUARIOS = {}
+
 def _cargar_usuarios():
-    """Carga usuarios activos desde Supabase (tabla usuario)"""
+    """Carga usuarios activos desde Supabase (tabla usuario) - BAJO DEMANDA"""
     usuarios = {}
     try:
         for u in Usuario.query.filter_by(activo=True).all():
@@ -41,6 +49,10 @@ def _cargar_usuarios():
     except Exception as e:
         print(f"Error cargando usuarios: {e}")
     return usuarios
+
+def _guardar_usuarios():
+    """Ya no se usa - los usuarios se guardan directamente en Supabase"""
+    pass
 
 def _guardar_usuarios():
     """Ya no se usa - los usuarios se guardan directamente en Supabase"""
