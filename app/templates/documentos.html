@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}Documentos - Quijandria Abogados{% endblock %}
+{% block title %}Gestión de Documentos - Quijandria Abogados{% endblock %}
 
 {% block content %}
 <div class="dashboard">
@@ -20,112 +20,126 @@
         <span style="color: #64748b;">Documentos</span>
     </div>
 
-    <!-- Título -->
-    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 1rem;">
-        <h1 style="display: flex; align-items: center; gap: 0.75rem; margin: 0;">
-            <span>📁</span>
-            <span>Gestión de Documentos</span>
-        </h1>
-        <a href="{{ url_for('main.subir_documento_drive') }}" class="btn btn-success btn-lg" style="text-decoration: none;">
-            <span>☁️</span> Subir Nuevo Documento
+    <h1 style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.5rem;">
+        <span>📄</span>
+        <span>Gestión de Documentos</span>
+    </h1>
+    <p style="color: var(--color-text-light); margin-bottom: 1.5rem;">
+        Administre todos los documentos del estudio jurídico. Los archivos se almacenan en Google Drive.
+    </p>
+
+    <!-- Barra de acciones -->
+    <div style="display: flex; gap: 0.75rem; margin-bottom: 1.5rem; flex-wrap: wrap; align-items: center;">
+        <a href="{{ url_for('main.subir_documento_drive') }}" class="btn btn-success">
+            <span>☁️</span> Subir a Drive
+        </a>
+        
+        <!-- ✅ BOTÓN GESTIONAR ESPACIO: Solo Admin/Dev -->
+        {% if rol in ['ADMINISTRADOR', 'DESARROLLADOR'] %}
+        <a href="{{ url_for('main.gestionar_espacio') }}" class="btn btn-warning" style="background: #f59e0b; color: white; border: none;">
+            <span>💾</span> Gestionar Espacio
+        </a>
+        {% endif %}
+        
+        <a href="{{ url_for('main.documentos') }}" class="btn btn-secondary">
+            <span>🔄</span> Limpiar
         </a>
     </div>
 
-    <!-- Filtros -->
-    <div style="background: white; padding: 1rem; border-radius: 8px; margin-bottom: 1.5rem; border: 1px solid #e2e8f0;">
-        <form method="GET" action="{{ url_for('main.documentos') }}" style="display: flex; gap: 1rem; flex-wrap: wrap; align-items: end;">
-            <div>
-                <label style="display: block; font-size: 0.85rem; color: #64748b; margin-bottom: 0.25rem;">Categoría</label>
-                <select name="categoria" class="form-control" style="width: 150px;">
-                    <option value="">Todas</option>
-                    <option value="escrito" {% if categoria_filtro == 'escrito' %}selected{% endif %}>Escrito</option>
-                    <option value="resolucion" {% if categoria_filtro == 'resolucion' %}selected{% endif %}>Resolución</option>
-                    <option value="contrato" {% if categoria_filtro == 'contrato' %}selected{% endif %}>Contrato</option>
-                    <option value="evidencia" {% if categoria_filtro == 'evidencia' %}selected{% endif %}>Evidencia</option>
-                    <option value="poder" {% if categoria_filtro == 'poder' %}selected{% endif %}>Poder</option>
-                    <option value="notificacion" {% if categoria_filtro == 'notificacion' %}selected{% endif %}>Notificación</option>
-                    <option value="otros" {% if categoria_filtro == 'otros' %}selected{% endif %}>Otros</option>
-                </select>
+    <!-- Filtros de búsqueda -->
+    <div class="form-container" style="margin-bottom: 1.5rem;">
+        <form method="GET" action="{{ url_for('main.documentos') }}">
+            <div class="form-row">
+                <div class="form-col-3">
+                    <div class="form-group">
+                        <label>Buscar por título</label>
+                        <input type="text" name="q" class="form-control" value="{{ termino_busqueda }}" placeholder="Nombre del documento...">
+                    </div>
+                </div>
+                <div class="form-col-3">
+                    <div class="form-group">
+                        <label>Categoría</label>
+                        <select name="categoria" class="form-control">
+                            <option value="">Todas</option>
+                            <option value="escrito" {% if categoria_filtro == 'escrito' %}selected{% endif %}>Escrito</option>
+                            <option value="resolucion" {% if categoria_filtro == 'resolucion' %}selected{% endif %}>Resolución</option>
+                            <option value="contrato" {% if categoria_filtro == 'contrato' %}selected{% endif %}>Contrato</option>
+                            <option value="evidencia" {% if categoria_filtro == 'evidencia' %}selected{% endif %}>Evidencia</option>
+                            <option value="poder" {% if categoria_filtro == 'poder' %}selected{% endif %}>Poder</option>
+                            <option value="notificacion" {% if categoria_filtro == 'notificacion' %}selected{% endif %}>Notificación</option>
+                            <option value="otros" {% if categoria_filtro == 'otros' %}selected{% endif %}>Otros</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-col-3">
+                    <div class="form-group">
+                        <label>Expediente</label>
+                        {{ form_busqueda.expediente_id(class="form-control") }}
+                    </div>
+                </div>
             </div>
-            <div>
-                <label style="display: block; font-size: 0.85rem; color: #64748b; margin-bottom: 0.25rem;">Expediente</label>
-                <select name="expediente_id" class="form-control" style="width: 250px;">
-                    <option value="0">Todos</option>
-                    {% for choice in form_busqueda.expediente_id.choices %}
-                    <option value="{{ choice[0] }}" {% if expediente_filtro == choice[0] %}selected{% endif %}>{{ choice[1] }}</option>
-                    {% endfor %}
-                </select>
+            <div style="display: flex; gap: 0.5rem;">
+                <button type="submit" class="btn btn-primary">
+                    <span>🔍</span> Buscar
+                </button>
+                <a href="{{ url_for('main.documentos') }}" class="btn btn-secondary">Limpiar</a>
             </div>
-            <div>
-                <label style="display: block; font-size: 0.85rem; color: #64748b; margin-bottom: 0.25rem;">Buscar</label>
-                <input type="text" name="q" value="{{ termino_busqueda }}" class="form-control" placeholder="Título..." style="width: 200px;">
-            </div>
-            <button type="submit" class="btn btn-primary">🔍 Filtrar</button>
-            <a href="{{ url_for('main.documentos') }}" class="btn btn-secondary">Limpiar</a>
         </form>
     </div>
 
-    <!-- Listado -->
+    <!-- Tabla de documentos -->
     {% if documentos.items %}
     <div class="table-container">
         <table class="data-table">
             <thead>
                 <tr>
-                    <th>📄 Documento</th>
-                    <th>☁️ Ubicación</th>
-                    <th>🏷️ Tipo</th>
-                    <th>📅 Fecha</th>
-                    <th>👤 Subido por</th>
-                    <th>💾 Tamaño</th>
-                    <th>⚙️ Acciones</th>
+                    <th>ID</th>
+                    <th>Documento</th>
+                    <th>Categoría</th>
+                    <th>Expediente</th>
+                    <th>Fecha</th>
+                    <th>Tamaño</th>
+                    <th>Ubicación</th>
+                    <th>Acciones</th>
                 </tr>
             </thead>
             <tbody>
                 {% for doc in documentos.items %}
                 <tr>
+                    <td>{{ doc.id }}</td>
                     <td>
-                        <div style="display: flex; align-items: center; gap: 0.5rem;">
-                            <span style="font-size: 1.5rem;">{{ doc.get_icono() }}</span>
-                            <div>
-                                <strong>{{ doc.titulo }}</strong>
-                                <br>
-                                <small style="color: var(--color-text-light);">{{ doc.nombre_archivo }}</small>
-                                {% if doc.descripcion %}
-                                    <br>
-                                    <small style="color: #6b7280;">{{ doc.descripcion[:50] }}{% if doc.descripcion|length > 50 %}...{% endif %}</small>
-                                {% endif %}
-                            </div>
-                        </div>
+                        <strong>{{ doc.titulo }}</strong><br>
+                        <small style="color: #64748b;">{{ doc.nombre_archivo }}</small>
                     </td>
-                    <td style="text-align: center;">
-                        {{ doc.get_ubicacion_label()|safe }}
-                    </td>
+                    <td>{{ doc.categoria|title if doc.categoria else 'Otro' }}</td>
                     <td>
-                        <span class="badge badge-info">{{ doc.get_tipo_label() }}</span>
-                        {% if doc.fecha_documento %}
-                            <br>
-                            <small style="color: #6b7280;">Doc: {{ doc.fecha_documento.strftime('%d/%m/%Y') }}</small>
+                        {% if doc.expediente %}
+                            <a href="{{ url_for('main.ver_expediente', id=doc.expediente_id) }}">
+                                {{ doc.expediente.get_identificador_principal() }}
+                            </a>
+                        {% else %}
+                            <span style="color: #94a3b8;">General</span>
+                        {% endif %}
+                    </td>
+                    <td>{{ doc.fecha_subida.strftime('%d/%m/%Y') if doc.fecha_subida else '-' }}</td>
+                    <td>{{ doc.get_tamaño_formateado() if doc.get_tamaño_formateado else '-' }}</td>
+                    <td>
+                        {% if doc.ubicacion == 'drive' %}
+                            <span style="color: #10b981;">☁️ Drive</span>
+                        {% else %}
+                            <span style="color: #6b7280;">{{ doc.ubicacion }}</span>
                         {% endif %}
                     </td>
                     <td>
-                        {{ doc.fecha_subida.strftime('%d/%m/%Y') if doc.fecha_subida else '-' }}
-                    </td>
-                    <td>{{ doc.usuario_subida or '-' }}</td>
-                    <td>{{ doc.get_tamaño_formateado() }}</td>
-                    <td>
-                        <div style="display: flex; gap: 0.5rem;">
-                            <!-- Ver (solo si está en Drive) -->
-                            {% if doc.drive_file_id %}
-                            <a href="{{ url_for('main.ver_documento', id=doc.id) }}" target="_blank" class="btn btn-small btn-success" title="Visualizar en Drive" style="text-decoration: none;">
-                                👁️ Ver
+                        <div style="display: flex; gap: 0.3rem;">
+                            <a href="{{ url_for('main.ver_documento', id=doc.id) }}" class="btn btn-sm btn-info" title="Ver">
+                                👁️
                             </a>
-                            {% endif %}
-
-                            <!-- Eliminar (solo Admin/Dev) -->
                             {% if rol in ['ADMINISTRADOR', 'DESARROLLADOR'] %}
-                            <form method="POST" action="{{ url_for('main.eliminar_documento_drive', id=doc.id) }}" 
-                                onsubmit="return confirm('¿Eliminar este documento de Google Drive?');" style="display: inline;">
-                                <button type="submit" class="btn btn-small btn-danger">🗑️</button>
+                            <form method="POST" action="{{ url_for('main.eliminar_documento_drive', id=doc.id) }}" style="display: inline;" onsubmit="return confirm('¿Eliminar este documento de Google Drive y del sistema?')">
+                                <button type="submit" class="btn btn-sm btn-danger" title="Eliminar">
+                                    🗑️
+                                </button>
                             </form>
                             {% endif %}
                         </div>
@@ -140,23 +154,25 @@
     {% if documentos.pages > 1 %}
     <div style="display: flex; justify-content: center; gap: 0.5rem; margin-top: 1.5rem;">
         {% if documentos.has_prev %}
-        <a href="{{ url_for('main.documentos', page=documentos.prev_num, categoria=categoria_filtro, expediente_id=expediente_filtro, q=termino_busqueda) }}" class="btn btn-secondary">← Anterior</a>
+            <a href="{{ url_for('main.documentos', page=documentos.prev_num, q=termino_busqueda, categoria=categoria_filtro, expediente_id=expediente_filtro) }}" class="btn btn-secondary">← Anterior</a>
         {% endif %}
-        <span style="padding: 0.5rem 1rem; background: white; border-radius: 6px; border: 1px solid #e2e8f0;">
+        
+        <span style="padding: 0.5rem 1rem; background: #f1f5f9; border-radius: 6px;">
             Página {{ documentos.page }} de {{ documentos.pages }}
         </span>
+        
         {% if documentos.has_next %}
-        <a href="{{ url_for('main.documentos', page=documentos.next_num, categoria=categoria_filtro, expediente_id=expediente_filtro, q=termino_busqueda) }}" class="btn btn-secondary">Siguiente →</a>
+            <a href="{{ url_for('main.documentos', page=documentos.next_num, q=termino_busqueda, categoria=categoria_filtro, expediente_id=expediente_filtro) }}" class="btn btn-secondary">Siguiente →</a>
         {% endif %}
     </div>
     {% endif %}
 
     {% else %}
-    <div style="text-align: center; padding: 3rem; background: white; border-radius: 12px; border: 2px dashed #e5e7eb;">
-        <div style="font-size: 4rem; margin-bottom: 1rem;">📂</div>
+    <div style="text-align: center; padding: 3rem; background: #f9fafb; border-radius: 12px;">
+        <div style="font-size: 4rem; margin-bottom: 1rem;">📁</div>
         <h3>No hay documentos</h3>
-        <p style="color: var(--color-text-light);">Suba el primer documento a Google Drive.</p>
-        <a href="{{ url_for('main.subir_documento_drive') }}" class="btn btn-success btn-lg" style="text-decoration: none;">
+        <p style="color: #6b7280;">Comience subiendo su primer documento a Google Drive.</p>
+        <a href="{{ url_for('main.subir_documento_drive') }}" class="btn btn-success" style="margin-top: 1rem;">
             <span>☁️</span> Subir Documento
         </a>
     </div>

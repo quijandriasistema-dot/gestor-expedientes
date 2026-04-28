@@ -81,30 +81,50 @@
                         <th>Fecha</th>
                         <th>Tamaño</th>
                         <th>Estado</th>
+                        <th>Acciones</th>
                     </tr>
                 </thead>
                 <tbody>
                     {% for doc in documentos %}
                     <tr>
                         <td><input type="checkbox" name="documentos[]" value="{{ doc.id }}" class="doc-checkbox"></td>
-                        <td>{{ doc.get_icono() }} {{ doc.titulo }}</td>
+                        <td>
+                            <strong>{{ doc.titulo }}</strong><br>
+                            <small style="color: #64748b;">{{ doc.nombre_archivo }}</small>
+                        </td>
                         <td>{{ doc.expediente.get_identificador_principal() if doc.expediente else 'General' }}</td>
                         <td>{{ doc.fecha_subida.strftime('%d/%m/%Y') if doc.fecha_subida else '-' }}</td>
-                        <td>{{ doc.get_tamaño_formateado() }}</td>
-                        <td>{{ doc.get_ubicacion_label()|safe }}</td>
+                        <td>{{ doc.get_tamaño_formateado() if doc.get_tamaño_formateado else '-' }}</td>
+                        <td>
+                            {% if doc.ubicacion == 'drive' %}
+                                <span style="color: #10b981;">☁️ Drive</span>
+                            {% else %}
+                                <span style="color: #6b7280;">{{ doc.ubicacion }}</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <form method="POST" action="{{ url_for('main.eliminar_documento_drive', id=doc.id) }}" style="display: inline;" onsubmit="return confirm('¿Eliminar este documento de Google Drive y del sistema?')">
+                                <button type="submit" class="btn btn-sm btn-danger" title="Eliminar">
+                                    🗑️
+                                </button>
+                            </form>
+                        </td>
                     </tr>
                     {% endfor %}
                 </tbody>
             </table>
         </div>
 
-        <div style="margin-top: 1.5rem; display: flex; gap: 1rem; justify-content: center;">
+        <div style="margin-top: 1.5rem; display: flex; gap: 1rem; justify-content: center; flex-wrap: wrap;">
             <button type="submit" name="accion" value="eliminar" class="btn btn-danger btn-lg"
-                    onclick="return confirm('¿Eliminar los documentos seleccionados de Google Drive? Los registros se marcarán como eliminados.')">
+                    onclick="return confirm('¿Eliminar los documentos seleccionados de Google Drive? Esta acción no se puede deshacer.')">
                 🗑️ Eliminar Seleccionados
             </button>
             <a href="{{ url_for('main.archivar_documentos') }}" class="btn btn-warning btn-lg" style="background: #f59e0b; color: white; text-decoration: none;">
                 📦 Archivar por Período
+            </a>
+            <a href="{{ url_for('main.documentos') }}" class="btn btn-secondary btn-lg" style="text-decoration: none;">
+                ❌ Volver a Documentos
             </a>
         </div>
     </form>
@@ -113,6 +133,9 @@
         <div style="font-size: 4rem; margin-bottom: 1rem;">☁️</div>
         <h3>No hay documentos en Google Drive</h3>
         <p style="color: #6b7280;">El espacio está libre o los documentos ya fueron archivados.</p>
+        <a href="{{ url_for('main.documentos') }}" class="btn btn-secondary" style="margin-top: 1rem;">
+            ← Volver a Documentos
+        </a>
     </div>
     {% endif %}
 </div>
