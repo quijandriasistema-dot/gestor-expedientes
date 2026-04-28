@@ -112,10 +112,32 @@ def puede_ver_modulo(modulo):
     """Verifica si el usuario actual puede ver un módulo"""
     if 'rol' not in session:
         return False
+    
+    # DESARROLLADOR tiene acceso a todo
     if session['rol'] == 'DESARROLLADOR':
         return True
+    
+    # ADMINISTRADOR tiene acceso a todo
+    if session['rol'] == 'ADMINISTRADOR':
+        return True
+    
+    # Verificar módulos asignados (para rol USUARIO)
     if 'modulos' in session:
-        return 'todo' in session['modulos'] or modulo in session['modulos']
+        modulos = session['modulos']
+        
+        # Si tiene acceso a todo
+        if 'todo' in modulos:
+            return True
+        
+        # Mapeo de tipos específicos de expediente al módulo general
+        modulo_general = modulo
+        if modulo in ['civil', 'penal', 'administrativo', 'conciliacion', 'archivo']:
+            modulo_general = 'expedientes'
+        
+        # Verificar si tiene el módulo específico o el general
+        if modulo in modulos or modulo_general in modulos:
+            return True
+    
     return False
 
 def puede_exportar():
@@ -3522,3 +3544,5 @@ def archivar_documentos():
 # ============================================
 # FIN DEL ARCHIVO
 # ============================================
+
+puede_ver_modulo
