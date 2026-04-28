@@ -384,6 +384,31 @@ def index():
 
     form_busqueda = BusquedaForm()
 
+    # ALERTA DE ESPACIO EN GOOGLE DRIVE (solo Admin/Dev)
+    espacio_drive = None
+    if session.get('rol') in ['ADMINISTRADOR', 'DESARROLLADOR']:
+        try:
+            from sqlalchemy import text
+            usuario_id = session.get('usuario_id')
+            if usuario_id:
+                result = db.session.execute(
+                    text("SELECT google_token FROM google_tokens WHERE usuario_id = :uid"),
+                    {'uid': usuario_id}
+                ).fetchone()
+                if result:
+                    import json
+                    token_data = result[0]
+                    if isinstance(token_data, dict):
+                        credentials_dict = token_data
+                    else:
+                        credentials_dict = json.loads(token_data)
+                    from app.drive_service import get_drive_service, obtener_espacio_usado
+                    service = get_drive_service(credentials_dict)
+                    espacio_drive = obtener_espacio_usado(service)
+        except Exception as e:
+            print(f"Error obteniendo espacio Drive: {e}")
+            espacio_drive = None
+
     return render_template('index.html',
                          title='Panel Principal',
                          usuario=session.get('nombre', 'Usuario'),
@@ -400,6 +425,7 @@ def index():
                          audiencias_manana=audiencias_manana,
                          audiencias_semana=audiencias_semana,
                          proximas_audiencias=proximas_audiencias,
+                         espacio_drive=espacio_drive,
                          form_busqueda=form_busqueda)
 
 # ============================================
@@ -3100,8 +3126,13 @@ def ver_documento(id):
 
 @bp.route('/documento/<int:id>/eliminar-drive', methods=['POST'])
 @requiere_login
+@no_cache
 def eliminar_documento_drive(id):
-    """Elimina documento de Drive y/o local"""
+    """Elimina documento de Drive (solo Admin/Dev)"""
+    if session.get('rol') not in ['ADMINISTRADOR', 'DESARROLLADOR']:
+        flash('No tiene permisos para eliminar documentos', 'error')
+        return redirect(url_for('main.documentos'))
+
     documento = Documento.query.get_or_404(id)
     
     try:
@@ -3141,7 +3172,12 @@ def eliminar_documento_drive(id):
 
 @bp.route('/gestionar-espacio')
 @requiere_login
+@no_cache
 def gestionar_espacio():
+    """Gestionar espacio en Drive (solo Admin/Dev)"""
+    if session.get('rol') not in ['ADMINISTRADOR', 'DESARROLLADOR']:
+        flash('No tiene permisos para esta acción', 'error')
+        return redirect(url_for('main.index'))
     """Muestra alerta de espacio y opciones para liberar"""
     usuario_id = session.get('usuario_id')
     if not usuario_id:
@@ -3184,7 +3220,12 @@ def gestionar_espacio():
 
 @bp.route('/liberar-espacio', methods=['POST'])
 @requiere_login
+@no_cache
 def liberar_espacio():
+    """Liberar espacio en Drive (solo Admin/Dev)"""
+    if session.get('rol') not in ['ADMINISTRADOR', 'DESARROLLADOR']:
+        flash('No tiene permisos para esta acción', 'error')
+        return redirect(url_for('main.index'))
     """Mueve documentos de Drive a local o los elimina"""
     accion = request.form.get('accion')
     documento_ids = request.form.getlist('documentos[]')
@@ -3250,7 +3291,12 @@ def liberar_espacio():
 
 @bp.route('/archivar-documentos', methods=['GET', 'POST'])
 @requiere_login
+@no_cache
 def archivar_documentos():
+    """Archivar documentos de Drive (solo Admin/Dev)"""
+    if session.get('rol') not in ['ADMINISTRADOR', 'DESARROLLADOR']:
+        flash('No tiene permisos para esta acción', 'error')
+        return redirect(url_for('main.index'))
     """Muestra formulario para archivar documentos y generar paquete ZIP"""
     
     # Obtener documentos que están en Drive

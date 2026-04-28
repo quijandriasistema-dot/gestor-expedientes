@@ -12,162 +12,169 @@
         </div>
         <div class="welcome-text">Sistema de Gestión de Expedientes Legales</div>
     </div>
-    
+
+    <!-- Breadcrumb -->
+    <div style="margin-bottom: 1rem;">
+        <a href="{{ url_for('main.index') }}" style="color: var(--color-primary); text-decoration: none;">Inicio</a>
+        <span style="color: #94a3b8;"> / </span>
+        <a href="{{ url_for('main.documentos') }}" style="color: var(--color-primary); text-decoration: none;">Documentos</a>
+        <span style="color: #94a3b8;"> / </span>
+        <span style="color: #64748b;">Archivar Documentos</span>
+    </div>
+
     <h1 style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.5rem;">
         <span>📦</span>
-        <span>Archivar Documentos</span>
+        <span>Archivar Documentos por Período</span>
     </h1>
     <p style="color: var(--color-text-light); margin-bottom: 1.5rem;">
-        Descargue paquetes de documentos para liberar espacio de Google Drive.
+        Seleccione un período para descargar los documentos en un paquete ZIP y liberar espacio en Google Drive.
+        Los documentos se marcarán como "Descargado en Oficina" pero conservarán su historial.
     </p>
-    
-    <!-- ⚠️ ADVERTENCIA IMPORTANTE -->
-    <div style="background: #fef3c7; border: 2px solid #f59e0b; border-radius: 8px; padding: 1.5rem; margin-bottom: 2rem;">
-        <h3 style="color: #92400e; margin-bottom: 0.75rem; display: flex; align-items: center; gap: 0.5rem;">
-            <span>⚠️</span>
-            <span>ADVERTENCIA IMPORTANTE</span>
-        </h3>
-        <p style="color: #78350f; margin-bottom: 0.5rem;">
-            <strong>Al archivar documentos:</strong>
-        </p>
-        <ul style="color: #78350f; margin-left: 1.5rem; margin-bottom: 1rem;">
-            <li>Los documentos se <strong>eliminarán de Google Drive</strong> y ya NO estarán en la nube.</li>
-            <li>Solo estarán disponibles en la <strong>PC de la oficina o equipo designado</strong> donde se descargue el paquete.</li>
-            <li>En el sistema aparecerán como <strong>"Archivado - Solo oficina"</strong>.</li>
-            <li>Para consultarlos, deberá acceder desde esa computadora.</li>
+
+    <!-- Advertencia -->
+    <div style="background: #fef3c7; border-left: 4px solid #f59e0b; padding: 1rem; margin-bottom: 1.5rem; border-radius: 4px;">
+        <strong>⚠️ Importante:</strong>
+        <ul style="margin: 0.5rem 0 0 1.2rem; color: #92400e;">
+            <li>Los documentos se descargarán en un archivo ZIP</li>
+            <li>Se eliminarán de Google Drive para liberar espacio</li>
+            <li>El historial se conservará en el sistema marcado como "En Oficina"</li>
+            <li>Esta acción solo puede ser realizada por Administradores</li>
         </ul>
-        <p style="color: #92400e; font-weight: 600; background: #fff; padding: 0.75rem; border-radius: 4px; border-left: 4px solid #f59e0b;">
-            ⚠️ Estos documentos ya NO estarán en la nube. Solo disponibles en la PC de la oficina o en el equipo que hayan designado.
-        </p>
     </div>
-    
-    <!-- Formulario de archivamiento -->
-    <div style="background: white; border-radius: 8px; padding: 1.5rem; border: 1px solid #e2e8f0; margin-bottom: 2rem;">
-        <h3 style="margin-bottom: 1rem; color: var(--color-primary);">📅 Seleccionar Período</h3>
-        
+
+    <!-- Formulario -->
+    <div class="form-container">
         <form method="POST" action="{{ url_for('main.archivar_documentos') }}">
-            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 1.5rem;">
-                <div>
-                    <label style="display: block; margin-bottom: 0.5rem; font-weight: 600;">Tipo de período</label>
-                    <select name="tipo_periodo" class="form-control" required onchange="mostrarSelector(this.value)">
-                        <option value="dia">📅 Por Día específico</option>
-                        <option value="semana">📆 Por Semana</option>
-                        <option value="mes">📅 Por Mes</option>
-                        <option value="año">📅 Por Año</option>
-                    </select>
+
+            <!-- Período -->
+            <div class="form-section">
+                <h3><span>📅</span> Seleccionar Período</h3>
+                <div class="form-row">
+                    <div class="form-col-2">
+                        <div class="form-group">
+                            <label>Tipo de Período *</label>
+                            <select name="tipo_periodo" id="tipo_periodo" class="form-control" onchange="mostrarSelector()" required>
+                                <option value="dia">Día específico</option>
+                                <option value="semana">Semana</option>
+                                <option value="mes" selected>Mes</option>
+                                <option value="año">Año completo</option>
+                            </select>
+                        </div>
+                    </div>
                 </div>
-                
-                <div id="selector-dia">
-                    <label style="display: block; margin-bottom: 0.5rem; font-weight: 600;">Fecha</label>
-                    <input type="date" name="fecha" class="form-control">
+
+                <!-- Selectores dinámicos -->
+                <div id="selector_dia" class="form-row" style="display: none;">
+                    <div class="form-col-2">
+                        <div class="form-group">
+                            <label>Fecha</label>
+                            <input type="date" name="fecha" class="form-control" value="{{ fecha_hoy[:4] + '-' + fecha_hoy[4:6] + '-' + fecha_hoy[6:] }}">
+                        </div>
+                    </div>
                 </div>
-                
-                <div id="selector-semana" style="display: none;">
-                    <label style="display: block; margin-bottom: 0.5rem; font-weight: 600;">Semana del año</label>
-                    <input type="week" name="semana" class="form-control">
+
+                <div id="selector_semana" class="form-row" style="display: none;">
+                    <div class="form-col-2">
+                        <div class="form-group">
+                            <label>Semana</label>
+                            <input type="week" name="semana" class="form-control">
+                        </div>
+                    </div>
                 </div>
-                
-                <div id="selector-mes" style="display: none;">
-                    <label style="display: block; margin-bottom: 0.5rem; font-weight: 600;">Mes</label>
-                    <input type="month" name="mes" class="form-control">
+
+                <div id="selector_mes" class="form-row">
+                    <div class="form-col-2">
+                        <div class="form-group">
+                            <label>Mes</label>
+                            <input type="month" name="mes" class="form-control" value="{{ fecha_hoy[:4] + '-' + fecha_hoy[4:6] }}">
+                        </div>
+                    </div>
                 </div>
-                
-                <div id="selector-año" style="display: none;">
-                    <label style="display: block; margin-bottom: 0.5rem; font-weight: 600;">Año</label>
-                    <input type="number" name="año" class="form-control" min="2020" max="2030" value="2026">
+
+                <div id="selector_año" class="form-row" style="display: none;">
+                    <div class="form-col-2">
+                        <div class="form-group">
+                            <label>Año</label>
+                            <input type="number" name="año" class="form-control" value="{{ fecha_hoy[:4] }}" min="2020" max="2030">
+                        </div>
+                    </div>
                 </div>
             </div>
-            
-            <div style="margin-bottom: 1.5rem;">
-                <label style="display: block; margin-bottom: 0.5rem; font-weight: 600;">
-                    <span>📁</span> Carpeta de destino (en tu computadora)
-                </label>
-                <input type="text" name="carpeta_destino" class="form-control" 
-                       placeholder="Ej: C:\Archivos\Expedientes\2026\Abril" 
-                       value="C:\Archivos\Expedientes\{{ fecha_hoy }}">
-                <small style="color: #64748b; display: block; margin-top: 0.5rem;">
-                    💡 Esta ruta es referencial. El ZIP se descargará a tu carpeta de Descargas por defecto.
-                </small>
+
+            <!-- Confirmación -->
+            <div class="form-section">
+                <h3><span>✅</span> Confirmación</h3>
+                <div style="background: #fee2e2; border: 1px solid #ef4444; border-radius: 8px; padding: 1rem; margin-bottom: 1rem;">
+                    <label style="display: flex; align-items: start; gap: 0.5rem; cursor: pointer;">
+                        <input type="checkbox" name="confirmar" value="1" required style="margin-top: 0.2rem;">
+                        <span style="color: #991b1b; font-size: 0.9rem;">
+                            Confirmo que he leído la advertencia y deseo descargar el paquete ZIP 
+                            con los documentos del período seleccionado. Entiendo que los documentos 
+                            se eliminarán de Google Drive y se marcarán como "Descargado en Oficina".
+                        </span>
+                    </label>
+                </div>
             </div>
-            
-            <div style="background: #fee2e2; border: 1px solid #ef4444; border-radius: 6px; padding: 1rem; margin-bottom: 1.5rem;">
-                <label style="display: flex; align-items: flex-start; gap: 0.75rem; cursor: pointer;">
-                    <input type="checkbox" name="confirmar" required style="margin-top: 0.25rem;">
-                    <span style="color: #991b1b; font-size: 0.95rem;">
-                        <strong>Confirmo que he leído la advertencia.</strong> Entiendo que los documentos archivados se eliminarán de Google Drive y solo estarán disponibles localmente.
-                    </span>
-                </label>
+
+            <!-- Botones -->
+            <div class="form-actions">
+                <button type="submit" class="btn btn-warning btn-lg" style="background: #f59e0b; color: white;">
+                    <span>📦</span> Generar Paquete ZIP y Liberar Espacio
+                </button>
+                <a href="{{ url_for('main.documentos') }}" class="btn btn-secondary btn-lg" style="text-decoration: none;">
+                    ❌ Cancelar
+                </a>
             </div>
-            
-            <button type="submit" class="btn btn-warning btn-lg" style="background: #f59e0b; color: white; border: none;">
-                <span>📦</span> Generar Paquete y Liberar Espacio
-            </button>
         </form>
     </div>
-    
-    <!-- Documentos que se archivarán (preview) -->
-    <div style="background: white; border-radius: 8px; padding: 1.5rem; border: 1px solid #e2e8f0;">
-        <h3 style="margin-bottom: 1rem; color: var(--color-primary);">📋 Documentos en Google Drive</h3>
-        
-        {% if documentos_drive %}
-        <p style="color: #64748b; margin-bottom: 1rem;">
-            Total: <strong>{{ documentos_drive|length }}</strong> documentos en la nube
-        </p>
-        
-        <div style="overflow-x: auto;">
-            <table class="table" style="width: 100%;">
-                <thead style="background: #f8fafc;">
-                    <tr>
-                        <th>Documento</th>
-                        <th>Expediente</th>
-                        <th>Fecha</th>
-                        <th>Tamaño</th>
-                        <th>Ubicación</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for doc in documentos_drive %}
-                    <tr>
-                        <td>
-                            <strong>{{ doc.titulo }}</strong><br>
-                            <small style="color: #64748b;">{{ doc.nombre_archivo }}</small>
-                        </td>
-                        <td>{{ doc.expediente.get_identificador_principal() if doc.expediente else 'N/A' }}</td>
-                        <td>{{ doc.fecha_subida.strftime('%d/%m/%Y') if doc.fecha_subida else 'N/A' }}</td>
-                        <td>{{ doc.get_tamaño_formateado() }}</td>
-                        <td>{{ doc.get_ubicacion_label()|safe }}</td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
-        {% else %}
-        <div style="text-align: center; padding: 2rem; color: #64748b;">
-            <p style="font-size: 3rem; margin-bottom: 1rem;">☁️</p>
-            <p>No hay documentos en Google Drive para archivar.</p>
-        </div>
-        {% endif %}
+
+    <!-- Documentos en Drive -->
+    <h2 style="margin-top: 2rem; margin-bottom: 1rem;">📁 Documentos actualmente en Drive</h2>
+    {% if documentos_drive %}
+    <div class="table-container">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Documento</th>
+                    <th>Expediente</th>
+                    <th>Fecha Subida</th>
+                    <th>Tamaño</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for doc in documentos_drive %}
+                <tr>
+                    <td>{{ doc.get_icono() }} {{ doc.titulo }}</td>
+                    <td>{{ doc.expediente.get_identificador_principal() if doc.expediente else 'General' }}</td>
+                    <td>{{ doc.fecha_subida.strftime('%d/%m/%Y') if doc.fecha_subida else '-' }}</td>
+                    <td>{{ doc.get_tamaño_formateado() }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
     </div>
+    {% else %}
+    <div style="text-align: center; padding: 2rem; background: #f9fafb; border-radius: 8px;">
+        <p style="color: #6b7280;">No hay documentos en Google Drive actualmente.</p>
+    </div>
+    {% endif %}
 </div>
 
 <script>
-function mostrarSelector(tipo) {
-    // Ocultar todos
-    document.getElementById('selector-dia').style.display = 'none';
-    document.getElementById('selector-semana').style.display = 'none';
-    document.getElementById('selector-mes').style.display = 'none';
-    document.getElementById('selector-año').style.display = 'none';
-    
-    // Mostrar el seleccionado
-    if (tipo === 'dia') {
-        document.getElementById('selector-dia').style.display = 'block';
-    } else if (tipo === 'semana') {
-        document.getElementById('selector-semana').style.display = 'block';
-    } else if (tipo === 'mes') {
-        document.getElementById('selector-mes').style.display = 'block';
-    } else if (tipo === 'año') {
-        document.getElementById('selector-año').style.display = 'block';
-    }
+function mostrarSelector() {
+    var tipo = document.getElementById('tipo_periodo').value;
+    document.getElementById('selector_dia').style.display = 'none';
+    document.getElementById('selector_semana').style.display = 'none';
+    document.getElementById('selector_mes').style.display = 'none';
+    document.getElementById('selector_año').style.display = 'none';
+
+    if (tipo === 'dia') document.getElementById('selector_dia').style.display = 'flex';
+    else if (tipo === 'semana') document.getElementById('selector_semana').style.display = 'flex';
+    else if (tipo === 'mes') document.getElementById('selector_mes').style.display = 'flex';
+    else if (tipo === 'año') document.getElementById('selector_año').style.display = 'flex';
 }
+
+// Inicializar
+mostrarSelector();
 </script>
 {% endblock %}

@@ -12,6 +12,39 @@
     </div>
     
     <!-- Bienvenida y Rol -->
+    <!-- ALERTA DE ESPACIO EN GOOGLE DRIVE (solo Admin/Dev) -->
+    {% if espacio_drive and espacio_drive.porcentaje >= 80 %}
+    <div style="background: #fef2f2; border: 2px solid #dc2626; border-radius: 12px; padding: 1rem 1.5rem; margin-bottom: 1.5rem; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 1rem;">
+        <div style="display: flex; align-items: center; gap: 1rem;">
+            <span style="font-size: 2rem;">🚨</span>
+            <div>
+                <strong style="color: #dc2626;">¡Alerta de Espacio en Google Drive!</strong>
+                <p style="margin: 0; color: #7f1d1b; font-size: 0.9rem;">
+                    Drive está al <strong>{{ "%.1f"|format(espacio_drive.porcentaje) }}%</strong> 
+                    ({{ "%.1f"|format(espacio_drive.usado_gb) }} GB de {{ "%.1f"|format(espacio_drive.total_gb) }} GB)
+                </p>
+            </div>
+        </div>
+        <a href="{{ url_for('main.gestionar_espacio') }}" class="btn btn-danger" style="text-decoration: none;">
+            💾 Gestionar Espacio
+        </a>
+    </div>
+    {% elif espacio_drive and espacio_drive.porcentaje >= 60 %}
+    <div style="background: #fffbeb; border: 2px solid #f59e0b; border-radius: 12px; padding: 1rem 1.5rem; margin-bottom: 1.5rem; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 1rem;">
+        <div style="display: flex; align-items: center; gap: 1rem;">
+            <span style="font-size: 2rem;">⚠️</span>
+            <div>
+                <strong style="color: #b45309;">Espacio en Google Drive al {{ "%.1f"|format(espacio_drive.porcentaje) }}%</strong>
+                <p style="margin: 0; color: #92400e; font-size: 0.9rem;">
+                    Considere archivar documentos antiguos para liberar espacio.
+                </p>
+            </div>
+        </div>
+        <a href="{{ url_for('main.archivar_documentos') }}" class="btn btn-warning" style="background: #f59e0b; color: white; text-decoration: none;">
+            📦 Archivar Documentos
+        </a>
+    </div>
+    {% endif %}
     <div class="welcome-section">
         <h1>
             <span>👋</span>

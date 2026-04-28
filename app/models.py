@@ -271,6 +271,8 @@ class Documento(db.Model):
             return '<span class="badge badge-success"><i class="fas fa-cloud"></i> Ambos</span>'
         elif self.ubicacion == 'archivado_local':
             return '<span class="badge badge-warning" title="Disponible solo en PC de oficina"><i class="fas fa-archive"></i> Archivado</span>'
+        elif self.ubicacion == 'descargado_en_oficina':
+            return '<span class="badge badge-info" title="Descargado en paquete ZIP en oficina"><i class="fas fa-download"></i> En Oficina</span>'
         elif self.ubicacion == 'eliminado':
             return '<span class="badge badge-danger"><i class="fas fa-trash"></i> Eliminado</span>'
         return ''
