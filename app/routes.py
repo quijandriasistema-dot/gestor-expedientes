@@ -54,10 +54,6 @@ def _guardar_usuarios():
     """Ya no se usa - los usuarios se guardan directamente en Supabase"""
     pass
 
-def _guardar_usuarios():
-    """Ya no se usa - los usuarios se guardan directamente en Supabase"""
-    pass
-
 # Cargar usuarios al inicio
 USUARIOS = _cargar_usuarios()
 
@@ -684,6 +680,37 @@ def ver_expediente(id):
                          audiencias=audiencias,
                          form_estado=form_estado,
                          rol=session.get('rol', 'USUARIO'))
+
+@bp.route('/expediente/<int:id>/eliminar', methods=['POST'])
+@requiere_login
+@no_cache
+def eliminar_expediente(id):
+    """Eliminar un expediente completo (solo ADMINISTRADOR)"""
+    if session.get('rol') != 'ADMINISTRADOR':
+        flash('No tiene permisos para eliminar expedientes', 'error')
+        return redirect(url_for('main.ver_expediente', id=id))
+
+    expediente = Expediente.query.get_or_404(id)
+    
+    try:
+        # Eliminar registros relacionados primero (para no violar foreign keys)
+        EstadoHistorial.query.filter_by(expediente_id=id).delete()
+        Audiencia.query.filter_by(expediente_id=id).delete()
+        Documento.query.filter_by(expediente_id=id).delete()
+        Notificacion.query.filter_by(expediente_id=id).delete()
+        
+        # Ahora eliminar el expediente
+        identificador = expediente.get_identificador_principal()
+        db.session.delete(expediente)
+        db.session.commit()
+        
+        flash(f'Expediente {identificador} eliminado correctamente', 'success')
+        return redirect(url_for('main.expedientes'))
+        
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Error al eliminar expediente: {str(e)}', 'error')
+        return redirect(url_for('main.ver_expediente', id=id))
 
 @bp.route('/expediente/<int:id>/editar', methods=['GET', 'POST'])
 @requiere_login
@@ -3544,5 +3571,3 @@ def archivar_documentos():
 # ============================================
 # FIN DEL ARCHIVO
 # ============================================
-
-puede_ver_modulo

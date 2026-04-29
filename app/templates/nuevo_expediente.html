@@ -22,7 +22,7 @@
     
     <!-- Formulario -->
     <div class="form-container">
-        <form method="POST" action="{{ url_for('main.nuevo_expediente') }}">
+        <form method="POST" action="{{ url_for('main.nuevo_expediente') }}" novalidate>
             {{ form.hidden_tag() }}
             
             <!-- Campo oculto: estado inicial -->
