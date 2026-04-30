@@ -42,9 +42,11 @@
         <a href="{{ url_for('main.subir_documento_drive', expediente_id=expediente.id) }}" class="btn btn-success btn-lg" style="text-decoration: none;">
             <span>☁️</span> Subir a Google Drive
         </a>
-        <a href="{{ url_for('main.archivar_documentos') }}" class="btn btn-warning btn-lg" style="background: #f59e0b; color: white; text-decoration: none;">
-            <span>📦</span> Archivar Documentos
+        {% if rol in ['ADMINISTRADOR', 'DESARROLLADOR'] %}
+        <a href="{{ url_for('main.gestionar_espacio') }}" class="btn btn-warning btn-lg" style="background: #f59e0b; color: white; text-decoration: none;">
+            <span>💾</span> Gestionar Espacio
         </a>
+        {% endif %}
         <a href="{{ url_for('main.documentos') }}" class="btn btn-secondary btn-lg" style="text-decoration: none;">
             📁 Todos los Documentos
         </a>
@@ -96,7 +98,7 @@
                                 <i class="fas fa-cloud"></i> Ambos
                             </span>
                         {% elif doc.ubicacion == 'archivado_local' %}
-                            <span class="badge badge-warning" title="Disponible solo en PC de oficina">
+                            <span class="badge badge-warning" title="Documento archivado en oficina">
                                 <i class="fas fa-archive"></i> Archivado
                             </span>
                             <div style="margin-top: 0.5rem; padding: 0.5rem; background: #fef3c7; border-radius: 4px; font-size: 0.85rem; color: #92400e;">
@@ -117,20 +119,28 @@
                     <td>{{ doc.usuario_subida or '-' }}</td>
                     <td>{{ doc.get_tamaño_formateado() }}</td>
                     <td>
-                        <div style="display: flex; gap: 0.5rem;">
-                            <!-- Ver (solo si tiene ID de Drive) -->
-                            {% if doc.drive_file_id %}
-                            <a href="{{ url_for('main.ver_documento', id=doc.id) }}" target="_blank" class="btn btn-small btn-success" title="Visualizar en Drive" style="text-decoration: none;">
+                        <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+                            <!-- VER: Solo si tiene ID de Drive y está en Drive -->
+                            {% if doc.drive_file_id and doc.ubicacion == 'drive' %}
+                            <a href="{{ url_for('main.ver_documento', id=doc.id) }}" target="_blank" 
+                               class="btn btn-small btn-success" title="Visualizar en Drive" 
+                               style="text-decoration: none;">
                                 👁️ Ver
                             </a>
+                            {% elif doc.ubicacion == 'archivado_local' %}
+                            <span class="btn btn-small btn-secondary" style="opacity: 0.6; cursor: not-allowed;" title="Documento archivado en oficina">
+                                📁 Archivado
+                            </span>
                             {% endif %}
                             
-
-                            <!-- Eliminar -->
+                            <!-- BOTÓN ELIMINAR COMPLETO (Drive + Supabase) - Solo Admin/Dev -->
                             {% if rol in ['ADMINISTRADOR', 'DESARROLLADOR'] %}
-                            <form method="POST" action="{{ url_for('main.eliminar_documento_drive', id=doc.id) }}" 
-                                onsubmit="return confirm('¿Eliminar este documento de Google Drive?');" style="display: inline;">
-                                <button type="submit" class="btn btn-small btn-danger">🗑️</button>
+                            <form method="POST" action="{{ url_for('main.eliminar_documento', id=doc.id) }}" 
+                                  onsubmit="return confirm('⚠️ ¿ELIMINAR COMPLETAMENTE?\n\nEsta acción eliminará el documento de:\n• Google Drive\n• Base de datos (Supabase)\n\n¿Está seguro? Esta acción NO se puede deshacer.');" 
+                                  style="display: inline;">
+                                <button type="submit" class="btn btn-small btn-danger" title="Eliminar completamente (Drive + Sistema)">
+                                    🗑️ Eliminar
+                                </button>
                             </form>
                             {% endif %}
                         </div>
@@ -148,9 +158,6 @@
         <div style="display: flex; gap: 1rem; justify-content: center; flex-wrap: wrap;">
             <a href="{{ url_for('main.subir_documento_drive', expediente_id=expediente.id) }}" class="btn btn-success btn-lg" style="text-decoration: none;">
                 <span>☁️</span> Subir a Google Drive
-            </a>
-            <a href="{{ url_for('main.archivar_documentos') }}" class="btn btn-warning btn-lg" style="background: #f59e0b; color: white; text-decoration: none;">
-                <span>📦</span> Archivar Documentos
             </a>
         </div>
     </div>

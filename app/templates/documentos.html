@@ -34,7 +34,7 @@
             <span>☁️</span> Subir a Drive
         </a>
         
-        <!-- ✅ BOTÓN GESTIONAR ESPACIO: Solo Admin/Dev -->
+        <!-- BOTÓN GESTIONAR ESPACIO: Solo Admin/Dev -->
         {% if rol in ['ADMINISTRADOR', 'DESARROLLADOR'] %}
         <a href="{{ url_for('main.gestionar_espacio') }}" class="btn btn-warning" style="background: #f59e0b; color: white; border: none;">
             <span>💾</span> Gestionar Espacio
@@ -110,6 +110,9 @@
                     <td>
                         <strong>{{ doc.titulo }}</strong><br>
                         <small style="color: #64748b;">{{ doc.nombre_archivo }}</small>
+                        {% if doc.descripcion %}
+                            <br><small style="color: #94a3b8;">{{ doc.descripcion[:60] }}{% if doc.descripcion|length > 60 %}...{% endif %}</small>
+                        {% endif %}
                     </td>
                     <td>{{ doc.categoria|title if doc.categoria else 'Otro' }}</td>
                     <td>
@@ -126,18 +129,31 @@
                     <td>
                         {% if doc.ubicacion == 'drive' %}
                             <span style="color: #10b981;">☁️ Drive</span>
+                        {% elif doc.ubicacion == 'archivado_local' %}
+                            <span style="color: #f59e0b;">📁 Archivado</span>
                         {% else %}
                             <span style="color: #6b7280;">{{ doc.ubicacion }}</span>
                         {% endif %}
                     </td>
                     <td>
                         <div style="display: flex; gap: 0.3rem;">
-                            <a href="{{ url_for('main.ver_documento', id=doc.id) }}" class="btn btn-sm btn-info" title="Ver">
+                            <!-- VER: Solo si está en Drive -->
+                            {% if doc.drive_file_id and doc.ubicacion == 'drive' %}
+                            <a href="{{ url_for('main.ver_documento', id=doc.id) }}" target="_blank" class="btn btn-sm btn-info" title="Ver en Drive">
                                 👁️
                             </a>
+                            {% elif doc.ubicacion == 'archivado_local' %}
+                            <span class="btn btn-sm btn-secondary" style="opacity: 0.6; cursor: not-allowed;" title="Documento archivado en oficina">
+                                📁
+                            </span>
+                            {% endif %}
+                            
+                            <!-- BOTÓN ELIMINAR COMPLETO (Drive + Supabase) - Solo Admin/Dev -->
                             {% if rol in ['ADMINISTRADOR', 'DESARROLLADOR'] %}
-                            <form method="POST" action="{{ url_for('main.eliminar_documento_drive', id=doc.id) }}" style="display: inline;" onsubmit="return confirm('¿Eliminar este documento de Google Drive y del sistema?')">
-                                <button type="submit" class="btn btn-sm btn-danger" title="Eliminar">
+                            <form method="POST" action="{{ url_for('main.eliminar_documento', id=doc.id) }}" 
+                                  style="display: inline;" 
+                                  onsubmit="return confirm('⚠️ ¿ELIMINAR COMPLETAMENTE?\n\nEsta acción eliminará el documento de:\n• Google Drive\n• Registro del sistema\n\n¿Está seguro? Esta acción NO se puede deshacer.');">
+                                <button type="submit" class="btn btn-sm btn-danger" title="Eliminar completamente">
                                     🗑️
                                 </button>
                             </form>

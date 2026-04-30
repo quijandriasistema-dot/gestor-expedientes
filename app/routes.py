@@ -1,4 +1,6 @@
 # app/routes.py - Rutas de la aplicación
+# Sistema de Gestión de Expedientes Legales - Quijandria Abogados EIRL
+# Versión con Service Account para Google Drive
 
 from flask import Blueprint, render_template, request, redirect, url_for, flash, session, jsonify, after_this_request, send_file
 from functools import wraps
@@ -9,6 +11,7 @@ from app.forms import ExpedienteForm, EstadoForm, BusquedaForm, AudienciaForm, B
 import json
 import os
 import bcrypt
+import time
 
 # ============================================
 # IMPORTS PARA EXPORTACIÓN (PDF/EXCEL)
@@ -21,18 +24,22 @@ from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, 
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import inch
 
+# ============================================
+# IMPORTS PARA GOOGLE DRIVE - SERVICE ACCOUNT
+# ============================================
+from app.drive_service_account import (
+    subir_archivo_drive,
+    eliminar_archivo_drive,
+    obtener_espacio_usado_drive,
+    descargar_archivo_drive
+)
+
 bp = Blueprint('main', __name__)
 
 # ============================================
 # CONFIGURACIÓN DE USUARIOS - SUPABASE (tabla: usuario)
 # ============================================
 
-# ============================================
-# CONFIGURACIÓN DE USUARIOS - SUPABASE (tabla: usuario)
-# ============================================
-
-# ← ELIMINADO: No cargar usuarios al inicio en serverless
-# En Vercel no hay app context al importar el módulo
 USUARIOS = {}
 
 def _cargar_usuarios():
@@ -108,32 +115,26 @@ def puede_ver_modulo(modulo):
     """Verifica si el usuario actual puede ver un módulo"""
     if 'rol' not in session:
         return False
-    
-    # DESARROLLADOR tiene acceso a todo
+
     if session['rol'] == 'DESARROLLADOR':
         return True
-    
-    # ADMINISTRADOR tiene acceso a todo
+
     if session['rol'] == 'ADMINISTRADOR':
         return True
-    
-    # Verificar módulos asignados (para rol USUARIO)
+
     if 'modulos' in session:
         modulos = session['modulos']
-        
-        # Si tiene acceso a todo
+
         if 'todo' in modulos:
             return True
-        
-        # Mapeo de tipos específicos de expediente al módulo general
+
         modulo_general = modulo
         if modulo in ['civil', 'penal', 'administrativo', 'conciliacion', 'archivo']:
             modulo_general = 'expedientes'
-        
-        # Verificar si tiene el módulo específico o el general
+
         if modulo in modulos or modulo_general in modulos:
             return True
-    
+
     return False
 
 def puede_exportar():
@@ -338,13 +339,11 @@ def login():
 
         if usuario:
             if usuario.check_password(password):
-                # Actualizar último acceso
                 usuario.ultimo_acceso = datetime.now()
                 db.session.commit()
-                
-                # CORREGIDO - Agregar usuario_id:
+
                 session['usuario'] = username
-                session['usuario_id'] = usuario.id  # ← AGREGAR ESTA LÍNEA
+                session['usuario_id'] = usuario.id
                 session['nombre'] = usuario.nombre
                 session['rol'] = usuario.rol
                 session['modulos'] = usuario.get_modulos_list()
@@ -418,23 +417,7 @@ def index():
     espacio_drive = None
     if session.get('rol') in ['ADMINISTRADOR', 'DESARROLLADOR']:
         try:
-            from sqlalchemy import text
-            usuario_id = session.get('usuario_id')
-            if usuario_id:
-                result = db.session.execute(
-                    text("SELECT google_token FROM google_tokens WHERE usuario_id = :uid"),
-                    {'uid': usuario_id}
-                ).fetchone()
-                if result:
-                    import json
-                    token_data = result[0]
-                    if isinstance(token_data, dict):
-                        credentials_dict = token_data
-                    else:
-                        credentials_dict = json.loads(token_data)
-                    from app.drive_service import get_drive_service, obtener_espacio_usado
-                    service = get_drive_service(credentials_dict)
-                    espacio_drive = obtener_espacio_usado(service)
+            espacio_drive = obtener_espacio_usado_drive()
         except Exception as e:
             print(f"Error obteniendo espacio Drive: {e}")
             espacio_drive = None
@@ -457,7 +440,6 @@ def index():
                          proximas_audiencias=proximas_audiencias,
                          espacio_drive=espacio_drive,
                          form_busqueda=form_busqueda)
-
 # ============================================
 # RUTAS DE EXPEDIENTES
 # ============================================
@@ -467,76 +449,62 @@ def index():
 @no_cache
 def expedientes():
     """Lista todos los expedientes con búsqueda y filtros"""
-    
+
     if not puede_ver_modulo('expedientes'):
         flash('No tiene permisos para ver expedientes', 'error')
         return redirect(url_for('main.index'))
-    
-    # Obtener parámetros de búsqueda
+
     buscar_numero = request.args.get('buscar_numero', '').strip()
     buscar_cliente = request.args.get('buscar_cliente', '').strip()
     filtro_tipo = request.args.get('filtro_tipo', '').strip()
     filtro_estado = request.args.get('filtro_estado', '').strip()
-    
-    # Query base
+
     query = Expediente.query
-    
-    # Aplicar filtros si existen
+
     if buscar_numero:
-        # Buscar en número de expediente O en DNI (para administrativos)
         query = query.filter(
             db.or_(
                 Expediente.numero_expediente.ilike(f'%{buscar_numero}%'),
                 Expediente.dni.ilike(f'%{buscar_numero}%')
             )
         )
-    
+
     if buscar_cliente:
-        # Búsqueda parcial en nombre del cliente (insensible a mayúsculas)
         query = query.filter(Expediente.cliente.ilike(f'%{buscar_cliente}%'))
-    
+
     if filtro_tipo:
         query = query.filter(Expediente.tipo == filtro_tipo)
-    
+
     if filtro_estado:
         query = query.filter(Expediente.estado == filtro_estado)
-    
-    # Ordenar por fecha de registro descendente (más recientes primero)
+
     expedientes = query.order_by(Expediente.fecha_registro.desc()).all()
-    
+
     return render_template('expedientes.html',
                          title='Gestión de Expedientes',
                          expedientes=expedientes,
                          rol=session.get('rol', 'USUARIO'))
 
 
-# ============================================
-# NUEVA RUTA: FILTRADO POR TIPO DE EXPEDIENTE
-# ============================================
-
 @bp.route('/expedientes/tipo/<string:tipo>')
 @requiere_login
 @no_cache
 def expedientes_por_tipo(tipo):
-    """Listado de expedientes filtrados por tipo (civil, penal, administrativo, conciliacion, archivo)"""
+    """Listado de expedientes filtrados por tipo"""
 
-    # Validar tipo permitido
     tipos_permitidos = ['civil', 'penal', 'administrativo', 'conciliacion', 'archivo']
     if tipo not in tipos_permitidos:
         flash('Tipo de expediente no válido', 'error')
         return redirect(url_for('main.expedientes'))
 
-    # Verificar permisos del módulo
     if not puede_ver_modulo(tipo):
         flash(f'No tiene permisos para ver expedientes de {tipo}', 'error')
         return redirect(url_for('main.index'))
 
-    # Obtener expedientes del tipo específico
     lista_expedientes = Expediente.query.filter_by(tipo=tipo).order_by(
         Expediente.fecha_registro.desc()
     ).all()
 
-    # Títulos por tipo
     titulos = {
         'civil': 'Expedientes de Derecho Civil',
         'penal': 'Expedientes de Derecho Penal',
@@ -668,7 +636,6 @@ def ver_expediente(id):
         expediente_id=id
     ).order_by(EstadoHistorial.fecha.desc()).all()
 
-    # Audiencias del expediente
     audiencias = Audiencia.query.filter_by(
         expediente_id=id
     ).order_by(Audiencia.fecha.desc(), Audiencia.hora.desc()).all()
@@ -685,28 +652,36 @@ def ver_expediente(id):
 @requiere_login
 @no_cache
 def eliminar_expediente(id):
-    """Eliminar un expediente completo (solo ADMINISTRADOR)"""
-    if session.get('rol') != 'ADMINISTRADOR':
+    """Eliminar un expediente completo (solo ADMINISTRADOR o DESARROLLADOR)"""
+    if session.get('rol') not in ['ADMINISTRADOR', 'DESARROLLADOR']:
         flash('No tiene permisos para eliminar expedientes', 'error')
         return redirect(url_for('main.ver_expediente', id=id))
 
     expediente = Expediente.query.get_or_404(id)
-    
+
     try:
-        # Eliminar registros relacionados primero (para no violar foreign keys)
+        # Eliminar documentos de Drive primero
+        documentos = Documento.query.filter_by(expediente_id=id).all()
+        for doc in documentos:
+            if doc.drive_file_id:
+                try:
+                    eliminar_archivo_drive(doc.drive_file_id)
+                except Exception as e:
+                    print(f"Error eliminando doc {doc.id} de Drive: {e}")
+
+        # Eliminar registros relacionados
         EstadoHistorial.query.filter_by(expediente_id=id).delete()
         Audiencia.query.filter_by(expediente_id=id).delete()
         Documento.query.filter_by(expediente_id=id).delete()
         Notificacion.query.filter_by(expediente_id=id).delete()
-        
-        # Ahora eliminar el expediente
+
         identificador = expediente.get_identificador_principal()
         db.session.delete(expediente)
         db.session.commit()
-        
+
         flash(f'Expediente {identificador} eliminado correctamente', 'success')
         return redirect(url_for('main.expedientes'))
-        
+
     except Exception as e:
         db.session.rollback()
         flash(f'Error al eliminar expediente: {str(e)}', 'error')
@@ -1024,7 +999,6 @@ def buscar():
                              tipo_busqueda=tipo_busqueda)
 
     return redirect(url_for('main.index'))
-
 # ============================================
 # RUTAS DE GESTIÓN DE USUARIOS - COMPLETAS
 # ============================================
@@ -1045,7 +1019,6 @@ def gestion_usuarios_admin():
     if session.get('rol') == 'DESARROLLADOR':
         return redirect(url_for('main.gestion_usuarios_dev'))
 
-    # Cargar usuarios desde Supabase
     usuarios_db = {}
     for u in Usuario.query.filter_by(activo=True).all():
         usuarios_db[u.username] = {
@@ -1104,7 +1077,6 @@ def api_obtener_usuario(username):
     if not usuario:
         return jsonify({'success': False, 'error': 'Usuario no encontrado'}), 404
 
-    # Restricciones de ADMINISTRADOR
     if rol_actual == 'ADMINISTRADOR':
         if usuario.rol == 'DESARROLLADOR':
             return jsonify({'success': False, 'error': 'No puede ver detalles del desarrollador'}), 403
@@ -1138,15 +1110,12 @@ def api_crear_usuario():
     modulos = data.get('modulos', ['civil'])
     email = data.get('email', '').strip()
 
-    # Validaciones
     if not username or not nombre or not password:
         return jsonify({'success': False, 'error': 'Datos incompletos'}), 400
 
-    # Verificar si ya existe
     if Usuario.query.filter_by(username=username).first():
         return jsonify({'success': False, 'error': 'El usuario ya existe'}), 400
 
-    # Restricciones de ADMINISTRADOR
     if rol_actual == 'ADMINISTRADOR':
         if rol_nuevo in ['ADMINISTRADOR', 'DESARROLLADOR']:
             return jsonify({'success': False, 'error': 'No puede crear administradores o desarrolladores'}), 403
@@ -1186,7 +1155,6 @@ def api_eliminar_usuario(username):
     if not usuario:
         return jsonify({'success': False, 'error': 'Usuario no encontrado'}), 404
 
-    # Restricciones de ADMINISTRADOR
     if rol_actual == 'ADMINISTRADOR':
         if usuario.rol == 'DESARROLLADOR':
             return jsonify({'success': False, 'error': 'No puede eliminar al desarrollador'}), 403
@@ -1194,7 +1162,6 @@ def api_eliminar_usuario(username):
             return jsonify({'success': False, 'error': 'No puede eliminar a otros administradores'}), 403
 
     try:
-        # Soft delete: marcar como inactivo
         usuario.activo = False
         db.session.commit()
         return jsonify({'success': True, 'message': 'Usuario eliminado correctamente'})
@@ -1218,7 +1185,6 @@ def api_editar_usuario(username):
 
     data = request.get_json()
 
-    # Restricciones de ADMINISTRADOR
     if rol_actual == 'ADMINISTRADOR':
         if usuario.rol == 'DESARROLLADOR':
             return jsonify({'success': False, 'error': 'No puede editar al desarrollador'}), 403
@@ -1260,16 +1226,13 @@ def audiencias():
         flash('No tiene permisos para ver audiencias', 'error')
         return redirect(url_for('main.index'))
 
-    # Filtros
     fecha_desde = request.args.get('fecha_desde', '')
     fecha_hasta = request.args.get('fecha_hasta', '')
     tipo_filtro = request.args.get('tipo', '')
     estado_filtro = request.args.get('estado', '')
 
-    # Query base
     query = Audiencia.query
 
-    # Aplicar filtros
     if fecha_desde:
         try:
             desde = datetime.strptime(fecha_desde, '%Y-%m-%d').date()
@@ -1290,16 +1253,11 @@ def audiencias():
     if estado_filtro:
         query = query.filter_by(estado=estado_filtro)
 
-    # Ordenar por fecha y hora
     query = query.order_by(Audiencia.fecha, Audiencia.hora)
-
-    # Obtener audiencias
     lista_audiencias = query.all()
 
-    # Formulario de búsqueda
     form_busqueda = BusquedaAudienciaForm()
 
-    # Estadísticas
     hoy = date.today()
     total_programadas = Audiencia.query.filter_by(estado='programada').count()
     audiencias_hoy = Audiencia.query.filter(
@@ -1338,7 +1296,6 @@ def nueva_audiencia():
 
     form = AudienciaForm()
 
-    # Cargar expedientes SIEMPRE (tanto para GET como para POST cuando hay errores)
     try:
         expedientes = Expediente.query.order_by(Expediente.fecha_registro.desc()).all()
     except Exception as e:
@@ -1347,14 +1304,12 @@ def nueva_audiencia():
 
     if request.method == 'POST':
         try:
-            # Obtener expediente_id del formulario manualmente
             expediente_id_str = request.form.get('expediente_id', '0')
             try:
                 expediente_id = int(expediente_id_str)
             except ValueError:
                 expediente_id = 0
 
-            # Validar que se seleccionó un expediente
             if expediente_id == 0:
                 flash('Debe seleccionar un expediente', 'error')
                 return render_template('nueva_audiencia.html',
@@ -1363,7 +1318,6 @@ def nueva_audiencia():
                                      expedientes=expedientes,
                                      rol=session.get('rol', 'USUARIO'))
 
-            # Validar que el expediente existe
             expediente = Expediente.query.get(expediente_id)
             if not expediente:
                 flash('El expediente seleccionado no existe', 'error')
@@ -1373,7 +1327,6 @@ def nueva_audiencia():
                                      expedientes=expedientes,
                                      rol=session.get('rol', 'USUARIO'))
 
-            # Validar fecha
             fecha_audiencia = form.fecha.data
             if not fecha_audiencia:
                 flash('Debe ingresar una fecha', 'error')
@@ -1391,7 +1344,6 @@ def nueva_audiencia():
                                      expedientes=expedientes,
                                      rol=session.get('rol', 'USUARIO'))
 
-            # Validar hora
             hora_audiencia = form.hora.data
             if not hora_audiencia:
                 flash('Debe ingresar una hora', 'error')
@@ -1401,7 +1353,6 @@ def nueva_audiencia():
                                      expedientes=expedientes,
                                      rol=session.get('rol', 'USUARIO'))
 
-            # Crear la audiencia
             nueva_audiencia = Audiencia(
                 expediente_id=expediente_id,
                 fecha=fecha_audiencia,
@@ -1420,7 +1371,6 @@ def nueva_audiencia():
             db.session.add(nueva_audiencia)
             db.session.commit()
 
-            # Actualizar estado del expediente
             if expediente.estado_actual != 'audiencia_programada':
                 expediente.estado_actual = 'audiencia_programada'
 
@@ -1441,14 +1391,12 @@ def nueva_audiencia():
             flash(f'Error al programar audiencia: {str(e)}', 'error')
             import traceback
             traceback.print_exc()
-            # IMPORTANTE: Pasar expedientes también cuando hay error
             return render_template('nueva_audiencia.html',
                                  title='Programar Audiencia',
                                  form=form,
                                  expedientes=expedientes,
                                  rol=session.get('rol', 'USUARIO'))
 
-    # GET: Mostrar formulario
     return render_template('nueva_audiencia.html',
                          title='Programar Audiencia',
                          form=form,
@@ -1470,7 +1418,6 @@ def nueva_audiencia_expediente(id):
 
     if form.validate_on_submit():
         try:
-            # Validar fecha no sea pasada
             fecha_audiencia = form.fecha.data
             if fecha_audiencia < date.today():
                 flash('No puede programar audiencias en fechas pasadas', 'error')
@@ -1498,7 +1445,6 @@ def nueva_audiencia_expediente(id):
             db.session.add(nueva_audiencia)
             db.session.commit()
 
-            # Actualizar estado del expediente
             if expediente.estado_actual != 'audiencia_programada':
                 expediente.estado_actual = 'audiencia_programada'
 
@@ -1603,7 +1549,6 @@ def cambiar_estado_audiencia(id):
             audiencia.fecha_actualizacion = datetime.now()
             db.session.commit()
 
-            # Si se aplaza, crear nueva audiencia sugerida (opcional)
             if nuevo_estado == 'aplazada':
                 flash('Audiencia marcada como aplazada. Programe una nueva fecha.', 'warning')
             else:
@@ -1639,24 +1584,22 @@ def eliminar_audiencia(id):
         db.session.rollback()
         flash(f'Error al eliminar: {str(e)}', 'error')
 
-    # Redirigir al expediente si venía de ahí, o al calendario
     referer = request.headers.get('Referer', '')
     if 'expediente' in referer:
         return redirect(url_for('main.ver_expediente', id=expediente_id))
 
     return redirect(url_for('main.audiencias'))
-
 # ============================================
 # RUTAS DE DOCUMENTOS - MÓDULO DOCUMENTOS
 # ============================================
+# CONFIGURACIÓN: Solo Google Drive con Service Account (sin almacenamiento local)
+# LÓGICA DUAL:
+#   1. ELIMINACIÓN NORMAL: Elimina de Drive + Supabase (todo)
+#   2. ARCHIVADO/LIBERAR ESPACIO: Solo elimina de Drive, marca como 'archivado_local' en Supabase
+#      (mantiene historial de búsqueda, muestra "Documento archivado en oficina")
 
 import os
 from werkzeug.utils import secure_filename
-
-# ============================================
-# CONFIGURACIÓN: Solo Google Drive (sin almacenamiento local)
-# ============================================
-
 
 def get_expedientes_choices():
     expedientes = Expediente.query.order_by(Expediente.fecha_registro.desc()).all()
@@ -1710,96 +1653,164 @@ def documentos():
                          rol=session.get('rol', 'USUARIO'))
 
 
+# ============================================
+# SUBIR DOCUMENTO (REDIRECCIÓN AUTOMÁTICA A DRIVE)
+# ============================================
+
 @bp.route('/documento/subir', methods=['GET', 'POST'])
 @requiere_login
 @no_cache
 def subir_documento():
-    """Formulario para subir nuevo documento"""
+    """
+    Todos los documentos se suben a Google Drive corporativo.
+    Redirección automática a subir_documento_drive.
+    """
     if not puede_ver_modulo('documentos'):
         flash('No tiene permisos para subir documentos', 'error')
         return redirect(url_for('main.index'))
 
-    # En Vercel: redirigir a subir-documento-drive (Google Drive)
-    if os.environ.get('VERCEL') == '1' or os.environ.get('VERCEL_ENV') is not None:
-        flash('En la versión web, los documentos se suben a Google Drive.', 'info')
-        return redirect(url_for('main.subir_documento_drive'))
-
-    form = DocumentoForm()
-    form.expediente_id.choices = get_expedientes_choices()
-
-    if form.validate_on_submit():
-        try:
-            archivo = form.archivo.data
-
-            if archivo and allowed_file(archivo.filename):
-                filename_original = secure_filename(archivo.filename)
-                extension = filename_original.rsplit('.', 1)[1].lower()
-
-                timestamp = int(time.time())
-                nombre_unico = f"{timestamp}_{filename_original}"
-
-                # Leer archivo en memoria para subir a Drive
-                file_content = archivo.read()
-                tamaño = len(file_content)
-
-                expediente_id = form.expediente_id.data
-                if expediente_id == 0:
-                    expediente_id = None
-
-                # Subir a Google Drive
-                resultado = subir_archivo(service, file_content, archivo.filename, 
-                                         archivo.content_type or 'application/octet-stream')
-
-                nuevo_documento = Documento(
-                    expediente_id=expediente_id,
-                    titulo=form.titulo.data,
-                    descripcion=form.descripcion.data,
-                    categoria=form.categoria.data,
-                    nombre_archivo=filename_original,
-                    tipo_archivo=extension,
-                    tamaño_bytes=tamaño,
-                    url_drive=resultado['url'],
-                    drive_file_id=resultado['id'],
-                    ubicacion='drive',
-                    fecha_documento=form.fecha_documento.data,
-                    usuario_subida=session.get('nombre', 'Sistema')
-                )
-
-                db.session.add(nuevo_documento)
-                db.session.commit()
-
-                flash(f'📄 Documento "{form.titulo.data}" subido correctamente ({nuevo_documento.get_tamaño_formateado()})', 'success')
-
-                if expediente_id:
-                    return redirect(url_for('main.expediente_documentos', id=expediente_id))
-                else:
-                    return redirect(url_for('main.documentos'))
-            else:
-                flash('❌ Tipo de archivo no permitido', 'error')
-
-        except Exception as e:
-            db.session.rollback()
-            flash(f'Error al subir documento: {str(e)}', 'error')
-            import traceback
-            traceback.print_exc()
-
-    return render_template('subir_documento.html',
-                         title='Subir Documento',
-                         form=form,
-                         rol=session.get('rol', 'USUARIO'))
+    # Todos los documentos van al Drive corporativo del estudio
+    return redirect(url_for('main.subir_documento_drive'))
 
 
-# NOTA: Las funciones de descarga y visualización local fueron eliminadas.
-# Todos los documentos se almacenan en Google Drive.
-# Para ver un documento, usar /documento/<int:id>/ver (abre vista de Drive)
-# Para descargar, usar el enlace directo de Google Drive.
+# ============================================
+# SUBIR DOCUMENTO A GOOGLE DRIVE (SERVICE ACCOUNT)
+# ============================================
 
+@bp.route('/subir-documento-drive', methods=['GET', 'POST'])
+@requiere_login
+def subir_documento_drive():
+    """
+    Sube documento al Drive corporativo del estudio.
+    Usa Service Account - ningún usuario necesita login de Google.
+    """
+    if not puede_ver_modulo('documentos'):
+        flash('No tiene permisos para subir documentos', 'error')
+        return redirect(url_for('main.index'))
+
+    if request.method == 'GET':
+        form = DocumentoForm()
+        form.expediente_id.choices = get_expedientes_choices()
+
+        expediente_id = request.args.get('expediente_id', type=int)
+        expediente = None
+        if expediente_id:
+            expediente = Expediente.query.get(expediente_id)
+
+        expedientes = Expediente.query.order_by(Expediente.fecha_registro.desc()).all()
+
+        return render_template('subir_documento.html',
+                             title='Subir a Google Drive',
+                             form=form,
+                             expediente=expediente,
+                             expedientes=expedientes,
+                             rol=session.get('rol', 'USUARIO'),
+                             modo_drive=True)
+
+    # POST: Procesar subida
+    if 'archivo' not in request.files:
+        flash('No se seleccionó archivo', 'danger')
+        return redirect(request.referrer or url_for('main.documentos'))
+
+    archivo = request.files['archivo']
+    expediente_id = request.form.get('expediente_id', type=int)
+    if expediente_id == 0:
+        expediente_id = None
+
+    if archivo.filename == '':
+        flash('Nombre de archivo vacío', 'danger')
+        return redirect(request.referrer or url_for('main.documentos'))
+
+    try:
+        # Verificar espacio antes de subir
+        espacio = obtener_espacio_usado_drive()
+
+        if espacio['porcentaje'] >= 80:
+            flash(f'⚠️ Drive corporativo al {espacio["porcentaje"]:.1f}%. Contacte al administrador.', 'warning')
+            return redirect(url_for('main.gestionar_espacio'))
+
+        # Leer archivo
+        file_content = archivo.read()
+        mime_type = archivo.content_type or 'application/octet-stream'
+
+        # Subir a Drive corporativo (service account - sin login usuario)
+        resultado = subir_archivo_drive(file_content, archivo.filename, mime_type)
+
+        # Guardar en base de datos
+        fecha_doc = None
+        if request.form.get('fecha_documento'):
+            try:
+                fecha_doc = datetime.strptime(request.form['fecha_documento'], '%Y-%m-%d').date()
+            except:
+                pass
+
+        nuevo_documento = Documento(
+            expediente_id=expediente_id,
+            titulo=request.form.get('titulo', archivo.filename),
+            nombre_archivo=archivo.filename,
+            url_drive=resultado['url'],
+            drive_file_id=resultado['id'],
+            ubicacion='drive',
+            categoria=request.form.get('categoria', 'otros'),
+            descripcion=request.form.get('descripcion'),
+            fecha_documento=fecha_doc,
+            usuario_subida=session.get('nombre', 'Sistema'),
+            tipo_archivo=archivo.filename.split('.')[-1].lower(),
+            tamaño_bytes=len(file_content),
+        )
+
+        db.session.add(nuevo_documento)
+        db.session.commit()
+
+        flash('✅ Documento subido al Drive corporativo correctamente', 'success')
+
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Error subiendo a Drive: {str(e)}', 'danger')
+
+    if expediente_id:
+        return redirect(url_for('main.expediente_documentos', id=expediente_id))
+    return redirect(url_for('main.documentos'))
+
+
+# ============================================
+# VER DOCUMENTO DESDE GOOGLE DRIVE
+# ============================================
+
+@bp.route('/documento/<int:id>/ver')
+@requiere_login
+@no_cache
+def ver_documento(id):
+    """Abre vista previa del documento en Google Drive"""
+    documento = Documento.query.get_or_404(id)
+
+    # Si está archivado localmente (liberación de espacio), mostrar mensaje especial
+    if documento.ubicacion == 'archivado_local':
+        flash('📁 Este documento ha sido archivado en la oficina. Consulte con el administrador.', 'info')
+        return redirect(url_for('main.expediente_documentos', id=documento.expediente_id))
+
+    # Verificar que tenga enlace a Drive
+    if not documento.drive_file_id:
+        flash('❌ Este documento no tiene vista previa disponible. El archivo puede haber sido eliminado de Drive.', 'warning')
+        return redirect(url_for('main.expediente_documentos', id=documento.expediente_id))
+
+    return render_template('ver_documento.html', documento=documento)
+
+
+# ============================================
+# ELIMINAR DOCUMENTO - ELIMINACIÓN COMPLETA (Drive + Supabase)
+# ============================================
+# ESTA FUNCIÓN ELIMINA TODO: del Drive, de Supabase, y registros relacionados
+# Usar solo cuando se quiere borrar definitivamente un documento
 
 @bp.route('/documento/<int:id>/eliminar', methods=['POST'])
 @requiere_login
 @no_cache
 def eliminar_documento(id):
-    """Eliminar un documento (solo registros en BD, archivos están en Drive)"""
+    """
+    ELIMINACIÓN COMPLETA: Elimina documento del Drive + Supabase + registros relacionados.
+    Solo Admin/Dev. Esta acción es IRREVERSIBLE.
+    """
     if session.get('rol') not in ['ADMINISTRADOR', 'DESARROLLADOR']:
         flash('No tiene permisos para eliminar documentos', 'error')
         return redirect(url_for('main.documentos'))
@@ -1808,31 +1819,18 @@ def eliminar_documento(id):
     expediente_id = documento.expediente_id
 
     try:
-        # Si tiene archivo en Drive, eliminarlo también
+        # PASO 1: Eliminar de Google Drive si tiene file_id
         if documento.drive_file_id:
-            usuario_id = session.get('usuario_id')
-            if usuario_id:
-                from sqlalchemy import text
-                result = db.session.execute(
-                    text("SELECT google_token FROM google_tokens WHERE usuario_id = :uid"),
-                    {'uid': usuario_id}
-                ).fetchone()
+            try:
+                eliminar_archivo_drive(documento.drive_file_id)
+            except Exception as e:
+                print(f"Advertencia: No se pudo eliminar de Drive (quizás ya no existe): {e}")
 
-                if result:
-                    import json
-                    token_data = result[0]
-                    if isinstance(token_data, dict):
-                        credentials_dict = token_data
-                    else:
-                        credentials_dict = json.loads(token_data)
-                    service = get_drive_service(credentials_dict)
-                    eliminar_archivo(service, documento.drive_file_id)
-
-        # Eliminar registro de base de datos
+        # PASO 2: Eliminar registro de base de datos (Supabase)
         db.session.delete(documento)
         db.session.commit()
 
-        flash('Documento eliminado correctamente', 'success')
+        flash('🗑️ Documento eliminado completamente (Drive + Sistema)', 'success')
     except Exception as e:
         db.session.rollback()
         flash(f'Error al eliminar: {str(e)}', 'error')
@@ -1841,6 +1839,60 @@ def eliminar_documento(id):
         return redirect(url_for('main.expediente_documentos', id=expediente_id))
     return redirect(url_for('main.documentos'))
 
+
+# ============================================
+# ELIMINAR DOCUMENTO DE DRIVE (SOLO DEL DRIVE, MANTIENE EN SUPABASE)
+# ============================================
+# ESTA FUNCIÓN solo elimina del Drive pero MANTIENE el registro en Supabase
+# marcado como 'archivado_local'. Sirve para liberar espacio manteniendo historial.
+
+@bp.route('/documento/<int:id>/eliminar-drive', methods=['POST'])
+@requiere_login
+@no_cache
+def eliminar_documento_drive(id):
+    """
+    ELIMINACIÓN PARCIAL: Elimina solo del Drive, mantiene registro en Supabase como 'archivado_local'.
+    El documento seguirá apareciendo en búsquedas con nota 'Archivado en oficina'.
+    Solo Admin/Dev.
+    """
+    if session.get('rol') not in ['ADMINISTRADOR', 'DESARROLLADOR']:
+        flash('No tiene permisos', 'error')
+        return redirect(url_for('main.documentos'))
+
+    documento = Documento.query.get_or_404(id)
+
+    try:
+        # PASO 1: Eliminar SOLO de Google Drive
+        if documento.drive_file_id:
+            eliminar_archivo_drive(documento.drive_file_id)
+
+        # PASO 2: MARCAR en Supabase como archivado_local (NO eliminar registro)
+        # Esto mantiene el historial de búsqueda
+        documento.ubicacion = 'archivado_local'
+        documento.url_drive = None
+        documento.drive_file_id = None
+        # Agregar nota en descripción sobre archivado
+        fecha_arch = datetime.now().strftime('%d/%m/%Y %H:%M')
+        arch_note = f"[ARCHIVADO EN OFICINA - {fecha_arch} por {session.get('nombre', 'Sistema')}]"
+        if documento.descripcion:
+            documento.descripcion = f"{documento.descripcion}\n{arch_note}"
+        else:
+            documento.descripcion = arch_note
+
+        db.session.commit()
+
+        flash('📁 Documento eliminado del Drive. Registro mantenido en sistema como "Archivado en oficina".', 'success')
+
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Error: {str(e)}', 'danger')
+
+    return redirect(request.referrer or url_for('main.expediente_documentos', id=documento.expediente_id))
+
+
+# ============================================
+# DOCUMENTOS DE UN EXPEDIENTE
+# ============================================
 
 @bp.route('/expediente/<int:id>/documentos')
 @requiere_login
@@ -1860,6 +1912,219 @@ def expediente_documentos(id):
                          documentos=documentos,
                          rol=session.get('rol', 'USUARIO'))
 
+
+# ============================================
+# GESTIONAR ESPACIO EN DRIVE CORPORATIVO
+# ============================================
+
+@bp.route('/gestionar-espacio')
+@requiere_login
+@no_cache
+def gestionar_espacio():
+    """Muestra espacio usado en Drive corporativo (solo Admin/Dev)"""
+    if session.get('rol') not in ['ADMINISTRADOR', 'DESARROLLADOR']:
+        flash('No tiene permisos', 'error')
+        return redirect(url_for('main.index'))
+
+    try:
+        espacio = obtener_espacio_usado_drive()
+
+        documentos_drive = Documento.query.filter(
+            Documento.ubicacion == 'drive',
+            Documento.drive_file_id.isnot(None)
+        ).order_by(Documento.fecha_subida.asc()).all()
+
+        return render_template('gestionar_espacio.html',
+                             espacio=espacio,
+                             documentos=documentos_drive)
+
+    except Exception as e:
+        flash(f'Error: {str(e)}', 'danger')
+        return redirect(url_for('main.index'))
+
+
+# ============================================
+# LIBERAR ESPACIO - ELIMINAR DEL DRIVE, MANTENER EN SUPABASE
+# ============================================
+# Esta función es para liberar espacio en Drive. 
+# Elimina del Drive pero marca como 'archivado_local' en Supabase.
+# Los documentos siguen apareciendo en búsquedas.
+
+@bp.route('/liberar-espacio', methods=['POST'])
+@requiere_login
+@no_cache
+def liberar_espacio():
+    """
+    LIBERAR ESPACIO: Elimina documentos del Drive pero MANTIENE registros en Supabase.
+    Los documentos quedan marcados como 'archivado_local' para historial de búsqueda.
+    Solo Admin/Dev.
+    """
+    if session.get('rol') not in ['ADMINISTRADOR', 'DESARROLLADOR']:
+        flash('No tiene permisos', 'error')
+        return redirect(url_for('main.index'))
+
+    documento_ids = request.form.getlist('documentos[]')
+
+    if not documento_ids:
+        flash('No seleccionaste documentos', 'warning')
+        return redirect(url_for('main.gestionar_espacio'))
+
+    liberados = 0
+
+    try:
+        for doc_id in documento_ids:
+            documento = Documento.query.get(doc_id)
+            if not documento or not documento.drive_file_id:
+                continue
+
+            try:
+                # PASO 1: Eliminar del Drive
+                eliminar_archivo_drive(documento.drive_file_id)
+
+                # PASO 2: Marcar como archivado_local (NO eliminar de Supabase)
+                documento.ubicacion = 'archivado_local'
+                documento.url_drive = None
+                documento.drive_file_id = None
+                fecha_arch = datetime.now().strftime('%d/%m/%Y %H:%M')
+                arch_note = f"[ARCHIVADO EN OFICINA - {fecha_arch} por {session.get('nombre', 'Sistema')}]"
+                if documento.descripcion:
+                    documento.descripcion = f"{documento.descripcion}\n{arch_note}"
+                else:
+                    documento.descripcion = arch_note
+
+                liberados += 1
+            except Exception as e:
+                print(f"Error liberando espacio doc {doc_id}: {e}")
+                continue
+
+        db.session.commit()
+        flash(f'📁 {liberados} documentos liberados del Drive. Registros mantenidos en sistema.', 'success')
+
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Error: {str(e)}', 'danger')
+
+    return redirect(url_for('main.gestionar_espacio'))
+
+
+# ============================================
+# ARCHIVAR DOCUMENTOS POR PERÍODO - LIBERAR ESPACIO MASIVO
+# ============================================
+# Esta función archiva documentos antiguos por período.
+# Elimina del Drive pero mantiene en Supabase como 'archivado_local'.
+# Útil para casos antiguos donde se quiere liberar espacio pero mantener historial.
+
+@bp.route('/archivar-documentos', methods=['GET', 'POST'])
+@requiere_login
+@no_cache
+def archivar_documentos():
+    """
+    ARCHIVAR POR PERÍODO: Elimina documentos antiguos del Drive por período.
+    MANTIENE registros en Supabase como 'archivado_local' para historial.
+    Los documentos archivados muestran "Documento archivado en oficina" en búsquedas.
+    Solo Admin/Dev.
+    """
+    if session.get('rol') not in ['ADMINISTRADOR', 'DESARROLLADOR']:
+        flash('No tiene permisos', 'error')
+        return redirect(url_for('main.index'))
+
+    # Obtener documentos que están en Drive (no archivados)
+    documentos_drive = Documento.query.filter(
+        Documento.ubicacion == 'drive',
+        Documento.drive_file_id.isnot(None)
+    ).order_by(Documento.fecha_subida.desc()).all()
+
+    if request.method == 'POST':
+        if not request.form.get('confirmar'):
+            flash('Debe confirmar la operación.', 'warning')
+            return redirect(url_for('main.archivar_documentos'))
+
+        tipo_periodo = request.form.get('tipo_periodo', 'mes')
+        hoy = datetime.now()
+        fecha_inicio = None
+        fecha_fin = None
+
+        try:
+            if tipo_periodo == 'dia':
+                fecha_str = request.form.get('fecha', hoy.strftime('%Y-%m-%d'))
+                fecha_inicio = datetime.strptime(fecha_str, '%Y-%m-%d')
+                fecha_fin = fecha_inicio + timedelta(days=1)
+
+            elif tipo_periodo == 'semana':
+                semana_str = request.form.get('semana', hoy.strftime('%Y-W%W'))
+                partes = semana_str.split('-W')
+                año = int(partes[0])
+                semana = int(partes[1])
+                fecha_inicio = datetime.strptime(f'{año}-W{semana:02d}-1', '%G-W%V-%u')
+                fecha_fin = fecha_inicio + timedelta(days=7)
+
+            elif tipo_periodo == 'mes':
+                mes_str = request.form.get('mes', hoy.strftime('%Y-%m'))
+                partes = mes_str.split('-')
+                año = int(partes[0])
+                mes = int(partes[1])
+                fecha_inicio = datetime(año, mes, 1)
+                fecha_fin = datetime(año, mes + 1, 1) if mes < 12 else datetime(año + 1, 1, 1)
+
+            elif tipo_periodo == 'año':
+                año = int(request.form.get('año', hoy.year))
+                fecha_inicio = datetime(año, 1, 1)
+                fecha_fin = datetime(año + 1, 1, 1)
+            else:
+                flash('Tipo de período no válido.', 'error')
+                return redirect(url_for('main.archivar_documentos'))
+
+        except Exception as e:
+            flash(f'Error en la fecha: {str(e)}', 'error')
+            return redirect(url_for('main.archivar_documentos'))
+
+        # Filtrar documentos del período que están en Drive
+        documentos_archivar = Documento.query.filter(
+            Documento.ubicacion == 'drive',
+            Documento.drive_file_id.isnot(None),
+            Documento.fecha_subida >= fecha_inicio,
+            Documento.fecha_subida < fecha_fin
+        ).all()
+
+        if not documentos_archivar:
+            flash('No hay documentos en ese período para archivar.', 'info')
+            return redirect(url_for('main.archivar_documentos'))
+
+        # Archivar: eliminar de Drive, mantener en Supabase como archivado_local
+        archivados = 0
+
+        for doc in documentos_archivar:
+            try:
+                # PASO 1: Eliminar de Drive
+                eliminar_archivo_drive(doc.drive_file_id)
+
+                # PASO 2: Marcar como archivado_local (mantener en Supabase)
+                doc.ubicacion = 'archivado_local'
+                doc.url_drive = None
+                doc.drive_file_id = None
+                fecha_arch = datetime.now().strftime('%d/%m/%Y %H:%M')
+                arch_note = f"[ARCHIVADO EN OFICINA - {fecha_arch} por {session.get('nombre', 'Sistema')}]"
+                if doc.descripcion:
+                    doc.descripcion = f"{doc.descripcion}\n{arch_note}"
+                else:
+                    doc.descripcion = arch_note
+
+                archivados += 1
+            except Exception as e:
+                print(f"Error archivando doc {doc.id}: {e}")
+                continue
+
+        db.session.commit()
+
+        flash(f'📁 {archivados} documentos archivados. Eliminados del Drive pero mantenidos en sistema como "Archivado en oficina".', 'success')
+        return redirect(url_for('main.documentos'))
+
+    # GET: Mostrar formulario
+    return render_template('archivar_documentos.html',
+                         title='Archivar Documentos por Período',
+                         documentos_drive=documentos_drive,
+                         fecha_hoy=datetime.now().strftime('%Y%m%d'),
+                         rol=session.get('rol', 'USUARIO'))
 # ============================================
 # RUTAS DE NOTIFICACIONES
 # ============================================
@@ -1869,7 +2134,6 @@ def expediente_documentos(id):
 @no_cache
 def notificaciones():
     """Centro de notificaciones del usuario"""
-    # Verificar y crear notificaciones de audiencias primero
     verificar_audiencias_y_notificar()
 
     todas = get_notificaciones_usuario(
@@ -1903,7 +2167,6 @@ def notificaciones_no_leidas():
         session.get('rol')
     )
 
-    # Obtener últimas 5 para preview
     ultimas = get_notificaciones_usuario(
         session.get('nombre'),
         session.get('rol'),
@@ -1969,13 +2232,11 @@ def exportar_excel(tipo):
         flash('No tiene permisos para exportar datos', 'error')
         return redirect(url_for('main.index'))
 
-    # Validar tipo
     tipos_permitidos = ['todos', 'civil', 'penal', 'administrativo', 'conciliacion', 'archivo']
     if tipo not in tipos_permitidos:
         flash('Tipo de exportación no válido', 'error')
         return redirect(url_for('main.index'))
 
-    # Obtener datos
     if tipo == 'todos':
         expedientes = Expediente.query.order_by(Expediente.fecha_registro.desc()).all()
         nombre_archivo = 'Todos_los_Expedientes'
@@ -1983,7 +2244,6 @@ def exportar_excel(tipo):
         expedientes = Expediente.query.filter_by(tipo=tipo).order_by(Expediente.fecha_registro.desc()).all()
         nombre_archivo = f'Expedientes_{tipo.title()}'
 
-    # Preparar datos para Excel
     data = []
     for exp in expedientes:
         data.append({
@@ -1999,18 +2259,13 @@ def exportar_excel(tipo):
             'Última Actualización': exp.fecha_actualizacion.strftime('%d/%m/%Y') if exp.fecha_actualizacion else 'N/A'
         })
 
-    # Crear DataFrame
     df = pd.DataFrame(data)
 
-    # Crear archivo Excel en memoria
     output = io.BytesIO()
     with pd.ExcelWriter(output, engine='openpyxl') as writer:
         df.to_excel(writer, sheet_name='Expedientes', index=False)
-
-        # Obtener la hoja de trabajo para formateo
         worksheet = writer.sheets['Expedientes']
 
-        # Ajustar anchos de columna
         for column in worksheet.columns:
             max_length = 0
             column_letter = column[0].column_letter
@@ -2042,13 +2297,11 @@ def exportar_pdf(tipo):
         flash('No tiene permisos para exportar datos', 'error')
         return redirect(url_for('main.index'))
 
-    # Validar tipo
     tipos_permitidos = ['todos', 'civil', 'penal', 'administrativo', 'conciliacion', 'archivo']
     if tipo not in tipos_permitidos:
         flash('Tipo de exportación no válido', 'error')
         return redirect(url_for('main.index'))
 
-    # Obtener datos
     if tipo == 'todos':
         expedientes = Expediente.query.order_by(Expediente.fecha_registro.desc()).all()
         titulo = 'Todos los Expedientes'
@@ -2063,12 +2316,10 @@ def exportar_pdf(tipo):
         }
         titulo = titulos.get(tipo, 'Expedientes')
 
-    # Crear PDF
     output = io.BytesIO()
     doc = SimpleDocTemplate(output, pagesize=letter, topMargin=0.5*inch, bottomMargin=0.5*inch)
     elements = []
 
-    # Estilos
     styles = getSampleStyleSheet()
     title_style = ParagraphStyle(
         'CustomTitle',
@@ -2076,16 +2327,14 @@ def exportar_pdf(tipo):
         fontSize=16,
         textColor=colors.HexColor('#1e3a8a'),
         spaceAfter=20,
-        alignment=1  # Centrado
+        alignment=1
     )
 
-    # Título
     elements.append(Paragraph("⚖️ QUIJANDRIA ABOGADOS EIRL", title_style))
     elements.append(Paragraph(f"{titulo}", styles['Heading2']))
     elements.append(Paragraph(f"Fecha de generación: {datetime.now().strftime('%d/%m/%Y %H:%M')}", styles['Normal']))
     elements.append(Spacer(1, 20))
 
-    # Tabla de datos
     table_data = [['ID', 'Tipo', 'Identificación', 'Cliente', 'Materia', 'Estado', 'Fecha']]
 
     for exp in expedientes:
@@ -2100,7 +2349,6 @@ def exportar_pdf(tipo):
             exp.fecha_registro.strftime('%d/%m/%Y') if exp.fecha_registro else 'N/A'
         ])
 
-    # Crear tabla
     table = Table(table_data, repeatRows=1)
     table.setStyle(TableStyle([
         ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#1e3a8a')),
@@ -2118,11 +2366,9 @@ def exportar_pdf(tipo):
     elements.append(table)
     elements.append(Spacer(1, 20))
 
-    # Pie de página
     elements.append(Paragraph(f"Total de expedientes: {len(expedientes)}", styles['Normal']))
     elements.append(Paragraph("Sistema de Gestión de Expedientes Legales - Quijandria Abogados", styles['Italic']))
 
-    # Generar PDF
     doc.build(elements)
     output.seek(0)
 
@@ -2153,7 +2399,6 @@ def imprimir_expediente_pdf(id):
     audiencias = Audiencia.query.filter_by(expediente_id=id).order_by(Audiencia.fecha.desc()).all()
     documentos = Documento.query.filter_by(expediente_id=id).all()
 
-    # Crear PDF
     output = io.BytesIO()
     doc = SimpleDocTemplate(
         output, 
@@ -2165,10 +2410,8 @@ def imprimir_expediente_pdf(id):
     )
     elements = []
 
-    # Estilos
     styles = getSampleStyleSheet()
 
-    # Estilo personalizado para títulos
     title_style = ParagraphStyle(
         'CustomTitle',
         parent=styles['Heading1'],
@@ -2187,19 +2430,16 @@ def imprimir_expediente_pdf(id):
         spaceBefore=12
     )
 
-    # ENCABEZADO
     elements.append(Paragraph("⚖️ QUIJANDRIA ABOGADOS EIRL", title_style))
     elements.append(Paragraph("Sistema de Gestión de Expedientes Legales", styles['Normal']))
     elements.append(Paragraph(f"<b>Reporte de Expediente</b>", styles['Heading3']))
     elements.append(Spacer(1, 10))
 
-    # Línea separadora
     elements.append(Table([['']], colWidths=[7*inch], style=TableStyle([
         ('LINEBELOW', (0, 0), (-1, 0), 2, colors.HexColor('#1e3a8a')),
     ])))
     elements.append(Spacer(1, 10))
 
-    # INFORMACIÓN GENERAL
     elements.append(Paragraph("📋 INFORMACIÓN GENERAL", section_style))
 
     info_data = [
@@ -2214,7 +2454,6 @@ def imprimir_expediente_pdf(id):
         ['Fecha de Registro', expediente.fecha_registro.strftime('%d/%m/%Y %H:%M') if expediente.fecha_registro else 'N/A'],
     ]
 
-    # Agregar campos específicos según tipo
     if expediente.tipo == 'civil':
         info_data.append(['Juez', expediente.juez or 'No asignado'])
         info_data.append(['Secretario', expediente.secretario or 'No asignado'])
@@ -2251,7 +2490,6 @@ def imprimir_expediente_pdf(id):
     ]))
     elements.append(info_table)
 
-    # HISTORIAL DE ESTADOS
     if historial:
         elements.append(Spacer(1, 15))
         elements.append(Paragraph("📈 HISTORIAL DE ESTADOS", section_style))
@@ -2279,7 +2517,6 @@ def imprimir_expediente_pdf(id):
         ]))
         elements.append(hist_table)
 
-    # AUDIENCIAS
     if audiencias:
         elements.append(Spacer(1, 15))
         elements.append(Paragraph("📅 AUDIENCIAS PROGRAMADAS", section_style))
@@ -2308,21 +2545,22 @@ def imprimir_expediente_pdf(id):
         ]))
         elements.append(aud_table)
 
-    # DOCUMENTOS
     if documentos:
         elements.append(Spacer(1, 15))
         elements.append(Paragraph("📄 DOCUMENTOS ADJUNTOS", section_style))
 
-        doc_data = [['Título', 'Categoría', 'Tipo', 'Fecha']]
+        doc_data = [['Título', 'Categoría', 'Tipo', 'Fecha', 'Ubicación']]
         for d in documentos:
+            ubicacion_label = 'Drive' if d.ubicacion == 'drive' else 'Oficina' if d.ubicacion == 'archivado_local' else d.ubicacion
             doc_data.append([
                 d.titulo[:30] + '...' if len(d.titulo) > 30 else d.titulo,
                 d.categoria.title() if d.categoria else 'Otro',
                 d.tipo_archivo.upper() if d.tipo_archivo else 'N/A',
-                d.fecha_subida.strftime('%d/%m/%Y') if d.fecha_subida else 'N/A'
+                d.fecha_subida.strftime('%d/%m/%Y') if d.fecha_subida else 'N/A',
+                ubicacion_label
             ])
 
-        doc_table = Table(doc_data, colWidths=[3*inch, 1.5*inch, 1*inch, 1.5*inch])
+        doc_table = Table(doc_data, colWidths=[2.5*inch, 1.2*inch, 1*inch, 1.2*inch, 1.1*inch])
         doc_table.setStyle(TableStyle([
             ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#4b5563')),
             ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
@@ -2336,7 +2574,6 @@ def imprimir_expediente_pdf(id):
         ]))
         elements.append(doc_table)
 
-    # PIE DE PÁGINA
     elements.append(Spacer(1, 30))
     elements.append(Table([['']], colWidths=[7*inch], style=TableStyle([
         ('LINEABOVE', (0, 0), (-1, 0), 1, colors.grey),
@@ -2356,7 +2593,6 @@ def imprimir_expediente_pdf(id):
     ]))
     elements.append(footer_table)
 
-    # Generar PDF
     doc.build(elements)
     output.seek(0)
 
@@ -2366,8 +2602,6 @@ def imprimir_expediente_pdf(id):
         as_attachment=True,
         download_name=f'Expediente_{expediente.numero_expediente.replace("/", "_")}_{datetime.now().strftime("%Y%m%d")}.pdf'
     )
-
-
 # ============================================
 # RUTA PARA EXPORTAR SEGUIMIENTO A EXCEL
 # ============================================
@@ -2387,7 +2621,6 @@ def exportar_seguimiento_excel(id):
     audiencias = Audiencia.query.filter_by(expediente_id=id).order_by(Audiencia.fecha.desc()).all()
     documentos = Documento.query.filter_by(expediente_id=id).order_by(Documento.fecha_subida.desc()).all()
 
-    # Crear archivo Excel
     output = io.BytesIO()
 
     with pd.ExcelWriter(output, engine='openpyxl') as writer:
@@ -2414,7 +2647,6 @@ def exportar_seguimiento_excel(id):
             ]
         }
 
-        # Agregar campos específicos según tipo
         if expediente.tipo == 'civil':
             resumen_data['Campo'].extend(['Juez', 'Secretario'])
             resumen_data['Valor'].extend([
@@ -2448,7 +2680,6 @@ def exportar_seguimiento_excel(id):
         df_resumen = pd.DataFrame(resumen_data)
         df_resumen.to_excel(writer, sheet_name='Resumen', index=False)
 
-        # Formatear hoja de resumen
         worksheet_resumen = writer.sheets['Resumen']
         worksheet_resumen.column_dimensions['A'].width = 25
         worksheet_resumen.column_dimensions['B'].width = 50
@@ -2502,12 +2733,14 @@ def exportar_seguimiento_excel(id):
         if documentos:
             doc_data = []
             for d in documentos:
+                ubicacion_label = 'Drive' if d.ubicacion == 'drive' else 'Archivado en Oficina' if d.ubicacion == 'archivado_local' else d.ubicacion
                 doc_data.append({
                     'N°': len(doc_data) + 1,
                     'Título': d.titulo,
                     'Categoría': d.categoria.title() if d.categoria else 'Otro',
                     'Tipo': d.tipo_archivo.upper() if d.tipo_archivo else 'N/A',
                     'Tamaño': d.get_tamaño_formateado() if hasattr(d, 'get_tamaño_formateado') else f"{d.tamaño_bytes} bytes",
+                    'Ubicación': ubicacion_label,
                     'Fecha Documento': d.fecha_documento.strftime('%d/%m/%Y') if d.fecha_documento else 'N/A',
                     'Fecha Subida': d.fecha_subida.strftime('%d/%m/%Y %H:%M') if d.fecha_subida else 'N/A',
                     'Subido por': d.usuario_subida or 'Sistema',
@@ -2523,10 +2756,11 @@ def exportar_seguimiento_excel(id):
             worksheet_doc.column_dimensions['C'].width = 15
             worksheet_doc.column_dimensions['D'].width = 10
             worksheet_doc.column_dimensions['E'].width = 12
-            worksheet_doc.column_dimensions['F'].width = 15
-            worksheet_doc.column_dimensions['G'].width = 18
-            worksheet_doc.column_dimensions['H'].width = 15
-            worksheet_doc.column_dimensions['I'].width = 30
+            worksheet_doc.column_dimensions['F'].width = 18
+            worksheet_doc.column_dimensions['G'].width = 15
+            worksheet_doc.column_dimensions['H'].width = 18
+            worksheet_doc.column_dimensions['I'].width = 15
+            worksheet_doc.column_dimensions['J'].width = 30
 
     output.seek(0)
 
@@ -2554,7 +2788,6 @@ def exportar_resumen_pdf(id):
 
     expediente = Expediente.query.get_or_404(id)
 
-    # Crear PDF con estilo profesional limpio
     output = io.BytesIO()
     doc = SimpleDocTemplate(
         output, 
@@ -2568,7 +2801,6 @@ def exportar_resumen_pdf(id):
     elements = []
     styles = getSampleStyleSheet()
 
-    # Estilos personalizados profesionales
     titulo_estudio = ParagraphStyle(
         'TituloEstudio',
         parent=styles['Heading1'],
@@ -2608,21 +2840,17 @@ def exportar_resumen_pdf(id):
         spaceBefore=30
     )
 
-    # ENCABEZADO
     elements.append(Paragraph("⚖️ QUIJANDRIA ABOGADOS EIRL", titulo_estudio))
     elements.append(Paragraph("Sistema de Gestión de Expedientes Legales", subtitulo_sistema))
 
-    # Línea decorativa
     elements.append(Table([['']], colWidths=[6.5*inch], style=TableStyle([
         ('LINEBELOW', (0, 0), (-1, 0), 2, colors.HexColor('#1e3a8a')),
         ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
     ])))
 
-    # Título del documento
     tipo_label = expediente.get_tipo_label()
     elements.append(Paragraph(f"RESUMEN DE {tipo_label.upper()}", titulo_documento))
 
-    # TABLA DE INFORMACIÓN
     datos_principales = [
         ['INFORMACIÓN GENERAL', ''],
         ['N° de Expediente:', expediente.numero_expediente if expediente.numero_expediente != '-' else 'No aplica (Administrativo)'],
@@ -2638,7 +2866,6 @@ def exportar_resumen_pdf(id):
         ['Materia:', expediente.materia],
     ]
 
-    # Campos específicos según tipo
     if expediente.tipo == 'civil':
         datos_principales.extend([
             ['Juez:', expediente.juez or 'Por asignar'],
@@ -2666,7 +2893,6 @@ def exportar_resumen_pdf(id):
             ['Ubicación Física:', expediente.ubicacion_archivo or 'Por definir'],
         ])
 
-    # Fechas
     datos_principales.extend([
         ['', ''],
         ['REGISTRO Y SEGUIMIENTO', ''],
@@ -2675,7 +2901,6 @@ def exportar_resumen_pdf(id):
         ['Registrado por:', expediente.usuario_registro or 'Sistema'],
     ])
 
-    # Crear tabla
     tabla_data = []
     for fila in datos_principales:
         if fila[0] == '' and fila[1] == '':
@@ -2687,7 +2912,6 @@ def exportar_resumen_pdf(id):
 
     tabla = Table(tabla_data, colWidths=[2*inch, 4.5*inch])
     tabla.setStyle(TableStyle([
-        # Títulos de sección
         ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#1e3a8a')),
         ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
         ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
@@ -2718,7 +2942,6 @@ def exportar_resumen_pdf(id):
         ('SPAN', (0, -6), (-1, -6)),
         ('ALIGN', (0, -6), (-1, -6), 'CENTER'),
 
-        # Etiquetas
         ('FONTNAME', (0, 1), (0, -1), 'Helvetica-Bold'),
         ('FONTSIZE', (0, 1), (0, -1), 9),
         ('TEXTCOLOR', (0, 1), (0, -1), colors.HexColor('#475569')),
@@ -2726,14 +2949,12 @@ def exportar_resumen_pdf(id):
         ('ALIGN', (0, 1), (0, -1), 'LEFT'),
         ('LEFTPADDING', (0, 1), (0, -1), 12),
 
-        # Valores
         ('FONTNAME', (1, 1), (1, -1), 'Helvetica'),
         ('FONTSIZE', (1, 1), (1, -1), 10),
         ('TEXTCOLOR', (1, 1), (1, -1), colors.HexColor('#1e293b')),
         ('ALIGN', (1, 1), (1, -1), 'LEFT'),
         ('LEFTPADDING', (1, 1), (1, -1), 12),
 
-        # Grid
         ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#e2e8f0')),
         ('BOX', (0, 0), (-1, -1), 1, colors.HexColor('#cbd5e1')),
         ('BOTTOMPADDING', (0, 1), (-1, -1), 6),
@@ -2743,7 +2964,6 @@ def exportar_resumen_pdf(id):
     elements.append(tabla)
     elements.append(Spacer(1, 20))
 
-    # Descripción
     if expediente.descripcion:
         desc_style = ParagraphStyle(
             'Desc',
@@ -2772,7 +2992,6 @@ def exportar_resumen_pdf(id):
         ]))
         elements.append(desc_tabla)
 
-    # Pie de página
     elements.append(Spacer(1, 40))
     elements.append(Table([['']], colWidths=[6.5*inch], style=TableStyle([
         ('LINEABOVE', (0, 0), (-1, 0), 1, colors.HexColor('#cbd5e1')),
@@ -2796,6 +3015,7 @@ def exportar_resumen_pdf(id):
         download_name=f'Resumen_{expediente.numero_expediente.replace("/", "_")}_{datetime.now().strftime("%Y%m%d")}.pdf'
     )
 
+
 # ============================================
 # RUTA: ENVIAR EXPEDIENTE A ARCHIVO
 # ============================================
@@ -2811,12 +3031,10 @@ def enviar_a_archivo(id):
 
     expediente_original = Expediente.query.get_or_404(id)
 
-    # Validar que no sea ya un archivo
     if expediente_original.tipo == 'archivo':
         flash('Este expediente ya está en archivo', 'warning')
         return redirect(url_for('main.ver_expediente', id=id))
 
-    # Validar que esté en estado concluido o similar
     estados_permitidos = ['proceso_completado', 'resuelto_favorable', 'resuelto_desfavorable', 
                           'archivado', 'enviado_a_archivo', 'ingresado', 'en_proceso', 
                           'audiencia_programada', 'seguimiento', 'derivado_juzgado']
@@ -2827,7 +3045,6 @@ def enviar_a_archivo(id):
 
     if request.method == 'POST':
         try:
-            # Obtener datos del formulario
             ubicacion = request.form.get('ubicacion_archivo', '').strip()
             fecha_archivado_str = request.form.get('fecha_archivado', '').strip()
             nota_final = request.form.get('nota_final', '').strip()
@@ -2840,7 +3057,6 @@ def enviar_a_archivo(id):
                                      hoy=date.today().isoformat(),
                                      rol=session.get('rol', 'USUARIO'))
 
-            # Parsear fecha
             try:
                 fecha_archivado = datetime.strptime(fecha_archivado_str, '%Y-%m-%d').date() if fecha_archivado_str else date.today()
             except ValueError:
@@ -2864,13 +3080,13 @@ def enviar_a_archivo(id):
             )
 
             db.session.add(expediente_archivo)
-            db.session.flush()  # ← OBTIENE EL ID sin commit definitivo
+            db.session.flush()
 
             # 2. Marcar original como enviado a archivo
             expediente_original.estado_actual = 'enviado_a_archivo'
             expediente_original.fecha_actualizacion = datetime.now()
 
-            # 3. Agregar historial al original (id ya existe)
+            # 3. Agregar historial al original
             historial_original = EstadoHistorial(
                 expediente_id=expediente_original.id,
                 estado='enviado_a_archivo',
@@ -2880,7 +3096,7 @@ def enviar_a_archivo(id):
             )
             db.session.add(historial_original)
 
-            # 4. Agregar historial al NUEVO archivo (id ya disponible gracias a flush)
+            # 4. Agregar historial al NUEVO archivo
             historial_archivo = EstadoHistorial(
                 expediente_id=expediente_archivo.id,
                 estado='archivado',
@@ -2891,7 +3107,6 @@ def enviar_a_archivo(id):
             )
             db.session.add(historial_archivo)
 
-            # 5. Commit final de TODO
             db.session.commit()
 
             flash(f'✅ Expediente archivado correctamente. Nuevo ID en archivo: {expediente_archivo.id}', 'success')
@@ -2908,666 +3123,63 @@ def enviar_a_archivo(id):
                                  hoy=date.today().isoformat(),
                                  rol=session.get('rol', 'USUARIO'))
 
-    # GET: Mostrar formulario
     return render_template('enviar_a_archivo.html',
                          title='Enviar a Archivo',
                          expediente_original=expediente_original,
                          hoy=date.today().isoformat(),
                          rol=session.get('rol', 'USUARIO'))
 
-# ============================================
-# GOOGLE DRIVE INTEGRACIÓN - DOCUMENTOS EN LA NUBE
-# ============================================
-
-from app.drive_service import (
-    get_auth_url, exchange_code, get_drive_service,
-    subir_archivo, eliminar_archivo, obtener_espacio_usado,
-    descargar_archivo
-)
 
 # ============================================
-# GOOGLE DRIVE OAUTH
+# RUTAS LEGACY - OAuth (ya no se usan)
 # ============================================
 
 @bp.route('/auth/google')
 @requiere_login
 def auth_google():
-    """Inicia flujo de autorización con Google Drive"""
-    try:
-        auth_data = get_auth_url()
-        
-        # ← DEBUG: Ver qué tipo de dato devuelve
-        print(f"DEBUG: tipo de auth_data = {type(auth_data)}")
-        print(f"DEBUG: valor de auth_data = {str(auth_data)[:100]}")
-        
-        # Si es string (URL directa), manejarlo
-        if isinstance(auth_data, str):
-            session['oauth_state'] = 'manual_state'
-            session['code_verifier'] = 'manual_verifier'
-            return redirect(auth_data)
-        
-        # Si es diccionario (lo esperado)
-        session['oauth_state'] = auth_data['state']
-        session['code_verifier'] = auth_data['code_verifier']
-        
-        return redirect(auth_data['url'])
-        
-    except Exception as e:
-        import traceback
-        traceback.print_exc()
-        flash(f'Error iniciando autorización: {str(e)}', 'danger')
-        return redirect(request.referrer or url_for('main.index'))
+    """Legacy: Ya no requiere OAuth. Redirige a subida directa."""
+    flash('El sistema usa almacenamiento corporativo automático. No se requiere vincular cuenta Google.', 'info')
+    return redirect(url_for('main.subir_documento_drive'))
 
 @bp.route('/oauth2callback')
 def oauth2callback():
-    """Callback de Google OAuth"""
-    code = request.args.get('code')
-    error = request.args.get('error')
-    
-    if error:
-        flash(f'Error de autorización: {error}', 'danger')
-        return redirect(url_for('main.index'))
-    
-    if not code:
-        flash('Error: No se recibió código de autorización', 'danger')
-        return redirect(url_for('main.index'))
-    
-    # Recuperar code_verifier de sesión
-    code_verifier = session.get('code_verifier')
-    if not code_verifier:
-        flash('Error: Sesión de autorización expirada. Intente nuevamente.', 'danger')
-        return redirect(url_for('main.index'))
-    
-    try:
-        # Intercambiar código con verifier
-        credentials = exchange_code(code, code_verifier)
-        
-        # ← GUARDAR TOKEN EN BASE DE DATOS
-        usuario_id = session.get('usuario_id')
-        if not usuario_id:
-            flash('Error: No se pudo identificar al usuario. Inicie sesión nuevamente.', 'danger')
-            return redirect(url_for('main.logout'))
-        
-        from sqlalchemy import text
-        
-        # Verificar si ya existe token para este usuario
-        existing = db.session.execute(
-            text("SELECT id FROM google_tokens WHERE usuario_id = :uid"),
-            {'uid': usuario_id}
-        ).fetchone()
-        
-        import json
-        token_json = json.dumps(credentials)
-        
-        if existing:
-            # Actualizar token existente
-            db.session.execute(
-                text("""
-                    UPDATE google_tokens 
-                    SET google_token = :token, fecha_actualizacion = NOW() 
-                    WHERE usuario_id = :uid
-                """),
-                {'token': token_json, 'uid': usuario_id}
-            )
-        else:
-            # Insertar nuevo token
-            db.session.execute(
-                text("""
-                    INSERT INTO google_tokens (usuario_id, google_token, fecha_creacion, fecha_actualizacion)
-                    VALUES (:uid, :token, NOW(), NOW())
-                """),
-                {'uid': usuario_id, 'token': token_json}
-            )
-        
-        db.session.commit()
-        flash('✅ Google Drive conectado correctamente', 'success')
-        
-    except Exception as e:
-        db.session.rollback()
-        flash(f'Error conectando Google Drive: {str(e)}', 'danger')
-    
-    # Limpiar sesión
-    session.pop('oauth_state', None)
-    session.pop('code_verifier', None)
-    
+    """Legacy: Callback OAuth (ya no se usa)"""
+    flash('Autenticación OAuth desactivada. Use subida directa.', 'info')
     return redirect(url_for('main.index'))
 
-# ============================================
-# SUBIR DOCUMENTO A GOOGLE DRIVE
-# ============================================
-
-@bp.route('/subir-documento-drive', methods=['GET', 'POST'])
-@requiere_login
-def subir_documento_drive():
-    """Sube documento a Google Drive"""
-    
-    # Si es GET, mostrar formulario
-    if request.method == 'GET':
-        form = DocumentoForm()
-        form.expediente_id.choices = get_expedientes_choices()
-        
-        # Obtener expediente_id de query string si viene de un expediente específico
-        expediente_id = request.args.get('expediente_id', type=int)
-        expediente = None
-        if expediente_id:
-            expediente = Expediente.query.get(expediente_id)
-        
-        # ← CORREGIDO: Agregar lista de expedientes para el select
-        expedientes = Expediente.query.order_by(Expediente.fecha_registro.desc()).all()
-        
-        return render_template('subir_documento.html',
-                             title='Subir a Google Drive',
-                             form=form,
-                             expediente=expediente,
-                             expedientes=expedientes,  # ← CORREGIDO
-                             rol=session.get('rol', 'USUARIO'),
-                             modo_drive=True)
-    
-    # POST: Procesar subida
-    if 'archivo' not in request.files:
-        flash('No se seleccionó archivo', 'danger')
-        return redirect(request.referrer or url_for('main.documentos'))
-    
-    archivo = request.files['archivo']
-    expediente_id = request.form.get('expediente_id', type=int)
-    
-    # ← CORREGIDO: Si expediente_id es 0, convertir a None
-    if expediente_id == 0:
-        expediente_id = None
-    
-    if archivo.filename == '':
-        flash('Nombre de archivo vacío', 'danger')
-        return redirect(request.referrer or url_for('main.documentos'))
-    
-    # Verificar token de Google
-    usuario_id = session.get('usuario_id')
-    if not usuario_id:
-        flash('Error de sesión. Inicie sesión nuevamente.', 'danger')
-        return redirect(url_for('main.logout'))
-    
-    try:
-        from sqlalchemy import text
-        result = db.session.execute(
-            text("SELECT google_token FROM google_tokens WHERE usuario_id = :uid"),
-            {'uid': usuario_id}
-        ).fetchone()
-        
-        if not result:
-            flash('❌ Debes conectar Google Drive primero. Haz clic en "Subir a Google Drive" para autorizar.', 'warning')
-            return redirect(url_for('main.auth_google'))
-        
-        # ← FIX COMPLETO: Manejar si Supabase devuelve dict o string
-        import json
-        token_data = result[0]
-        
-        if isinstance(token_data, dict):
-            credentials_dict = token_data  # Ya es dict, usar directo
-        else:
-            credentials_dict = json.loads(token_data)  # Es string, parsear
-        
-        service = get_drive_service(credentials_dict)
-        
-        # Verificar espacio antes de subir
-        espacio = obtener_espacio_usado(service)
-        
-        if espacio['porcentaje'] >= 80:
-            flash(f'⚠️ Google Drive al {espacio["porcentaje"]:.1f}%. Libera espacio antes de subir más documentos.', 'warning')
-            return redirect(url_for('main.gestionar_espacio'))
-        
-        # Leer archivo
-        file_content = archivo.read()
-        mime_type = archivo.content_type or 'application/octet-stream'
-        
-        # Subir a Drive
-        resultado = subir_archivo(service, file_content, archivo.filename, mime_type)
-        
-        # Guardar en base de datos
-        from datetime import datetime
-        fecha_doc = None
-        if request.form.get('fecha_documento'):
-            try:
-                fecha_doc = datetime.strptime(request.form['fecha_documento'], '%Y-%m-%d').date()
-            except:
-                pass
-        
-        nuevo_documento = Documento(
-            expediente_id=expediente_id,
-            titulo=request.form.get('titulo', archivo.filename),
-            nombre_archivo=archivo.filename,
-            url_drive=resultado['url'],
-            drive_file_id=resultado['id'],
-            ubicacion='drive',
-            categoria=request.form.get('categoria', 'otros'),
-            descripcion=request.form.get('descripcion'),
-            fecha_documento=fecha_doc,
-            usuario_subida=session.get('nombre', 'Sistema'),
-            tipo_archivo=archivo.filename.split('.')[-1].lower(),
-            tamaño_bytes=len(file_content),
-        # ruta_archivo=''  # ← Ya no es necesario, puede ser null
-        )
-        
-        db.session.add(nuevo_documento)
-        db.session.commit()
-        
-        flash('✅ Documento subido a Google Drive correctamente', 'success')
-        
-    except Exception as e:
-        db.session.rollback()
-        flash(f'Error subiendo a Drive: {str(e)}', 'danger')
-    
-    if expediente_id:
-        return redirect(url_for('main.expediente_documentos', id=expediente_id))
-    return redirect(url_for('main.documentos'))
 
 # ============================================
-# VER DOCUMENTO DESDE GOOGLE DRIVE
+# NOTA SOBRE DOCUMENTOS - LÓGICA DUAL
 # ============================================
-
-@bp.route('/documento/<int:id>/ver')
-@requiere_login
-@no_cache
-def ver_documento(id):
-    documento = Documento.query.get_or_404(id)
-    
-    # Si es local o archivado, mostrar mensaje
-    if documento.ubicacion in ['local', 'archivado_local']:
-        flash('📁 Este documento solo está disponible en la oficina.', 'info')
-        return redirect(url_for('main.expediente_documentos', id=documento.expediente_id))
-    
-    # Si no tiene drive_file_id, mostrar error amigable
-    if not documento.drive_file_id:
-        flash('❌ Este documento no tiene vista previa disponible. El archivo puede haber sido eliminado de Drive.', 'warning')
-        return redirect(url_for('main.expediente_documentos', id=documento.expediente_id))
-    
-    return render_template('ver_documento.html', documento=documento)
-
-# ============================================
-# ELIMINAR DOCUMENTO (Drive y/o Local)
-# ============================================
-
-@bp.route('/documento/<int:id>/eliminar-drive', methods=['POST'])
-@requiere_login
-@no_cache
-def eliminar_documento_drive(id):
-    """Elimina documento de Drive (solo Admin/Dev)"""
-    if session.get('rol') not in ['ADMINISTRADOR', 'DESARROLLADOR']:
-        flash('No tiene permisos para eliminar documentos', 'error')
-        return redirect(url_for('main.documentos'))
-
-    documento = Documento.query.get_or_404(id)
-    
-    try:
-        # Si está en Drive, eliminar de Drive primero
-        if documento.ubicacion in ['drive', 'ambos'] and documento.drive_file_id:
-            usuario_id = session.get('usuario_id')
-            if usuario_id:
-                from sqlalchemy import text
-                result = db.session.execute(
-                    text("SELECT google_token FROM google_tokens WHERE usuario_id = :uid"),
-                    {'uid': usuario_id}
-                ).fetchone()
-                
-                if result:
-                    import json
-                    token_data = result[0]
-                    
-                    # ← CORREGIDO: Manejar si es dict o string
-                    if isinstance(token_data, dict):
-                        credentials_dict = token_data
-                    else:
-                        credentials_dict = json.loads(token_data)
-                    
-                    service = get_drive_service(credentials_dict)
-                    eliminar_archivo(service, documento.drive_file_id)
-        
-        # Eliminar registro de base de datos
-        db.session.delete(documento)
-        db.session.commit()
-        
-        flash('🗑️ Documento eliminado correctamente', 'success')
-        
-    except Exception as e:
-        db.session.rollback()
-        flash(f'Error eliminando documento: {str(e)}', 'danger')
-    
-    return redirect(request.referrer or url_for('main.expediente_documentos', id=documento.expediente_id))
-
-# ============================================
-# GESTIONAR ESPACIO EN GOOGLE DRIVE
-# ============================================
-
-@bp.route('/gestionar-espacio')
-@requiere_login
-@no_cache
-def gestionar_espacio():
-    """Gestionar espacio en Drive (solo Admin/Dev)"""
-    if session.get('rol') not in ['ADMINISTRADOR', 'DESARROLLADOR']:
-        flash('No tiene permisos para esta acción', 'error')
-        return redirect(url_for('main.index'))
-    """Muestra alerta de espacio y opciones para liberar"""
-    usuario_id = session.get('usuario_id')
-    if not usuario_id:
-        flash('Error de sesión', 'danger')
-        return redirect(url_for('main.logout'))
-    
-    try:
-        from sqlalchemy import text
-        result = db.session.execute(
-            text("SELECT google_token FROM google_tokens WHERE usuario_id = :uid"),
-            {'uid': usuario_id}
-        ).fetchone()
-        
-        if not result:
-            flash('No tienes Google Drive conectado', 'warning')
-            return redirect(url_for('main.auth_google'))
-        
-        import json
-        token_data = result[0]
-        if isinstance(token_data, dict):
-            credentials_dict = token_data
-        else:
-            credentials_dict = json.loads(token_data)
-        service = get_drive_service(credentials_dict)
-        espacio = obtener_espacio_usado(service)
-        
-        # Obtener documentos que ocupan espacio
-        documentos_drive = Documento.query.filter(
-            Documento.ubicacion.in_(['drive', 'ambos']),
-            Documento.drive_file_id.isnot(None)
-        ).order_by(Documento.fecha_subida.asc()).all()
-        
-        return render_template('gestionar_espacio.html',
-                             espacio=espacio,
-                             documentos=documentos_drive)
-                             
-    except Exception as e:
-        flash(f'Error obteniendo información de Drive: {str(e)}', 'danger')
-        return redirect(url_for('main.index'))
-
-@bp.route('/liberar-espacio', methods=['POST'])
-@requiere_login
-@no_cache
-def liberar_espacio():
-    """Liberar espacio en Drive (solo Admin/Dev)"""
-    if session.get('rol') not in ['ADMINISTRADOR', 'DESARROLLADOR']:
-        flash('No tiene permisos para esta acción', 'error')
-        return redirect(url_for('main.index'))
-    """Mueve documentos de Drive a local o los elimina"""
-    accion = request.form.get('accion')
-    documento_ids = request.form.getlist('documentos[]')
-    
-    if not documento_ids:
-        flash('No seleccionaste documentos', 'warning')
-        return redirect(url_for('main.gestionar_espacio'))
-    
-    usuario_id = session.get('usuario_id')
-    if not usuario_id:
-        flash('Error de sesión', 'danger')
-        return redirect(url_for('main.logout'))
-    
-    try:
-        from sqlalchemy import text
-        result = db.session.execute(
-            text("SELECT google_token FROM google_tokens WHERE usuario_id = :uid"),
-            {'uid': usuario_id}
-        ).fetchone()
-        
-        if not result:
-            flash('Google Drive no conectado', 'danger')
-            return redirect(url_for('main.gestionar_espacio'))
-        
-        import json
-        token_data = result[0]
-        if isinstance(token_data, dict):
-            credentials_dict = token_data
-        else:
-            credentials_dict = json.loads(token_data)
-        service = get_drive_service(credentials_dict)
-        
-        liberados = 0
-        
-        for doc_id in documento_ids:
-            documento = Documento.query.get(doc_id)
-            if not documento or not documento.drive_file_id:
-                continue
-            
-            try:
-                if accion == 'eliminar':
-                    eliminar_archivo(service, documento.drive_file_id)
-                    db.session.delete(documento)
-                    
-                liberados += 1
-                
-            except Exception as e:
-                print(f"Error procesando documento {doc_id}: {e}")
-                continue
-        
-        db.session.commit()
-        
-        if accion == 'eliminar':
-            flash(f'🗑️ {liberados} documentos eliminados permanentemente', 'success')
-        pass  # Solo eliminación disponible
-
-        
-    except Exception as e:
-        db.session.rollback()
-        flash(f'Error: {str(e)}', 'danger')
-    
-    return redirect(url_for('main.gestionar_espacio'))
-
-# ============================================
-# ARCHIVAR DOCUMENTOS - LIBERAR ESPACIO DE DRIVE
-# ============================================
-
-@bp.route('/archivar-documentos', methods=['GET', 'POST'])
-@requiere_login
-@no_cache
-def archivar_documentos():
-    """Archivar documentos de Drive (solo Admin/Dev)"""
-    if session.get('rol') not in ['ADMINISTRADOR', 'DESARROLLADOR']:
-        flash('No tiene permisos para esta acción', 'error')
-        return redirect(url_for('main.index'))
-    
-    # Obtener documentos que están en Drive
-    documentos_drive = Documento.query.filter(
-        Documento.ubicacion == 'drive',
-        Documento.drive_file_id.isnot(None)
-    ).order_by(Documento.fecha_subida.desc()).all()
-    
-    if request.method == 'POST':
-        # Verificar confirmación
-        if not request.form.get('confirmar'):
-            flash('Debe confirmar que ha leído la advertencia.', 'warning')
-            return redirect(url_for('main.archivar_documentos'))
-        
-        tipo_periodo = request.form.get('tipo_periodo', 'mes')
-        carpeta_destino = request.form.get('carpeta_destino', 'Archivos_Expedientes')
-        
-        # Calcular fechas según período
-        hoy = datetime.now()
-        fecha_inicio = None
-        fecha_fin = None
-        nombre_paquete = ""
-        
-        try:
-            if tipo_periodo == 'dia':
-                fecha_str = request.form.get('fecha', '').strip()
-                if not fecha_str:
-                    fecha_str = hoy.strftime('%Y-%m-%d')
-                fecha_inicio = datetime.strptime(fecha_str, '%Y-%m-%d')
-                fecha_fin = fecha_inicio + timedelta(days=1)
-                nombre_paquete = f"expedientes_{fecha_str}"
-                
-            elif tipo_periodo == 'semana':
-                semana_str = request.form.get('semana', '').strip()
-                # Validar formato: debe ser YYYY-WXX
-                if not semana_str or '-W' not in semana_str:
-                    # Usar semana actual como fallback
-                    semana_str = hoy.strftime('%Y-W%W')
-                
-                partes = semana_str.split('-W')
-                if len(partes) != 2:
-                    flash('Formato de semana inválido. Use el selector de semana del navegador.', 'error')
-                    return redirect(url_for('main.archivar_documentos'))
-                
-                año = int(partes[0])
-                semana = int(partes[1])
-                
-                # Calcular el primer día de la semana (lunes)
-                # Usar el método ISO: el primer día de la semana 1 es el que tiene el primer jueves
-                fecha_inicio = datetime.strptime(f'{año}-W{semana:02d}-1', '%G-W%V-%u')
-                fecha_fin = fecha_inicio + timedelta(days=7)
-                nombre_paquete = f"expedientes_semana_{año}_W{semana:02d}"
-                
-            elif tipo_periodo == 'mes':
-                mes_str = request.form.get('mes', '').strip()
-                if not mes_str:
-                    mes_str = hoy.strftime('%Y-%m')
-                
-                partes = mes_str.split('-')
-                if len(partes) != 2:
-                    flash('Formato de mes inválido.', 'error')
-                    return redirect(url_for('main.archivar_documentos'))
-                
-                año = int(partes[0])
-                mes = int(partes[1])
-                fecha_inicio = datetime(año, mes, 1)
-                if mes == 12:
-                    fecha_fin = datetime(año + 1, 1, 1)
-                else:
-                    fecha_fin = datetime(año, mes + 1, 1)
-                nombre_paquete = f"expedientes_{mes_str}"
-                
-            elif tipo_periodo == 'año':
-                año_str = request.form.get('año', '').strip()
-                if not año_str:
-                    año = hoy.year
-                else:
-                    try:
-                        año = int(año_str)
-                    except ValueError:
-                        flash('Año inválido.', 'error')
-                        return redirect(url_for('main.archivar_documentos'))
-                
-                fecha_inicio = datetime(año, 1, 1)
-                fecha_fin = datetime(año + 1, 1, 1)
-                nombre_paquete = f"expedientes_{año}"
-                
-            else:
-                flash('Tipo de período no válido.', 'error')
-                return redirect(url_for('main.archivar_documentos'))
-                
-        except ValueError as e:
-            flash(f'Error en la fecha seleccionada: {str(e)}', 'error')
-            return redirect(url_for('main.archivar_documentos'))
-        except Exception as e:
-            flash(f'Error procesando el período: {str(e)}', 'error')
-            return redirect(url_for('main.archivar_documentos'))
-        
-        # Filtrar documentos del período
-        documentos_archivar = Documento.query.filter(
-            Documento.ubicacion == 'drive',
-            Documento.drive_file_id.isnot(None),
-            Documento.fecha_subida >= fecha_inicio,
-            Documento.fecha_subida < fecha_fin
-        ).all()
-        
-        if not documentos_archivar:
-            flash('No hay documentos en ese período para archivar.', 'info')
-            return redirect(url_for('main.archivar_documentos'))
-        
-        # Obtener token de Google
-        usuario_id = session.get('usuario_id')
-        try:
-            from sqlalchemy import text
-            result = db.session.execute(
-                text("SELECT google_token FROM google_tokens WHERE usuario_id = :uid"),
-                {'uid': usuario_id}
-            ).fetchone()
-            
-            if not result:
-                flash('Google Drive no conectado.', 'danger')
-                return redirect(url_for('main.auth_google'))
-            
-            import json
-            token_data = result[0]
-            if isinstance(token_data, dict):
-                credentials_dict = token_data
-            else:
-                credentials_dict = json.loads(token_data)
-            
-            service = get_drive_service(credentials_dict)
-            
-        except Exception as e:
-            flash(f'Error conectando Drive: {str(e)}', 'danger')
-            return redirect(url_for('main.archivar_documentos'))
-        
-        # Crear ZIP en memoria
-        import io
-        import zipfile
-        
-        zip_buffer = io.BytesIO()
-        archivados = 0
-        
-        with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
-            for doc in documentos_archivar:
-                try:
-                    # Descargar de Drive
-                    file_content = descargar_archivo(service, doc.drive_file_id)
-                    
-                    if file_content:
-                        # Agregar al ZIP
-                        zip_file.writestr(doc.nombre_archivo, file_content)
-                        
-                        # Eliminar de Drive
-                        eliminar_archivo(service, doc.drive_file_id)
-                        
-                        # Marcar como archivado local
-                        doc.ubicacion = 'archivado_local'
-                        doc.url_drive = None
-                        doc.drive_file_id = None
-                        
-                        archivados += 1
-                        
-                except Exception as e:
-                    print(f"Error archivando {doc.id}: {e}")
-                    continue
-        
-        db.session.commit()
-        
-        # Preparar ZIP para descarga
-        zip_buffer.seek(0)
-        
-        flash(f'📦 {archivados} documentos archivados. El ZIP se descargará ahora.', 'success')
-        
-        return send_file(
-            zip_buffer,
-            mimetype='application/zip',
-            as_attachment=True,
-            download_name=f'{nombre_paquete}.zip'
-        )
-    
-    # GET: Mostrar formulario
-    return render_template('archivar_documentos.html',
-                         title='Archivar Documentos',
-                         documentos_drive=documentos_drive,
-                         fecha_hoy=datetime.now().strftime('%Y%m%d'),
-                         rol=session.get('rol', 'USUARIO'))
-
-# ============================================
-# NOTA SOBRE DOCUMENTOS (v1.1+)
-# ============================================
-# Desde la versión 1.1, TODOS los documentos se almacenan
-# exclusivamente en Google Drive. El almacenamiento local fue
-# eliminado completamente.
+#
+# TODOS los documentos se almacenan en Google Drive corporativo
+# usando Service Account (quijandria-drive-service).
+# Ningún usuario necesita vincular su Gmail personal.
+#
+# LÓGICA DUAL DE ELIMINACIÓN:
+#
+# 1. ELIMINACIÓN COMPLETA (eliminar_documento):
+#    - Elimina del Drive (file_id)
+#    - Elimina registro de Supabase (db.session.delete)
+#    - Elimina todo rastro del documento
+#    - Usar cuando se quiere borrar DEFINITIVAMENTE
+#
+# 2. ARCHIVADO / LIBERAR ESPACIO (eliminar_documento_drive, liberar_espacio, archivar_documentos):
+#    - Elimina SOLO del Drive (libera espacio)
+#    - MANTIENE registro en Supabase
+#    - Marca ubicacion = 'archivado_local'
+#    - Agrega nota en descripción: "[ARCHIVADO EN OFICINA - fecha]"
+#    - El documento sigue apareciendo en búsquedas
+#    - Al ver el documento muestra: "Documento archivado en oficina"
+#    - Útil para casos antiguos donde se quiere mantener historial
 #
 # Flujo de documentos:
-#   1. Subida: /subir-documento-drive → Google Drive
-#   2. Visualización: /documento/<id>/ver → iframe de Drive
-#   3. Eliminación: /documento/<id>/eliminar-drive → Drive + BD
-#   4. Limpieza: /archivar-documentos o /liberar-espacio → elimina de Drive
+#   1. Subida: /subir-documento-drive → Drive corporativo
+#   2. Visualización: /documento/<id>/ver → iframe de Drive (o mensaje si archivado)
+#   3. Eliminación completa: /documento/<id>/eliminar → Drive + Supabase
+#   4. Archivado (liberar espacio): /documento/<id>/eliminar-drive → solo Drive
+#   5. Limpieza masiva: /archivar-documentos o /liberar-espacio → Drive (mantener Supabase)
 #
-# No hay descarga directa ni visualización local.
 # ============================================
 # FIN DEL ARCHIVO
 # ============================================

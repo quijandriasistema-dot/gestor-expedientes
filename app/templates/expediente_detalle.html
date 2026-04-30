@@ -34,11 +34,11 @@
                 <span>✏️</span> Editar
             </a>
 
-            <!-- BOTÓN ELIMINAR (solo ADMINISTRADOR) -->
-            {% if rol == 'ADMINISTRADOR' %}
+            <!-- BOTÓN ELIMINAR (solo ADMINISTRADOR y DESARROLLADOR) -->
+            {% if rol in ['ADMINISTRADOR', 'DESARROLLADOR'] %}
             <form method="POST" action="{{ url_for('main.eliminar_expediente', id=expediente.id) }}" 
-                  style="display: inline;" 
-                  onsubmit="return confirm('¿Está seguro de eliminar el expediente {{ expediente.get_identificador_principal() }}? Esta acción no se puede deshacer y se eliminarán todos los historiales, audiencias y documentos asociados.');">
+                style="display: inline;" 
+                onsubmit="return confirm('¿Está seguro de eliminar el expediente {{ expediente.get_identificador_principal() }}? Esta acción no se puede deshacer y se eliminarán todos los historiales, audiencias y documentos asociados.');">
                 <button type="submit" class="btn btn-action btn-danger" style="background: #dc2626; color: white; border: none;">
                     <span>🗑️</span> Eliminar
                 </button>
