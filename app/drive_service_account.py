@@ -4,7 +4,8 @@
 
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
-from googleapiclient.http import MediaIoBaseUpload, MediaIoBaseDownload
+from googleapiclient.http import MediaIoBaseUpload, MediaIoBaseDownload, MediaFileUpload
+from googleapiclient.errors import HttpError
 import io
 import os
 import json
@@ -51,38 +52,101 @@ def get_drive_service_account():
         scopes=SCOPES
     )
     
-    service = build('drive', 'v3', credentials=credentials)
+    service = build('drive', 'v3', credentials=credentials, cache_discovery=False)
     return service
 
 
 def subir_archivo_drive(file_content, filename, mime_type='application/pdf'):
     """
     Sube archivo DIRECTAMENTE al Drive corporativo del estudio.
+    SOLUCIÓN ALTERNATIVA: Usa upload simple en lugar de resumable para evitar error 403.
     """
-    service = get_drive_service_account()
-    
-    file_metadata = {
-        'name': filename,
-        'parents': [DRIVE_FOLDER_ID]
-    }
-    
-    media = MediaIoBaseUpload(
-        io.BytesIO(file_content),
-        mimetype=mime_type,
-        resumable=True
-    )
-    
-    file = service.files().create(
-        body=file_metadata,
-        media_body=media,
-        fields='id, webViewLink, webContentLink'
-    ).execute()
-    
-    return {
-        'id': file['id'],
-        'url': file.get('webViewLink', f"https://drive.google.com/file/d/{file['id']}/view"),
-        'download_url': file.get('webContentLink')
-    }
+    try:
+        service = get_drive_service_account()
+        
+        file_metadata = {
+            'name': filename,
+            'parents': [DRIVE_FOLDER_ID]
+        }
+        
+        # SOLUCIÓN: Usar MediaIoBaseUpload SIN resumable (upload simple)
+        # El parámetro resumable=True causa el error 403 en Service Accounts sin Drive propio
+        media = MediaIoBaseUpload(
+            io.BytesIO(file_content),
+            mimetype=mime_type,
+            resumable=False  # <-- CAMBIO CLAVE: upload simple
+        )
+        
+        file = service.files().create(
+            body=file_metadata,
+            media_body=media,
+            fields='id, webViewLink, webContentLink'
+        ).execute()
+        
+        return {
+            'id': file['id'],
+            'url': file.get('webViewLink', f"https://drive.google.com/file/d/{file['id']}/view"),
+            'download_url': file.get('webContentLink')
+        }
+        
+    except HttpError as e:
+        error_msg = str(e)
+        if "storageQuotaExceeded" in error_msg:
+            raise Exception(
+                f"Error 403 - Storage Quota: La cuenta de servicio no tiene espacio propio. "
+                f"Verifique que la carpeta {DRIVE_FOLDER_ID} esté compartida como EDITOR. "
+                f"Error original: {error_msg}"
+            )
+        raise Exception(f"Error de Google Drive ({e.resp.status}): {error_msg}")
+    except Exception as e:
+        raise Exception(f"Error subiendo a Drive: {str(e)}")
+
+
+def subir_archivo_drive_resumable(file_content, filename, mime_type='application/pdf'):
+    """
+    MÉTODO ALTERNATIVO para archivos grandes (>5MB).
+    Si el simple upload falla, intenta con resumable pero con manejo especial.
+    """
+    try:
+        service = get_drive_service_account()
+        
+        file_metadata = {
+            'name': filename,
+            'parents': [DRIVE_FOLDER_ID]
+        }
+        
+        # Para resumable, necesitamos que la cuenta de servicio tenga un "espacio"
+        # Solución: Crear el archivo primero SIN contenido, luego subir el contenido
+        # Paso 1: Crear archivo vacío
+        file = service.files().create(
+            body=file_metadata,
+            fields='id'
+        ).execute()
+        
+        file_id = file['id']
+        
+        # Paso 2: Subir contenido al archivo existente
+        media = MediaIoBaseUpload(
+            io.BytesIO(file_content),
+            mimetype=mime_type,
+            resumable=True
+        )
+        
+        # Usar update en lugar de create
+        updated = service.files().update(
+            fileId=file_id,
+            media_body=media,
+            fields='id, webViewLink, webContentLink'
+        ).execute()
+        
+        return {
+            'id': updated['id'],
+            'url': updated.get('webViewLink', f"https://drive.google.com/file/d/{updated['id']}/view"),
+            'download_url': updated.get('webContentLink')
+        }
+        
+    except Exception as e:
+        raise Exception(f"Error en upload resumable: {str(e)}")
 
 
 def eliminar_archivo_drive(file_id):
