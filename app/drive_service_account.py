@@ -1,80 +1,85 @@
 # app/drive_service_account.py
-# Subida directa al Drive corporativo SIN login de usuario
-# Usa Service Account - todos los documentos van al mismo Drive
+# Subida al Drive corporativo usando OAuth 2.0 con cuenta central
+# Todos los usuarios suben a quijandria.sistema@gmail.com
 
-from google.oauth2 import service_account
+from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
-from googleapiclient.http import MediaIoBaseUpload, MediaIoBaseDownload, MediaFileUpload
+from googleapiclient.http import MediaIoBaseUpload, MediaIoBaseDownload
+from google.auth.transport.requests import Request
 from googleapiclient.errors import HttpError
 import io
 import os
 import json
 
 # ============================================
-# CONFIGURACIÓN - DATOS CONFIRMADOS POR USUARIO
+# CONFIGURACIÓN
 # ============================================
 
-# ID de la carpeta compartida en Drive del estudio
+# ID de la carpeta Expedientes_Legales en Drive
 DRIVE_FOLDER_ID = "1onwHI6s26r3FPzpclFYGoWRAGY77nZX2"
 
-# Email del Service Account
-SERVICE_ACCOUNT_EMAIL = "quijandria-drive-service@direct-volt-494302-h1.iam.gserviceaccount.com"
+# Email de la cuenta corporativa
+DRIVE_ACCOUNT_EMAIL = "quijandria.sistema@gmail.com"
 
 SCOPES = ['https://www.googleapis.com/auth/drive']
 
 
-def get_drive_service_account():
+def get_drive_credentials():
     """
-    Crea servicio de Drive usando cuenta de servicio (robot).
-    NO requiere que ningún usuario inicie sesión.
+    Crea credenciales OAuth 2.0 desde el refresh_token guardado en Vercel.
+    NO requiere que ningún usuario inicie sesión con Google.
     """
-    credentials_info = None
+    # Obtener valores de variables de entorno (Vercel)
+    client_id = os.environ.get('GOOGLE_CLIENT_ID')
+    client_secret = os.environ.get('GOOGLE_CLIENT_SECRET')
+    refresh_token = os.environ.get('GOOGLE_REFRESH_TOKEN')
     
-    # Opción 1: Variables de entorno (Vercel/Producción)
-    creds_env = os.environ.get('GOOGLE_SERVICE_ACCOUNT_JSON')
-    if creds_env:
-        credentials_info = json.loads(creds_env)
-    else:
-        # Opción 2: Archivo local (desarrollo)
-        creds_path = os.path.join(os.path.dirname(__file__), '..', 'service-account.json')
-        if os.path.exists(creds_path):
-            with open(creds_path, 'r') as f:
-                credentials_info = json.load(f)
-        else:
-            raise Exception(
-                "No se encontró configuración de Service Account. "
-                "Configura GOOGLE_SERVICE_ACCOUNT_JSON en variables de entorno "
-                "o coloca service-account.json en la raíz del proyecto."
-            )
+    # Validar que existan todas las variables
+    if not all([client_id, client_secret, refresh_token]):
+        raise Exception(
+            "Faltan variables de entorno de Google OAuth. "
+            "Configura GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET y GOOGLE_REFRESH_TOKEN en Vercel."
+        )
     
-    credentials = service_account.Credentials.from_service_account_info(
-        credentials_info,
+    # Crear credenciales desde refresh_token
+    creds = Credentials(
+        token=None,  # Se refresca automáticamente
+        refresh_token=refresh_token,
+        token_uri="https://oauth2.googleapis.com/token",
+        client_id=client_id,
+        client_secret=client_secret,
         scopes=SCOPES
     )
     
-    service = build('drive', 'v3', credentials=credentials, cache_discovery=False)
+    # Refrescar el token (obtener access_token nuevo)
+    creds.refresh(Request())
+    
+    return creds
+
+
+def get_drive_service():
+    """Crea servicio de Drive con credenciales OAuth 2.0"""
+    creds = get_drive_credentials()
+    service = build('drive', 'v3', credentials=creds, cache_discovery=False)
     return service
 
 
 def subir_archivo_drive(file_content, filename, mime_type='application/pdf'):
     """
-    Sube archivo DIRECTAMENTE al Drive corporativo del estudio.
-    SOLUCIÓN ALTERNATIVA: Usa upload simple en lugar de resumable para evitar error 403.
+    Sube archivo al Drive corporativo (quijandria.sistema@gmail.com).
     """
     try:
-        service = get_drive_service_account()
+        service = get_drive_service()
         
         file_metadata = {
             'name': filename,
             'parents': [DRIVE_FOLDER_ID]
         }
         
-        # SOLUCIÓN: Usar MediaIoBaseUpload SIN resumable (upload simple)
-        # El parámetro resumable=True causa el error 403 en Service Accounts sin Drive propio
         media = MediaIoBaseUpload(
             io.BytesIO(file_content),
             mimetype=mime_type,
-            resumable=False  # <-- CAMBIO CLAVE: upload simple
+            resumable=False  # Upload simple para evitar problemas
         )
         
         file = service.files().create(
@@ -91,10 +96,10 @@ def subir_archivo_drive(file_content, filename, mime_type='application/pdf'):
         
     except HttpError as e:
         error_msg = str(e)
-        if "storageQuotaExceeded" in error_msg:
+        if e.resp.status == 403:
             raise Exception(
-                f"Error 403 - Storage Quota: La cuenta de servicio no tiene espacio propio. "
-                f"Verifique que la carpeta {DRIVE_FOLDER_ID} esté compartida como EDITOR. "
+                f"Error 403: La cuenta {DRIVE_ACCOUNT_EMAIL} no tiene permisos sobre la carpeta. "
+                f"Verifica que la carpeta {DRIVE_FOLDER_ID} esté compartida con {DRIVE_ACCOUNT_EMAIL} como EDITOR. "
                 f"Error original: {error_msg}"
             )
         raise Exception(f"Error de Google Drive ({e.resp.status}): {error_msg}")
@@ -102,88 +107,49 @@ def subir_archivo_drive(file_content, filename, mime_type='application/pdf'):
         raise Exception(f"Error subiendo a Drive: {str(e)}")
 
 
-def subir_archivo_drive_resumable(file_content, filename, mime_type='application/pdf'):
-    """
-    MÉTODO ALTERNATIVO para archivos grandes (>5MB).
-    Si el simple upload falla, intenta con resumable pero con manejo especial.
-    """
-    try:
-        service = get_drive_service_account()
-        
-        file_metadata = {
-            'name': filename,
-            'parents': [DRIVE_FOLDER_ID]
-        }
-        
-        # Para resumable, necesitamos que la cuenta de servicio tenga un "espacio"
-        # Solución: Crear el archivo primero SIN contenido, luego subir el contenido
-        # Paso 1: Crear archivo vacío
-        file = service.files().create(
-            body=file_metadata,
-            fields='id'
-        ).execute()
-        
-        file_id = file['id']
-        
-        # Paso 2: Subir contenido al archivo existente
-        media = MediaIoBaseUpload(
-            io.BytesIO(file_content),
-            mimetype=mime_type,
-            resumable=True
-        )
-        
-        # Usar update en lugar de create
-        updated = service.files().update(
-            fileId=file_id,
-            media_body=media,
-            fields='id, webViewLink, webContentLink'
-        ).execute()
-        
-        return {
-            'id': updated['id'],
-            'url': updated.get('webViewLink', f"https://drive.google.com/file/d/{updated['id']}/view"),
-            'download_url': updated.get('webContentLink')
-        }
-        
-    except Exception as e:
-        raise Exception(f"Error en upload resumable: {str(e)}")
-
-
 def eliminar_archivo_drive(file_id):
     """Elimina archivo del Drive corporativo"""
-    service = get_drive_service_account()
+    service = get_drive_service()
     service.files().delete(fileId=file_id).execute()
     return True
 
 
 def obtener_espacio_usado_drive():
-    """Obtiene espacio usado estimado en la carpeta del estudio"""
-    service = get_drive_service_account()
-    
-    results = service.files().list(
-        q=f"'{DRIVE_FOLDER_ID}' in parents and trashed=false",
-        fields='files(id, size, name)'
-    ).execute()
-    
-    archivos = results.get('files', [])
-    total_bytes = sum(int(f.get('size', 0)) for f in archivos)
-    
-    # Drive de cuenta de servicio = 15GB gratis
-    total_gb = 15
-    usado_gb = total_bytes / (1024**3)
-    porcentaje = (usado_gb / total_gb) * 100
-    
-    return {
-        'usado_gb': usado_gb,
-        'total_gb': total_gb,
-        'porcentaje': porcentaje,
-        'archivos_count': len(archivos)
-    }
+    """Obtiene espacio usado en la cuenta de Google Drive"""
+    try:
+        service = get_drive_service()
+        
+        # Obtener quota de la cuenta
+        about = service.about().get(fields="storageQuota").execute()
+        quota = about.get('storageQuota', {})
+        
+        usage = int(quota.get('usage', 0))
+        limit = int(quota.get('limit', 16106127360))  # 15GB por defecto
+        
+        usado_gb = usage / (1024**3)
+        total_gb = limit / (1024**3)
+        porcentaje = (usage / limit) * 100 if limit > 0 else 0
+        
+        return {
+            'usado_gb': round(usado_gb, 2),
+            'total_gb': round(total_gb, 2),
+            'porcentaje': round(porcentaje, 1),
+            'archivos_count': None  # No aplicable para quota general
+        }
+        
+    except Exception as e:
+        print(f"Error obteniendo espacio Drive: {e}")
+        return {
+            'usado_gb': 0.0,
+            'total_gb': 15.0,
+            'porcentaje': 0.0,
+            'archivos_count': None
+        }
 
 
 def descargar_archivo_drive(file_id):
     """Descarga archivo del Drive corporativo"""
-    service = get_drive_service_account()
+    service = get_drive_service()
     
     request = service.files().get_media(fileId=file_id)
     fh = io.BytesIO()
