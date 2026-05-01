@@ -3066,7 +3066,8 @@ def exportar_resumen_pdf(id):
         mimetype='application/pdf',
         as_attachment=True,
         download_name=f'Resumen_{expediente.numero_expediente.replace("/", "_")}_{datetime.now().strftime("%Y%m%d")}.pdf'
-    )def exportar_pdf(tipo):
+    )
+def exportar_pdf(tipo):
     """Exportar expedientes a PDF (solo Admin/Dev)"""
     if not puede_exportar():
         flash('No tiene permisos para exportar datos', 'error')
