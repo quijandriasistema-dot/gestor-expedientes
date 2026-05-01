@@ -2543,7 +2543,8 @@ def imprimir_expediente_pdf(id):
         info_data.append(['Ubicación en Archivo', expediente.ubicacion_archivo or 'No especificada'])
 
     desc_style = ParagraphStyle('DescStyle', parent=styles['Normal'], fontSize=9, leading=11)
-    descripcion_formateada = (expediente.descripcion or 'Sin descripción').replace('', '<br/>')
+    descripcion_texto = expediente.descripcion or 'Sin descripción'
+    descripcion_formateada = '<br/>'.join(descripcion_texto.splitlines())
     info_data.append(['Descripción', Paragraph(descripcion_formateada, desc_style)])
 
     info_table = Table(info_data, colWidths=[2*inch, 5*inch])
@@ -3022,55 +3023,45 @@ def exportar_resumen_pdf(id):
             tabla_data.append([fila[0], fila[1]])
 
     tabla = Table(tabla_data, colWidths=[2*inch, 4.5*inch])
-    tabla.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#1e3a8a')),
-        ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
-        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-        ('FONTSIZE', (0, 0), (-1, 0), 10),
-        ('SPAN', (0, 0), (-1, 0)),
-        ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
-        ('BOTTOMPADDING', (0, 0), (-1, 0), 8),
-        ('TOPPADDING', (0, 0), (-1, 0), 8),
 
-        ('BACKGROUND', (0, 5), (-1, 5), colors.HexColor('#1e3a8a')),
-        ('TEXTCOLOR', (0, 5), (-1, 5), colors.white),
-        ('FONTNAME', (0, 5), (-1, 5), 'Helvetica-Bold'),
-        ('FONTSIZE', (0, 5), (-1, 5), 10),
-        ('SPAN', (0, 5), (-1, 5)),
-        ('ALIGN', (0, 5), (-1, 5), 'CENTER'),
+    # Calcular índices de filas de encabezado dinámicamente
+    header_rows = []
+    for idx, fila in enumerate(tabla_data):
+        if fila[0] in ['INFORMACIÓN GENERAL', 'PARTES DEL PROCESO', 'DETALLES DEL CASO', 'REGISTRO Y SEGUIMIENTO']:
+            header_rows.append(idx)
 
-        ('BACKGROUND', (0, 9), (-1, 9), colors.HexColor('#1e3a8a')),
-        ('TEXTCOLOR', (0, 9), (-1, 9), colors.white),
-        ('FONTNAME', (0, 9), (-1, 9), 'Helvetica-Bold'),
-        ('FONTSIZE', (0, 9), (-1, 9), 10),
-        ('SPAN', (0, 9), (-1, 9)),
-        ('ALIGN', (0, 9), (-1, 9), 'CENTER'),
-
-        ('BACKGROUND', (0, -6), (-1, -6), colors.HexColor('#1e3a8a')),
-        ('TEXTCOLOR', (0, -6), (-1, -6), colors.white),
-        ('FONTNAME', (0, -6), (-1, -6), 'Helvetica-Bold'),
-        ('FONTSIZE', (0, -6), (-1, -6), 10),
-        ('SPAN', (0, -6), (-1, -6)),
-        ('ALIGN', (0, -6), (-1, -6), 'CENTER'),
-
+    style_commands = [
         ('FONTNAME', (0, 1), (0, -1), 'Helvetica-Bold'),
         ('FONTSIZE', (0, 1), (0, -1), 9),
         ('TEXTCOLOR', (0, 1), (0, -1), colors.HexColor('#475569')),
         ('BACKGROUND', (0, 1), (0, -1), colors.HexColor('#f8fafc')),
         ('ALIGN', (0, 1), (0, -1), 'LEFT'),
         ('LEFTPADDING', (0, 1), (0, -1), 12),
-
         ('FONTNAME', (1, 1), (1, -1), 'Helvetica'),
         ('FONTSIZE', (1, 1), (1, -1), 10),
         ('TEXTCOLOR', (1, 1), (1, -1), colors.HexColor('#1e293b')),
         ('ALIGN', (1, 1), (1, -1), 'LEFT'),
         ('LEFTPADDING', (1, 1), (1, -1), 12),
-
         ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#e2e8f0')),
         ('BOX', (0, 0), (-1, -1), 1, colors.HexColor('#cbd5e1')),
         ('BOTTOMPADDING', (0, 1), (-1, -1), 6),
         ('TOPPADDING', (0, 1), (-1, -1), 6),
-    ]))
+    ]
+
+    # Aplicar estilo de encabezado a las filas dinámicas
+    for h_row in header_rows:
+        style_commands.extend([
+            ('BACKGROUND', (0, h_row), (-1, h_row), colors.HexColor('#1e3a8a')),
+            ('TEXTCOLOR', (0, h_row), (-1, h_row), colors.white),
+            ('FONTNAME', (0, h_row), (-1, h_row), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, h_row), (-1, h_row), 10),
+            ('SPAN', (0, h_row), (-1, h_row)),
+            ('ALIGN', (0, h_row), (-1, h_row), 'CENTER'),
+            ('BOTTOMPADDING', (0, h_row), (-1, h_row), 8),
+            ('TOPPADDING', (0, h_row), (-1, h_row), 8),
+        ])
+
+    tabla.setStyle(TableStyle(style_commands))
 
     elements.append(tabla)
     elements.append(Spacer(1, 20))
