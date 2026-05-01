@@ -2505,7 +2505,9 @@ def imprimir_expediente_pdf(id):
         info_data.append(['Ubicación en Archivo', expediente.ubicacion_archivo or 'No especificada'])
 
     desc_style = ParagraphStyle('DescStyle', parent=styles['Normal'], fontSize=9, leading=11)
-    info_data.append(['Descripción', Paragraph(expediente.descripcion or 'Sin descripción', desc_style)])
+    descripcion_formateada = (expediente.descripcion or 'Sin descripción').replace('
+', '<br/>')
+    info_data.append(['Descripción', Paragraph(descripcion_formateada, desc_style)])
 
     info_table = Table(info_data, colWidths=[2*inch, 5*inch])
     info_table.setStyle(TableStyle([
@@ -3065,7 +3067,9 @@ def exportar_resumen_pdf(id):
         output,
         mimetype='application/pdf',
         as_attachment=True,
+        download_name=f'Resumen_{expediente.numero_expediente.replace("/", "_")}_{datetime.now().strftime("%Y%m%d")}.pdf'
     )
+
 # RUTA: ENVIAR EXPEDIENTE A ARCHIVO
 # ============================================
 
