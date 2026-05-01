@@ -23,6 +23,7 @@ from reportlab.lib.pagesizes import letter, A4
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import inch
+from reportlab.lib.utils import ImageReader
 
 # ============================================
 # IMPORTS PARA GOOGLE DRIVE - SERVICE ACCOUNT
@@ -2330,7 +2331,23 @@ def exportar_pdf(tipo):
         alignment=1
     )
 
-    elements.append(Paragraph("⚖️ QUIJANDRIA ABOGADOS EIRL", title_style))
+    # --- LOGO DEL ESTUDIO ---
+    logo_path = os.path.join(os.path.dirname(__file__), 'static', 'images', 'logo-quijandria.png')
+    if os.path.exists(logo_path):
+        try:
+            logo = ImageReader(logo_path)
+            logo_img = Table([[logo]], colWidths=[1.5*inch], rowHeights=[1.2*inch])
+            logo_img.setStyle(TableStyle([
+                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ]))
+            elements.append(logo_img)
+            elements.append(Spacer(1, 8))
+        except Exception as e:
+            print(f"Error cargando logo: {e}")
+    # -------------------------
+
+    elements.append(Paragraph("QUIJANDRIA ABOGADOS EIRL", title_style))
     elements.append(Paragraph(f"{titulo}", styles['Heading2']))
     elements.append(Paragraph(f"Fecha de generación: {datetime.now().strftime('%d/%m/%Y %H:%M')}", styles['Normal']))
     elements.append(Spacer(1, 20))
@@ -2378,7 +2395,6 @@ def exportar_pdf(tipo):
         as_attachment=True,
         download_name=f'{titulo.replace(" ", "_")}_{datetime.now().strftime("%Y%m%d")}.pdf'
     )
-
 
 # ============================================
 # RUTA PARA IMPRIMIR EXPEDIENTE EN PDF
@@ -2430,7 +2446,781 @@ def imprimir_expediente_pdf(id):
         spaceBefore=12
     )
 
-    elements.append(Paragraph("⚖️ QUIJANDRIA ABOGADOS EIRL", title_style))
+    # --- LOGO DEL ESTUDIO ---
+    logo_path = os.path.join(os.path.dirname(__file__), 'static', 'images', 'logo-quijandria.png')
+    if os.path.exists(logo_path):
+        try:
+            logo = ImageReader(logo_path)
+            # Logo centrado, ancho 1.5 pulgadas (aprox 3.8cm)
+            logo_img = Table([[logo]], colWidths=[1.5*inch], rowHeights=[1.2*inch])
+            logo_img.setStyle(TableStyle([
+                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ]))
+            elements.append(logo_img)
+            elements.append(Spacer(1, 8))
+        except Exception as e:
+            print(f"Error cargando logo: {e}")
+    # -------------------------
+
+    elements.append(Paragraph("QUIJANDRIA ABOGADOS EIRL", title_style))
+    elements.append(Paragraph("Sistema de Gestión de Expedientes Legales", styles['Normal']))
+    elements.append(Paragraph(f"<b>Reporte de Expediente</b>", styles['Heading3']))
+    elements.append(Spacer(1, 10))
+
+    elements.append(Table([['']], colWidths=[7*inch], style=TableStyle([
+        ('LINEBELOW', (0, 0), (-1, 0), 2, colors.HexColor('#1e3a8a')),
+    ])))
+    elements.append(Spacer(1, 10))
+
+    elements.append(Paragraph("📋 INFORMACIÓN GENERAL", section_style))
+
+    info_data = [
+        ['Campo', 'Valor'],
+        ['Tipo de Expediente', expediente.get_tipo_label()],
+        ['N° de Expediente', expediente.numero_expediente if expediente.numero_expediente != '-' else 'N/A'],
+        ['Cliente', expediente.cliente],
+        ['DNI', expediente.dni or 'No aplica'],
+        ['Teléfono', expediente.telefono or 'No registrado'],
+        ['Materia', expediente.materia],
+        ['Estado Actual', expediente.get_estado_label()],
+        ['Fecha de Registro', expediente.fecha_registro.strftime('%d/%m/%Y %H:%M') if expediente.fecha_registro else 'N/A'],
+    ]
+
+    if expediente.tipo == 'civil':
+        info_data.append(['Juez', expediente.juez or 'No asignado'])
+        info_data.append(['Secretario', expediente.secretario or 'No asignado'])
+    elif expediente.tipo == 'penal':
+        info_data.append(['N° Caso Fiscal', expediente.numero_cf or 'No asignado'])
+        info_data.append(['Fiscal', expediente.fiscal or 'No asignado'])
+        info_data.append(['Juzgado', expediente.juzgado or 'No asignado'])
+    elif expediente.tipo == 'administrativo':
+        info_data.append(['Entidad Receptora', expediente.entidad_receptora or 'No especificada'])
+        info_data.append(['Trámite', expediente.tramite or 'No especificado'])
+    elif expediente.tipo == 'conciliacion':
+        info_data.append(['Conciliador', expediente.conciliador or 'No asignado'])
+        info_data.append(['Solicitante', expediente.solicitante or 'No especificado'])
+        info_data.append(['Invitados', expediente.invitados or 'No especificados'])
+    elif expediente.tipo == 'archivo':
+        info_data.append(['Ubicación en Archivo', expediente.ubicacion_archivo or 'No especificada'])
+
+    desc_style = ParagraphStyle('DescStyle', parent=styles['Normal'], fontSize=9, leading=11)
+    info_data.append(['Descripción', Paragraph(expediente.descripcion or 'Sin descripción', desc_style)])
+
+    info_table = Table(info_data, colWidths=[2*inch, 5*inch])
+    info_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#1e3a8a')),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, 0), 10),
+        ('BOTTOMPADDING', (0, 0), (-1, 0), 8),
+        ('BACKGROUND', (0, 1), (-1, -1), colors.HexColor('#f3f4f6')),
+        ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
+        ('FONTNAME', (0, 1), (0, -1), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 1), (-1, -1), 9),
+        ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+        ('LEFTPADDING', (0, 0), (-1, -1), 6),
+        ('RIGHTPADDING', (0, 0), (-1, -1), 6),
+    ]))
+    elements.append(info_table)
+
+    if historial:
+        elements.append(Spacer(1, 15))
+        elements.append(Paragraph("📈 HISTORIAL DE ESTADOS", section_style))
+
+        hist_data = [['Fecha', 'Estado', 'Descripción', 'Usuario']]
+        hist_style_body = ParagraphStyle('HistBody', parent=styles['Normal'], fontSize=8, leading=10)
+        for h in historial:
+            desc_text = h.descripcion or 'Sin descripción'
+            # Usar Paragraph para que el texto se ajuste automáticamente
+            desc_para = Paragraph(desc_text, hist_style_body)
+            hist_data.append([
+                h.fecha.strftime('%d/%m/%Y %H:%M') if h.fecha else 'N/A',
+                h.estado,
+                desc_para,
+                h.usuario or 'Sistema'
+            ])
+
+        hist_table = Table(hist_data, colWidths=[1.1*inch, 1.0*inch, 3.8*inch, 1.1*inch])
+        hist_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#047857')),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, 0), 9),
+            ('BOTTOMPADDING', (0, 0), (-1, 0), 8),
+            ('BACKGROUND', (0, 1), (-1, -1), colors.HexColor('#ecfdf5')),
+            ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
+            ('FONTSIZE', (0, 1), (-1, -1), 8),
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ]))
+        elements.append(hist_table)
+
+    if audiencias:
+        elements.append(Spacer(1, 15))
+        elements.append(Paragraph("📅 AUDIENCIAS PROGRAMADAS", section_style))
+
+        aud_data = [['Fecha', 'Hora', 'Tipo', 'Lugar', 'Estado']]
+        for a in audiencias:
+            aud_data.append([
+                a.fecha.strftime('%d/%m/%Y') if a.fecha else 'N/A',
+                a.hora.strftime('%H:%M') if a.hora else 'N/A',
+                a.get_tipo_label() if hasattr(a, 'get_tipo_label') else a.tipo_audiencia,
+                a.lugar or 'No especificado',
+                a.get_estado_label() if hasattr(a, 'get_estado_label') else a.estado
+            ])
+
+        aud_table = Table(aud_data, colWidths=[1*inch, 0.8*inch, 1.5*inch, 2.2*inch, 1.5*inch])
+        aud_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#b45309')),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, 0), 9),
+            ('BOTTOMPADDING', (0, 0), (-1, 0), 8),
+            ('BACKGROUND', (0, 1), (-1, -1), colors.HexColor('#fffbeb')),
+            ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
+            ('FONTSIZE', (0, 1), (-1, -1), 8),
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ]))
+        elements.append(aud_table)
+
+    if documentos:
+        elements.append(Spacer(1, 15))
+        elements.append(Paragraph("📄 DOCUMENTOS ADJUNTOS", section_style))
+
+        doc_data = [['Título', 'Categoría', 'Tipo', 'Fecha', 'Ubicación']]
+        for d in documentos:
+            ubicacion_label = 'Drive' if d.ubicacion == 'drive' else 'Oficina' if d.ubicacion == 'archivado_local' else d.ubicacion
+            doc_data.append([
+                d.titulo[:30] + '...' if len(d.titulo) > 30 else d.titulo,
+                d.categoria.title() if d.categoria else 'Otro',
+                d.tipo_archivo.upper() if d.tipo_archivo else 'N/A',
+                d.fecha_subida.strftime('%d/%m/%Y') if d.fecha_subida else 'N/A',
+                ubicacion_label
+            ])
+
+        doc_table = Table(doc_data, colWidths=[2.5*inch, 1.2*inch, 1*inch, 1.2*inch, 1.1*inch])
+        doc_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#4b5563')),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, 0), 9),
+            ('BOTTOMPADDING', (0, 0), (-1, 0), 8),
+            ('BACKGROUND', (0, 1), (-1, -1), colors.HexColor('#f9fafb')),
+            ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
+            ('FONTSIZE', (0, 1), (-1, -1), 8),
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ]))
+        elements.append(doc_table)
+
+    elements.append(Spacer(1, 30))
+    elements.append(Table([['']], colWidths=[7*inch], style=TableStyle([
+        ('LINEABOVE', (0, 0), (-1, 0), 1, colors.grey),
+    ])))
+    elements.append(Spacer(1, 10))
+
+    footer_data = [
+        [f"Generado el: {datetime.now().strftime('%d/%m/%Y %H:%M')}", "Quijandria Abogados EIRL"],
+        [f"Usuario: {session.get('nombre', 'Sistema')}", "Sistema de Gestión de Expedientes v1.0"]
+    ]
+    footer_table = Table(footer_data, colWidths=[3.5*inch, 3.5*inch])
+    footer_table.setStyle(TableStyle([
+        ('FONTSIZE', (0, 0), (-1, -1), 8),
+        ('TEXTCOLOR', (0, 0), (-1, -1), colors.grey),
+        ('ALIGN', (0, 0), (0, -1), 'LEFT'),
+        ('ALIGN', (1, 0), (1, -1), 'RIGHT'),
+    ]))
+    elements.append(footer_table)
+
+    doc.build(elements)
+    output.seek(0)
+
+    return send_file(
+        output,
+        mimetype='application/pdf',
+        as_attachment=True,
+        download_name=f'Expediente_{expediente.numero_expediente.replace("/", "_")}_{datetime.now().strftime("%Y%m%d")}.pdf'
+    )# ============================================
+# RUTA PARA EXPORTAR SEGUIMIENTO A EXCEL
+# ============================================
+
+@bp.route('/expediente/<int:id>/exportar-seguimiento')
+@requiere_login
+@no_cache
+def exportar_seguimiento_excel(id):
+    """Exportar seguimiento completo de expediente a Excel profesional (solo Admin/Dev)"""
+
+    if not puede_exportar():
+        flash('No tiene permisos para exportar seguimientos', 'error')
+        return redirect(url_for('main.ver_expediente', id=id))
+
+    expediente = Expediente.query.get_or_404(id)
+    historial = EstadoHistorial.query.filter_by(expediente_id=id).order_by(EstadoHistorial.fecha.desc()).all()
+    audiencias = Audiencia.query.filter_by(expediente_id=id).order_by(Audiencia.fecha.desc()).all()
+    documentos = Documento.query.filter_by(expediente_id=id).order_by(Documento.fecha_subida.desc()).all()
+
+    output = io.BytesIO()
+
+    with pd.ExcelWriter(output, engine='openpyxl') as writer:
+        # HOJA 1: RESUMEN DEL EXPEDIENTE
+        resumen_data = {
+            'Campo': [
+                'ID', 'Tipo', 'N° Expediente', 'Cliente', 'DNI', 'Teléfono',
+                'Materia', 'Descripción', 'Estado Actual', 'Fecha de Registro',
+                'Última Actualización', 'Usuario de Registro'
+            ],
+            'Valor': [
+                expediente.id,
+                expediente.get_tipo_label(),
+                expediente.numero_expediente if expediente.numero_expediente != '-' else f'DNI: {expediente.dni}',
+                expediente.cliente,
+                expediente.dni or 'No aplica',
+                expediente.telefono or 'No registrado',
+                expediente.materia,
+                expediente.descripcion or 'Sin descripción',
+                expediente.get_estado_label(),
+                expediente.fecha_registro.strftime('%d/%m/%Y %H:%M') if expediente.fecha_registro else 'N/A',
+                expediente.fecha_actualizacion.strftime('%d/%m/%Y %H:%M') if expediente.fecha_actualizacion else 'N/A',
+                expediente.usuario_registro or 'Sistema'
+            ]
+        }
+
+        if expediente.tipo == 'civil':
+            resumen_data['Campo'].extend(['Juez', 'Secretario'])
+            resumen_data['Valor'].extend([
+                expediente.juez or 'No asignado',
+                expediente.secretario or 'No asignado'
+            ])
+        elif expediente.tipo == 'penal':
+            resumen_data['Campo'].extend(['N° Caso Fiscal', 'Fiscal', 'Juzgado'])
+            resumen_data['Valor'].extend([
+                expediente.numero_cf or 'No asignado',
+                expediente.fiscal or 'No asignado',
+                expediente.juzgado or 'No asignado'
+            ])
+        elif expediente.tipo == 'administrativo':
+            resumen_data['Campo'].extend(['Entidad Receptora', 'Trámite'])
+            resumen_data['Valor'].extend([
+                expediente.entidad_receptora or 'No especificada',
+                expediente.tramite or 'No especificado'
+            ])
+        elif expediente.tipo == 'conciliacion':
+            resumen_data['Campo'].extend(['Conciliador', 'Solicitante', 'Invitados'])
+            resumen_data['Valor'].extend([
+                expediente.conciliador or 'No asignado',
+                expediente.solicitante or 'No especificado',
+                expediente.invitados or 'No especificados'
+            ])
+        elif expediente.tipo == 'archivo':
+            resumen_data['Campo'].append('Ubicación en Archivo')
+            resumen_data['Valor'].append(expediente.ubicacion_archivo or 'No especificada')
+
+        df_resumen = pd.DataFrame(resumen_data)
+        df_resumen.to_excel(writer, sheet_name='Resumen', index=False)
+
+        worksheet_resumen = writer.sheets['Resumen']
+        worksheet_resumen.column_dimensions['A'].width = 25
+        worksheet_resumen.column_dimensions['B'].width = 50
+
+        # HOJA 2: HISTORIAL DE ESTADOS
+        if historial:
+            hist_data = []
+            for h in historial:
+                hist_data.append({
+                    'N°': len(hist_data) + 1,
+                    'Fecha': h.fecha.strftime('%d/%m/%Y %H:%M') if h.fecha else 'N/A',
+                    'Estado': h.estado,
+                    'Descripción': h.descripcion or 'Sin descripción',
+                    'Usuario': h.usuario or 'Sistema'
+                })
+
+            df_historial = pd.DataFrame(hist_data)
+            df_historial.to_excel(writer, sheet_name='Historial de Estados', index=False)
+
+            worksheet_hist = writer.sheets['Historial de Estados']
+            worksheet_hist.column_dimensions['A'].width = 5
+            worksheet_hist.column_dimensions['B'].width = 18
+            worksheet_hist.column_dimensions['C'].width = 15
+            worksheet_hist.column_dimensions['D'].width = 40
+            worksheet_hist.column_dimensions['E'].width = 15
+
+        # HOJA 3: AUDIENCIAS
+        if audiencias:
+            aud_data = []
+            for a in audiencias:
+                aud_data.append({
+                    'N°': len(aud_data) + 1,
+                    'Fecha': a.fecha.strftime('%d/%m/%Y') if a.fecha else 'N/A',
+                    'Hora': a.hora.strftime('%H:%M') if a.hora else 'N/A',
+                    'Tipo': a.get_tipo_label() if hasattr(a, 'get_tipo_label') else a.tipo_audiencia,
+                    'Lugar': a.lugar or 'No especificado',
+                    'Sala': a.sala or 'No especificada',
+                    'Magistrado': a.magistrado or 'No asignado',
+                    'Estado': a.get_estado_label() if hasattr(a, 'get_estado_label') else a.estado,
+                    'Observaciones': a.observaciones or 'Sin observaciones'
+                })
+
+            df_audiencias = pd.DataFrame(aud_data)
+            df_audiencias.to_excel(writer, sheet_name='Audiencias', index=False)
+
+            worksheet_aud = writer.sheets['Audiencias']
+            for idx, col in enumerate(df_audiencias.columns, 1):
+                worksheet_aud.column_dimensions[chr(64 + idx)].width = 15 if idx <= 3 else 20
+
+        # HOJA 4: DOCUMENTOS
+        if documentos:
+            doc_data = []
+            for d in documentos:
+                ubicacion_label = 'Drive' if d.ubicacion == 'drive' else 'Archivado en Oficina' if d.ubicacion == 'archivado_local' else d.ubicacion
+                doc_data.append({
+                    'N°': len(doc_data) + 1,
+                    'Título': d.titulo,
+                    'Categoría': d.categoria.title() if d.categoria else 'Otro',
+                    'Tipo': d.tipo_archivo.upper() if d.tipo_archivo else 'N/A',
+                    'Tamaño': d.get_tamaño_formateado() if hasattr(d, 'get_tamaño_formateado') else f"{d.tamaño_bytes} bytes",
+                    'Ubicación': ubicacion_label,
+                    'Fecha Documento': d.fecha_documento.strftime('%d/%m/%Y') if d.fecha_documento else 'N/A',
+                    'Fecha Subida': d.fecha_subida.strftime('%d/%m/%Y %H:%M') if d.fecha_subida else 'N/A',
+                    'Subido por': d.usuario_subida or 'Sistema',
+                    'Descripción': d.descripcion or 'Sin descripción'
+                })
+
+            df_documentos = pd.DataFrame(doc_data)
+            df_documentos.to_excel(writer, sheet_name='Documentos', index=False)
+
+            worksheet_doc = writer.sheets['Documentos']
+            worksheet_doc.column_dimensions['A'].width = 5
+            worksheet_doc.column_dimensions['B'].width = 30
+            worksheet_doc.column_dimensions['C'].width = 15
+            worksheet_doc.column_dimensions['D'].width = 10
+            worksheet_doc.column_dimensions['E'].width = 12
+            worksheet_doc.column_dimensions['F'].width = 18
+            worksheet_doc.column_dimensions['G'].width = 15
+            worksheet_doc.column_dimensions['H'].width = 18
+            worksheet_doc.column_dimensions['I'].width = 15
+            worksheet_doc.column_dimensions['J'].width = 30
+
+    output.seek(0)
+
+    return send_file(
+        output,
+        mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        as_attachment=True,
+        download_name=f'Seguimiento_{expediente.numero_expediente.replace("/", "_")}_{datetime.now().strftime("%Y%m%d")}.xlsx'
+    )
+
+
+# ============================================
+# RUTA PARA EXPORTAR RESUMEN PDF PROFESIONAL
+# ============================================
+
+@bp.route('/expediente/<int:id>/exportar-pdf')
+@requiere_login
+@no_cache
+def exportar_resumen_pdf(id):
+    """Generar PDF resumen profesional del expediente (solo Admin/Dev)"""
+
+    if not puede_exportar():
+        flash('No tiene permisos para exportar expedientes', 'error')
+        return redirect(url_for('main.ver_expediente', id=id))
+
+    expediente = Expediente.query.get_or_404(id)
+
+    output = io.BytesIO()
+    doc = SimpleDocTemplate(
+        output, 
+        pagesize=letter,
+        topMargin=0.75*inch,
+        bottomMargin=0.75*inch,
+        rightMargin=0.75*inch,
+        leftMargin=0.75*inch
+    )
+
+    elements = []
+    styles = getSampleStyleSheet()
+
+    titulo_estudio = ParagraphStyle(
+        'TituloEstudio',
+        parent=styles['Heading1'],
+        fontSize=20,
+        textColor=colors.HexColor('#1e3a8a'),
+        alignment=1,
+        spaceAfter=6,
+        fontName='Helvetica-Bold'
+    )
+
+    subtitulo_sistema = ParagraphStyle(
+        'SubtituloSistema',
+        parent=styles['Normal'],
+        fontSize=10,
+        textColor=colors.HexColor('#64748b'),
+        alignment=1,
+        spaceAfter=24,
+        fontName='Helvetica'
+    )
+
+    titulo_documento = ParagraphStyle(
+        'TituloDocumento',
+        parent=styles['Heading2'],
+        fontSize=14,
+        textColor=colors.HexColor('#334155'),
+        alignment=1,
+        spaceAfter=20,
+        fontName='Helvetica-Bold'
+    )
+
+    nota_estilo = ParagraphStyle(
+        'Nota',
+        parent=styles['Italic'],
+        fontSize=8,
+        textColor=colors.HexColor('#94a3b8'),
+        alignment=1,
+        spaceBefore=30
+    )
+
+    # --- LOGO DEL ESTUDIO ---
+    logo_path = os.path.join(os.path.dirname(__file__), 'static', 'images', 'logo-quijandria.png')
+    if os.path.exists(logo_path):
+        try:
+            logo = ImageReader(logo_path)
+            logo_img = Table([[logo]], colWidths=[1.5*inch], rowHeights=[1.2*inch])
+            logo_img.setStyle(TableStyle([
+                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ]))
+            elements.append(logo_img)
+            elements.append(Spacer(1, 8))
+        except Exception as e:
+            print(f"Error cargando logo: {e}")
+    # -------------------------
+
+    elements.append(Paragraph("QUIJANDRIA ABOGADOS EIRL", titulo_estudio))
+    elements.append(Paragraph("Sistema de Gestión de Expedientes Legales", subtitulo_sistema))
+
+    elements.append(Table([['']], colWidths=[6.5*inch], style=TableStyle([
+        ('LINEBELOW', (0, 0), (-1, 0), 2, colors.HexColor('#1e3a8a')),
+        ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+    ])))
+
+    tipo_label = expediente.get_tipo_label()
+    elements.append(Paragraph(f"RESUMEN DE {tipo_label.upper()}", titulo_documento))
+
+    datos_principales = [
+        ['INFORMACIÓN GENERAL', ''],
+        ['N° de Expediente:', expediente.numero_expediente if expediente.numero_expediente != '-' else 'No aplica (Administrativo)'],
+        ['Tipo de Proceso:', expediente.get_tipo_label()],
+        ['Estado Actual:', expediente.get_estado_label()],
+        ['', ''],
+        ['PARTES DEL PROCESO', ''],
+        ['Cliente:', expediente.cliente],
+        ['DNI:', expediente.dni or 'No aplica'],
+        ['Teléfono:', expediente.telefono or 'No registrado'],
+        ['', ''],
+        ['DETALLES DEL CASO', ''],
+        ['Materia:', expediente.materia],
+    ]
+
+    if expediente.tipo == 'civil':
+        datos_principales.extend([
+            ['Juez:', expediente.juez or 'Por asignar'],
+            ['Secretario:', expediente.secretario or 'Por asignar'],
+        ])
+    elif expediente.tipo == 'penal':
+        datos_principales.extend([
+            ['N° Caso Fiscal:', expediente.numero_cf or 'Por asignar'],
+            ['Fiscal:', expediente.fiscal or 'Por asignar'],
+            ['Juzgado:', expediente.juzgado or 'Por asignar'],
+        ])
+    elif expediente.tipo == 'administrativo':
+        datos_principales.extend([
+            ['Entidad Receptora:', expediente.entidad_receptora or 'Por definir'],
+            ['Trámite:', expediente.tramite or 'Por definir'],
+        ])
+    elif expediente.tipo == 'conciliacion':
+        datos_principales.extend([
+            ['Conciliador:', expediente.conciliador or 'Por asignar'],
+            ['Solicitante:', expediente.solicitante or expediente.cliente],
+            ['Invitados:', expediente.invitados or 'No especificados'],
+        ])
+    elif expediente.tipo == 'archivo':
+        datos_principales.extend([
+            ['Ubicación Física:', expediente.ubicacion_archivo or 'Por definir'],
+        ])
+
+    datos_principales.extend([
+        ['', ''],
+        ['REGISTRO Y SEGUIMIENTO', ''],
+        ['Fecha de Ingreso:', expediente.fecha_registro.strftime('%d de %B de %Y').upper() if expediente.fecha_registro else 'No registrada'],
+        ['Última Actualización:', expediente.fecha_actualizacion.strftime('%d de %B de %Y - %H:%M').upper() if expediente.fecha_actualizacion else 'Sin actualizaciones'],
+        ['Registrado por:', expediente.usuario_registro or 'Sistema'],
+    ])
+
+    tabla_data = []
+    for fila in datos_principales:
+        if fila[0] == '' and fila[1] == '':
+            tabla_data.append(['', ''])
+        elif fila[1] == '':
+            tabla_data.append([fila[0], ''])
+        else:
+            tabla_data.append([fila[0], fila[1]])
+
+    tabla = Table(tabla_data, colWidths=[2*inch, 4.5*inch])
+    tabla.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#1e3a8a')),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, 0), 10),
+        ('SPAN', (0, 0), (-1, 0)),
+        ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
+        ('BOTTOMPADDING', (0, 0), (-1, 0), 8),
+        ('TOPPADDING', (0, 0), (-1, 0), 8),
+
+        ('BACKGROUND', (0, 5), (-1, 5), colors.HexColor('#1e3a8a')),
+        ('TEXTCOLOR', (0, 5), (-1, 5), colors.white),
+        ('FONTNAME', (0, 5), (-1, 5), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 5), (-1, 5), 10),
+        ('SPAN', (0, 5), (-1, 5)),
+        ('ALIGN', (0, 5), (-1, 5), 'CENTER'),
+
+        ('BACKGROUND', (0, 9), (-1, 9), colors.HexColor('#1e3a8a')),
+        ('TEXTCOLOR', (0, 9), (-1, 9), colors.white),
+        ('FONTNAME', (0, 9), (-1, 9), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 9), (-1, 9), 10),
+        ('SPAN', (0, 9), (-1, 9)),
+        ('ALIGN', (0, 9), (-1, 9), 'CENTER'),
+
+        ('BACKGROUND', (0, -6), (-1, -6), colors.HexColor('#1e3a8a')),
+        ('TEXTCOLOR', (0, -6), (-1, -6), colors.white),
+        ('FONTNAME', (0, -6), (-1, -6), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, -6), (-1, -6), 10),
+        ('SPAN', (0, -6), (-1, -6)),
+        ('ALIGN', (0, -6), (-1, -6), 'CENTER'),
+
+        ('FONTNAME', (0, 1), (0, -1), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 1), (0, -1), 9),
+        ('TEXTCOLOR', (0, 1), (0, -1), colors.HexColor('#475569')),
+        ('BACKGROUND', (0, 1), (0, -1), colors.HexColor('#f8fafc')),
+        ('ALIGN', (0, 1), (0, -1), 'LEFT'),
+        ('LEFTPADDING', (0, 1), (0, -1), 12),
+
+        ('FONTNAME', (1, 1), (1, -1), 'Helvetica'),
+        ('FONTSIZE', (1, 1), (1, -1), 10),
+        ('TEXTCOLOR', (1, 1), (1, -1), colors.HexColor('#1e293b')),
+        ('ALIGN', (1, 1), (1, -1), 'LEFT'),
+        ('LEFTPADDING', (1, 1), (1, -1), 12),
+
+        ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#e2e8f0')),
+        ('BOX', (0, 0), (-1, -1), 1, colors.HexColor('#cbd5e1')),
+        ('BOTTOMPADDING', (0, 1), (-1, -1), 6),
+        ('TOPPADDING', (0, 1), (-1, -1), 6),
+    ]))
+
+    elements.append(tabla)
+    elements.append(Spacer(1, 20))
+
+    if expediente.descripcion:
+        desc_style = ParagraphStyle(
+            'Desc',
+            parent=styles['Normal'],
+            fontSize=10,
+            textColor=colors.HexColor('#334155'),
+            alignment=0,
+            spaceAfter=6
+        )
+        elements.append(Paragraph("<b>DESCRIPCIÓN DEL CASO:</b>", desc_style))
+
+        desc_data = [[Paragraph(expediente.descripcion, desc_style)]]
+        desc_tabla = Table(desc_data, colWidths=[6.5*inch])
+        desc_tabla.setStyle(TableStyle([
+            ('FONTNAME', (0, 0), (-1, -1), 'Helvetica'),
+            ('FONTSIZE', (0, 0), (-1, -1), 10),
+            ('TEXTCOLOR', (0, 0), (-1, -1), colors.HexColor('#334155')),
+            ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor('#f8fafc')),
+            ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+            ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+            ('LEFTPADDING', (0, 0), (-1, -1), 12),
+            ('RIGHTPADDING', (0, 0), (-1, -1), 12),
+            ('TOPPADDING', (0, 0), (-1, -1), 10),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 10),
+            ('BOX', (0, 0), (-1, -1), 1, colors.HexColor('#e2e8f0')),
+        ]))
+        elements.append(desc_tabla)
+
+    elements.append(Spacer(1, 40))
+    elements.append(Table([['']], colWidths=[6.5*inch], style=TableStyle([
+        ('LINEABOVE', (0, 0), (-1, 0), 1, colors.HexColor('#cbd5e1')),
+        ('TOPPADDING', (0, 0), (-1, 0), 20),
+    ])))
+
+    elements.append(Paragraph(
+        "Este documento es confidencial y de uso exclusivo del estudio jurídico. "
+        "Generado el " + datetime.now().strftime('%d/%m/%Y a las %H:%M') + 
+        " por " + session.get('nombre', 'Sistema'),
+        nota_estilo
+    ))
+
+    doc.build(elements)
+    output.seek(0)
+
+    return send_file(
+        output,
+        mimetype='application/pdf',
+        as_attachment=True,
+        download_name=f'Resumen_{expediente.numero_expediente.replace("/", "_")}_{datetime.now().strftime("%Y%m%d")}.pdf'
+    )def exportar_pdf(tipo):
+    """Exportar expedientes a PDF (solo Admin/Dev)"""
+    if not puede_exportar():
+        flash('No tiene permisos para exportar datos', 'error')
+        return redirect(url_for('main.index'))
+
+    tipos_permitidos = ['todos', 'civil', 'penal', 'administrativo', 'conciliacion', 'archivo']
+    if tipo not in tipos_permitidos:
+        flash('Tipo de exportación no válido', 'error')
+        return redirect(url_for('main.index'))
+
+    if tipo == 'todos':
+        expedientes = Expediente.query.order_by(Expediente.fecha_registro.desc()).all()
+        titulo = 'Todos los Expedientes'
+    else:
+        expedientes = Expediente.query.filter_by(tipo=tipo).order_by(Expediente.fecha_registro.desc()).all()
+        titulos = {
+            'civil': 'Expedientes de Derecho Civil',
+            'penal': 'Expedientes de Derecho Penal',
+            'administrativo': 'Expedientes Administrativos',
+            'conciliacion': 'Expedientes de Conciliación',
+            'archivo': 'Expedientes en Archivo'
+        }
+        titulo = titulos.get(tipo, 'Expedientes')
+
+    output = io.BytesIO()
+    doc = SimpleDocTemplate(output, pagesize=letter, topMargin=0.5*inch, bottomMargin=0.5*inch)
+    elements = []
+
+    styles = getSampleStyleSheet()
+    title_style = ParagraphStyle(
+        'CustomTitle',
+        parent=styles['Heading1'],
+        fontSize=16,
+        textColor=colors.HexColor('#1e3a8a'),
+        spaceAfter=20,
+        alignment=1
+    )
+
+    # --- LOGO DEL ESTUDIO ---
+    logo_path = os.path.join(os.path.dirname(__file__), 'static', 'images', 'logo-quijandria.png')
+    if os.path.exists(logo_path):
+        try:
+            logo = ImageReader(logo_path)
+            logo_img = Table([[logo]], colWidths=[1.5*inch], rowHeights=[1.2*inch])
+            logo_img.setStyle(TableStyle([
+                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ]))
+            elements.append(logo_img)
+            elements.append(Spacer(1, 8))
+        except Exception as e:
+            print(f"Error cargando logo: {e}")
+    # -------------------------
+
+    elements.append(Paragraph("QUIJANDRIA ABOGADOS EIRL", title_style))
+    elements.append(Paragraph(f"{titulo}", styles['Heading2']))
+    elements.append(Paragraph(f"Fecha de generación: {datetime.now().strftime('%d/%m/%Y %H:%M')}", styles['Normal']))
+    elements.append(Spacer(1, 20))
+
+    table_data = [['ID', 'Tipo', 'Identificación', 'Cliente', 'Materia', 'Estado', 'Fecha']]
+
+    for exp in expedientes:
+        identificacion = exp.numero_expediente if exp.numero_expediente != '-' else f'DNI: {exp.dni}'
+        table_data.append([
+            str(exp.id),
+            exp.get_tipo_label(),
+            identificacion,
+            exp.cliente[:25] + '...' if len(exp.cliente) > 25 else exp.cliente,
+            exp.materia[:20] + '...' if len(exp.materia) > 20 else exp.materia,
+            exp.get_estado_label(),
+            exp.fecha_registro.strftime('%d/%m/%Y') if exp.fecha_registro else 'N/A'
+        ])
+
+    table = Table(table_data, repeatRows=1)
+    table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#1e3a8a')),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, 0), 10),
+        ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+        ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+        ('GRID', (0, 0), (-1, -1), 1, colors.black),
+        ('FONTSIZE', (0, 1), (-1, -1), 9),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+    ]))
+
+    elements.append(table)
+    elements.append(Spacer(1, 20))
+
+    elements.append(Paragraph(f"Total de expedientes: {len(expedientes)}", styles['Normal']))
+    elements.append(Paragraph("Sistema de Gestión de Expedientes Legales - Quijandria Abogados", styles['Italic']))
+
+    doc.build(elements)
+    output.seek(0)
+
+    return send_file(
+        output,
+        mimetype='application/pdf',
+        as_attachment=True,
+        download_name=f'{titulo.replace(" ", "_")}_{datetime.now().strftime("%Y%m%d")}.pdf'
+    )
+
+# ============================================
+# RUTA PARA IMPRIMIR EXPEDIENTE EN PDF
+# ============================================
+
+@bp.route('/expediente/<int:id>/imprimir')
+@requiere_login
+@no_cache
+def imprimir_expediente_pdf(id):
+    """Generar PDF del detalle de expediente con historial y audiencias (solo Admin/Dev)"""
+
+    if not puede_exportar():
+        flash('No tiene permisos para imprimir expedientes', 'error')
+        return redirect(url_for('main.ver_expediente', id=id))
+
+    expediente = Expediente.query.get_or_404(id)
+    historial = EstadoHistorial.query.filter_by(expediente_id=id).order_by(EstadoHistorial.fecha.desc()).all()
+    audiencias = Audiencia.query.filter_by(expediente_id=id).order_by(Audiencia.fecha.desc()).all()
+    documentos = Documento.query.filter_by(expediente_id=id).all()
+
+    output = io.BytesIO()
+    doc = SimpleDocTemplate(
+        output, 
+        pagesize=letter,
+        topMargin=0.5*inch,
+        bottomMargin=0.5*inch,
+        rightMargin=0.5*inch,
+        leftMargin=0.5*inch
+    )
+    elements = []
+
+    styles = getSampleStyleSheet()
+
+    title_style = ParagraphStyle(
+        'CustomTitle',
+        parent=styles['Heading1'],
+        fontSize=18,
+        textColor=colors.HexColor('#1e3a8a'),
+        spaceAfter=12,
+        alignment=1
+    )
+
+    section_style = ParagraphStyle(
+        'SectionTitle',
+        parent=styles['Heading2'],
+        fontSize=12,
+        textColor=colors.HexColor('#1e3a8a'),
+        spaceAfter=8,
+        spaceBefore=12
+    )
+
+    elements.append(Paragraph("QUIJANDRIA ABOGADOS EIRL", title_style))
     elements.append(Paragraph("Sistema de Gestión de Expedientes Legales", styles['Normal']))
     elements.append(Paragraph(f"<b>Reporte de Expediente</b>", styles['Heading3']))
     elements.append(Spacer(1, 10))
@@ -2840,7 +3630,7 @@ def exportar_resumen_pdf(id):
         spaceBefore=30
     )
 
-    elements.append(Paragraph("⚖️ QUIJANDRIA ABOGADOS EIRL", titulo_estudio))
+    elements.append(Paragraph("QUIJANDRIA ABOGADOS EIRL", titulo_estudio))
     elements.append(Paragraph("Sistema de Gestión de Expedientes Legales", subtitulo_sistema))
 
     elements.append(Table([['']], colWidths=[6.5*inch], style=TableStyle([
