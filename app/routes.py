@@ -17,6 +17,7 @@ import time
 # IMPORTS PARA EXPORTACIÓN (PDF/EXCEL)
 # ============================================
 import io
+import base64
 import pandas as pd
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import letter, A4
@@ -2331,11 +2332,30 @@ def exportar_pdf(tipo):
         alignment=1
     )
 
-    # --- LOGO DEL ESTUDIO ---
+# --- LOGO DEL ESTUDIO ---
+    # Intentar cargar desde archivo local primero
     logo_path = os.path.join(os.path.dirname(__file__), 'static', 'images', 'logo-quijandria.png')
+    logo = None
+
     if os.path.exists(logo_path):
         try:
             logo = ImageReader(logo_path)
+        except Exception as e:
+            print(f"Error cargando logo local: {e}")
+
+    # Si no existe localmente, usar base64 incrustado
+    if logo is None:
+        try:
+            # Logo en base64 (reemplazar esta cadena con tu logo real convertido a base64)
+            LOGO_BASE64 = "PASTE_YOUR_BASE64_LOGO_HERE"
+            if LOGO_BASE64 != "PASTE_YOUR_BASE64_LOGO_HERE":
+                logo_bytes = base64.b64decode(LOGO_BASE64)
+                logo = ImageReader(io.BytesIO(logo_bytes))
+        except Exception as e:
+            print(f"Error cargando logo base64: {e}")
+
+    if logo:
+        try:
             logo_img = Table([[logo]], colWidths=[1.5*inch], rowHeights=[1.2*inch])
             logo_img.setStyle(TableStyle([
                 ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
@@ -2344,7 +2364,7 @@ def exportar_pdf(tipo):
             elements.append(logo_img)
             elements.append(Spacer(1, 8))
         except Exception as e:
-            print(f"Error cargando logo: {e}")
+            print(f"Error mostrando logo: {e}")
     # -------------------------
 
     elements.append(Paragraph("QUIJANDRIA ABOGADOS EIRL", title_style))
@@ -2447,11 +2467,29 @@ def imprimir_expediente_pdf(id):
     )
 
     # --- LOGO DEL ESTUDIO ---
+    # Intentar cargar desde archivo local primero
     logo_path = os.path.join(os.path.dirname(__file__), 'static', 'images', 'logo-quijandria.png')
+    logo = None
+
     if os.path.exists(logo_path):
         try:
             logo = ImageReader(logo_path)
-            # Logo centrado, ancho 1.5 pulgadas (aprox 3.8cm)
+        except Exception as e:
+            print(f"Error cargando logo local: {e}")
+
+    # Si no existe localmente, usar base64 incrustado
+    if logo is None:
+        try:
+            # Logo en base64 (reemplazar esta cadena con tu logo real convertido a base64)
+            LOGO_BASE64 = "PASTE_YOUR_BASE64_LOGO_HERE"
+            if LOGO_BASE64 != "PASTE_YOUR_BASE64_LOGO_HERE":
+                logo_bytes = base64.b64decode(LOGO_BASE64)
+                logo = ImageReader(io.BytesIO(logo_bytes))
+        except Exception as e:
+            print(f"Error cargando logo base64: {e}")
+
+    if logo:
+        try:
             logo_img = Table([[logo]], colWidths=[1.5*inch], rowHeights=[1.2*inch])
             logo_img.setStyle(TableStyle([
                 ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
@@ -2460,7 +2498,7 @@ def imprimir_expediente_pdf(id):
             elements.append(logo_img)
             elements.append(Spacer(1, 8))
         except Exception as e:
-            print(f"Error cargando logo: {e}")
+            print(f"Error mostrando logo: {e}")
     # -------------------------
 
     elements.append(Paragraph("QUIJANDRIA ABOGADOS EIRL", title_style))
@@ -2505,8 +2543,7 @@ def imprimir_expediente_pdf(id):
         info_data.append(['Ubicación en Archivo', expediente.ubicacion_archivo or 'No especificada'])
 
     desc_style = ParagraphStyle('DescStyle', parent=styles['Normal'], fontSize=9, leading=11)
-    descripcion_formateada = (expediente.descripcion or 'Sin descripción').replace('
-', '<br/>')
+    descripcion_formateada = (expediente.descripcion or 'Sin descripción').replace('', '<br/>')
     info_data.append(['Descripción', Paragraph(descripcion_formateada, desc_style)])
 
     info_table = Table(info_data, colWidths=[2*inch, 5*inch])
@@ -2879,11 +2916,30 @@ def exportar_resumen_pdf(id):
         spaceBefore=30
     )
 
-    # --- LOGO DEL ESTUDIO ---
+# --- LOGO DEL ESTUDIO ---
+    # Intentar cargar desde archivo local primero
     logo_path = os.path.join(os.path.dirname(__file__), 'static', 'images', 'logo-quijandria.png')
+    logo = None
+
     if os.path.exists(logo_path):
         try:
             logo = ImageReader(logo_path)
+        except Exception as e:
+            print(f"Error cargando logo local: {e}")
+
+    # Si no existe localmente, usar base64 incrustado
+    if logo is None:
+        try:
+            # Logo en base64 (reemplazar esta cadena con tu logo real convertido a base64)
+            LOGO_BASE64 = "PASTE_YOUR_BASE64_LOGO_HERE"
+            if LOGO_BASE64 != "PASTE_YOUR_BASE64_LOGO_HERE":
+                logo_bytes = base64.b64decode(LOGO_BASE64)
+                logo = ImageReader(io.BytesIO(logo_bytes))
+        except Exception as e:
+            print(f"Error cargando logo base64: {e}")
+
+    if logo:
+        try:
             logo_img = Table([[logo]], colWidths=[1.5*inch], rowHeights=[1.2*inch])
             logo_img.setStyle(TableStyle([
                 ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
@@ -2892,7 +2948,7 @@ def exportar_resumen_pdf(id):
             elements.append(logo_img)
             elements.append(Spacer(1, 8))
         except Exception as e:
-            print(f"Error cargando logo: {e}")
+            print(f"Error mostrando logo: {e}")
     # -------------------------
 
     elements.append(Paragraph("QUIJANDRIA ABOGADOS EIRL", titulo_estudio))
