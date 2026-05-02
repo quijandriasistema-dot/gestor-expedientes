@@ -25,6 +25,7 @@ from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, 
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import inch
 from reportlab.lib.utils import ImageReader
+from reportlab.platypus import Image as RLImage
 
 # ============================================
 # IMPORTS PARA GOOGLE DRIVE - SERVICE ACCOUNT
@@ -2467,12 +2468,12 @@ def imprimir_expediente_pdf(id):
     )
 
     # --- LOGO DEL ESTUDIO ---
-    logo_path = os.path.join(os.path.dirname(__file__), 'static', 'images', 'logo-quijandria.png')
+    logo_path = os.path.join(os.path.dirname(__file__), '..', 'static', 'images', 'logo-quijandria.png')
     logo = None
 
     if os.path.exists(logo_path):
         try:
-            logo = ImageReader(logo_path)
+            logo = RLImage(logo_path, width=1.5*inch, height=1.2*inch)
         except Exception as e:
             print(f"Error cargando logo local: {e}")
 
@@ -2943,12 +2944,12 @@ def exportar_resumen_pdf(id):
     )
 
     # --- LOGO DEL ESTUDIO ---
-    logo_path = os.path.join(os.path.dirname(__file__), 'static', 'images', 'logo-quijandria.png')
+    logo_path = os.path.join(os.path.dirname(__file__), '..', 'static', 'images', 'logo-quijandria.png')
     logo = None
 
     if os.path.exists(logo_path):
         try:
-            logo = ImageReader(logo_path)
+            logo = RLImage(logo_path, width=1.5*inch, height=1.2*inch)
         except Exception as e:
             print(f"Error cargando logo local: {e}")
 
