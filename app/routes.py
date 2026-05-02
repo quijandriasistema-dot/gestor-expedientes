@@ -2440,7 +2440,7 @@ def imprimir_expediente_pdf(id):
     doc = SimpleDocTemplate(
         output, 
         pagesize=letter,
-        topMargin=0.5*inch,
+        topMargin=1.8*inch,  # Aumentado para dejar espacio al logo
         bottomMargin=0.5*inch,
         rightMargin=0.5*inch,
         leftMargin=0.5*inch
@@ -2467,29 +2467,7 @@ def imprimir_expediente_pdf(id):
         spaceBefore=12
     )
 
-    # --- LOGO DEL ESTUDIO ---
-    logo_path = os.path.join(os.path.dirname(__file__), '..', 'static', 'images', 'logo-quijandria.png')
-    logo = None
-
-    if os.path.exists(logo_path):
-        try:
-            logo = RLImage(logo_path, width=1.5*inch, height=1.2*inch)
-        except Exception as e:
-            print(f"Error cargando logo local: {e}")
-
-    if logo:
-        try:
-            logo_img = Table([[logo]], colWidths=[1.5*inch], rowHeights=[1.2*inch])
-            logo_img.setStyle(TableStyle([
-                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-                ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-            ]))
-            elements.append(logo_img)
-            elements.append(Spacer(1, 8))
-        except Exception as e:
-            print(f"Error mostrando logo: {e}")
-    # -------------------------
-
+    # Título (el logo va en el encabezado de página, no aquí)
     elements.append(Paragraph("QUIJANDRIA ABOGADOS EIRL", title_style))
     elements.append(Paragraph("Sistema de Gestión de Expedientes Legales", styles['Normal']))
     elements.append(Paragraph("<b>Reporte de Expediente</b>", styles['Heading3']))
@@ -2687,7 +2665,23 @@ def imprimir_expediente_pdf(id):
     ]))
     elements.append(footer_table)
 
-    doc.build(elements)
+    # --- FUNCIÓN PARA DIBUJAR LOGO EN ENCABEZADO ---
+    def draw_logo(canvas, doc):
+        logo_path = os.path.join(os.path.dirname(__file__), '..', 'static', 'images', 'logo-quijandria.png')
+        if os.path.exists(logo_path):
+            try:
+                # Dibujar logo centrado en la parte superior
+                logo_width = 1.5 * inch
+                logo_height = 1.2 * inch
+                page_width = letter[0]
+                x = (page_width - logo_width) / 2  # Centrado
+                y = letter[1] - 1.4 * inch  # Desde arriba
+                
+                canvas.drawImage(logo_path, x, y, width=logo_width, height=logo_height, preserveAspectRatio=True, mask='auto')
+            except Exception as e:
+                print(f"Error dibujando logo: {e}")
+
+    doc.build(elements, onFirstPage=draw_logo, onLaterPages=draw_logo)
     output.seek(0)
 
     return send_file(
@@ -2886,7 +2880,7 @@ def exportar_resumen_pdf(id):
     doc = SimpleDocTemplate(
         output, 
         pagesize=letter,
-        topMargin=0.75*inch,
+        topMargin=1.8*inch,  # Aumentado para dejar espacio al logo
         bottomMargin=0.75*inch,
         rightMargin=0.75*inch,
         leftMargin=0.75*inch
@@ -2943,29 +2937,7 @@ def exportar_resumen_pdf(id):
         wordWrap='CJK'
     )
 
-    # --- LOGO DEL ESTUDIO ---
-    logo_path = os.path.join(os.path.dirname(__file__), '..', 'static', 'images', 'logo-quijandria.png')
-    logo = None
-
-    if os.path.exists(logo_path):
-        try:
-            logo = RLImage(logo_path, width=1.5*inch, height=1.2*inch)
-        except Exception as e:
-            print(f"Error cargando logo local: {e}")
-
-    if logo:
-        try:
-            logo_img = Table([[logo]], colWidths=[1.5*inch], rowHeights=[1.2*inch])
-            logo_img.setStyle(TableStyle([
-                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-                ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-            ]))
-            elements.append(logo_img)
-            elements.append(Spacer(1, 8))
-        except Exception as e:
-            print(f"Error mostrando logo: {e}")
-    # -------------------------
-
+    # Título (el logo va en el encabezado de página)
     elements.append(Paragraph("QUIJANDRIA ABOGADOS EIRL", titulo_estudio))
     elements.append(Paragraph("Sistema de Gestión de Expedientes Legales", subtitulo_sistema))
 
@@ -3129,7 +3101,23 @@ def exportar_resumen_pdf(id):
         nota_estilo
     ))
 
-    doc.build(elements)
+    # --- FUNCIÓN PARA DIBUJAR LOGO EN ENCABEZADO ---
+    def draw_logo(canvas, doc):
+        logo_path = os.path.join(os.path.dirname(__file__), '..', 'static', 'images', 'logo-quijandria.png')
+        if os.path.exists(logo_path):
+            try:
+                # Dibujar logo centrado en la parte superior
+                logo_width = 1.5 * inch
+                logo_height = 1.2 * inch
+                page_width = letter[0]
+                x = (page_width - logo_width) / 2  # Centrado
+                y = letter[1] - 1.4 * inch  # Desde arriba
+                
+                canvas.drawImage(logo_path, x, y, width=logo_width, height=logo_height, preserveAspectRatio=True, mask='auto')
+            except Exception as e:
+                print(f"Error dibujando logo: {e}")
+
+    doc.build(elements, onFirstPage=draw_logo, onLaterPages=draw_logo)
     output.seek(0)
 
     return send_file(
