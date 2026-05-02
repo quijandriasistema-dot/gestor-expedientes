@@ -26,6 +26,7 @@ from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import inch
 from reportlab.lib.utils import ImageReader
 from reportlab.platypus import Image as RLImage
+from logo_config import get_logo_image
 
 # ============================================
 # IMPORTS PARA GOOGLE DRIVE - SERVICE ACCOUNT
@@ -2440,7 +2441,7 @@ def imprimir_expediente_pdf(id):
     doc = SimpleDocTemplate(
         output, 
         pagesize=letter,
-        topMargin=1.8*inch,  # Aumentado para dejar espacio al logo
+        topMargin=1.8*inch,
         bottomMargin=0.5*inch,
         rightMargin=0.5*inch,
         leftMargin=0.5*inch
@@ -2467,7 +2468,6 @@ def imprimir_expediente_pdf(id):
         spaceBefore=12
     )
 
-    # Título (el logo va en el encabezado de página, no aquí)
     elements.append(Paragraph("QUIJANDRIA ABOGADOS EIRL", title_style))
     elements.append(Paragraph("Sistema de Gestión de Expedientes Legales", styles['Normal']))
     elements.append(Paragraph("<b>Reporte de Expediente</b>", styles['Heading3']))
@@ -2480,7 +2480,6 @@ def imprimir_expediente_pdf(id):
 
     elements.append(Paragraph("📋 INFORMACIÓN GENERAL", section_style))
 
-    # Estilo para valores largos con wrap
     wrap_style = ParagraphStyle(
         'WrapStyle',
         parent=styles['Normal'],
@@ -2518,7 +2517,6 @@ def imprimir_expediente_pdf(id):
     elif expediente.tipo == 'archivo':
         info_data.append(['Ubicación en Archivo', Paragraph(expediente.ubicacion_archivo or 'No especificada', wrap_style)])
 
-    # Descripción con saltos de línea respetados
     descripcion_texto = expediente.descripcion or 'Sin descripción'
     descripcion_formateada = '<br/>'.join(descripcion_texto.split('\n')) if descripcion_texto else 'Sin descripción'
     info_data.append(['Descripción', Paragraph(descripcion_formateada, wrap_style)])
@@ -2550,7 +2548,6 @@ def imprimir_expediente_pdf(id):
         hist_style_body = ParagraphStyle('HistBody', parent=styles['Normal'], fontSize=8, leading=11, wordWrap='CJK')
         for h in historial:
             desc_text = h.descripcion or 'Sin descripción'
-            # Convertir saltos de línea a <br/> para respetar formato
             desc_text_formateado = '<br/>'.join(desc_text.split('\n')) if desc_text else 'Sin descripción'
             desc_para = Paragraph(desc_text_formateado, hist_style_body)
             hist_data.append([
@@ -2665,21 +2662,18 @@ def imprimir_expediente_pdf(id):
     ]))
     elements.append(footer_table)
 
-    # --- FUNCIÓN PARA DIBUJAR LOGO EN ENCABEZADO ---
     def draw_logo(canvas, doc):
-        logo_path = os.path.join(os.path.dirname(__file__), '..', 'static', 'images', 'logo-quijandria.png')
-        if os.path.exists(logo_path):
-            try:
-                # Dibujar logo centrado en la parte superior
+        try:
+            logo = get_logo_image()
+            if logo:
                 logo_width = 1.5 * inch
                 logo_height = 1.2 * inch
                 page_width = letter[0]
-                x = (page_width - logo_width) / 2  # Centrado
-                y = letter[1] - 1.4 * inch  # Desde arriba
-                
-                canvas.drawImage(logo_path, x, y, width=logo_width, height=logo_height, preserveAspectRatio=True, mask='auto')
-            except Exception as e:
-                print(f"Error dibujando logo: {e}")
+                x = (page_width - logo_width) / 2
+                y = letter[1] - 1.4 * inch
+                canvas.drawImage(logo, x, y, width=logo_width, height=logo_height, preserveAspectRatio=True, mask='auto')
+        except Exception as e:
+            print(f"Error dibujando logo: {e}")
 
     doc.build(elements, onFirstPage=draw_logo, onLaterPages=draw_logo)
     output.seek(0)
@@ -2880,7 +2874,7 @@ def exportar_resumen_pdf(id):
     doc = SimpleDocTemplate(
         output, 
         pagesize=letter,
-        topMargin=1.8*inch,  # Aumentado para dejar espacio al logo
+        topMargin=1.8*inch,
         bottomMargin=0.75*inch,
         rightMargin=0.75*inch,
         leftMargin=0.75*inch
@@ -2928,7 +2922,6 @@ def exportar_resumen_pdf(id):
         spaceBefore=30
     )
 
-    # Estilo wrap para valores largos
     wrap_style = ParagraphStyle(
         'WrapStyle',
         parent=styles['Normal'],
@@ -2937,7 +2930,6 @@ def exportar_resumen_pdf(id):
         wordWrap='CJK'
     )
 
-    # Título (el logo va en el encabezado de página)
     elements.append(Paragraph("QUIJANDRIA ABOGADOS EIRL", titulo_estudio))
     elements.append(Paragraph("Sistema de Gestión de Expedientes Legales", subtitulo_sistema))
 
@@ -3006,12 +2998,10 @@ def exportar_resumen_pdf(id):
         elif fila[1] == '':
             tabla_data.append([fila[0], ''])
         else:
-            # Envolver valores largos en Paragraph para que hagan wrap
             tabla_data.append([fila[0], Paragraph(fila[1], wrap_style)])
 
     tabla = Table(tabla_data, colWidths=[2*inch, 4.5*inch])
 
-    # Calcular índices de filas de encabezado dinámicamente
     header_rows = []
     for idx, fila in enumerate(tabla_data):
         if fila[0] in ['INFORMACIÓN GENERAL', 'PARTES DEL PROCESO', 'DETALLES DEL CASO', 'REGISTRO Y SEGUIMIENTO']:
@@ -3036,7 +3026,6 @@ def exportar_resumen_pdf(id):
         ('VALIGN', (0, 0), (-1, -1), 'TOP'),
     ]
 
-    # Aplicar estilo de encabezado a las filas dinámicas
     for h_row in header_rows:
         style_commands.extend([
             ('BACKGROUND', (0, h_row), (-1, h_row), colors.HexColor('#1e3a8a')),
@@ -3067,7 +3056,6 @@ def exportar_resumen_pdf(id):
         )
         elements.append(Paragraph("<b>DESCRIPCIÓN DEL CASO:</b>", desc_style))
 
-        # >>> CORRECCIÓN CLAVE: Respetar saltos de línea <<<
         descripcion_texto = expediente.descripcion
         descripcion_formateada = '<br/>'.join(descripcion_texto.split('\n')) if descripcion_texto else 'Sin descripción'
         
@@ -3101,21 +3089,18 @@ def exportar_resumen_pdf(id):
         nota_estilo
     ))
 
-    # --- FUNCIÓN PARA DIBUJAR LOGO EN ENCABEZADO ---
     def draw_logo(canvas, doc):
-        logo_path = os.path.join(os.path.dirname(__file__), '..', 'static', 'images', 'logo-quijandria.png')
-        if os.path.exists(logo_path):
-            try:
-                # Dibujar logo centrado en la parte superior
+        try:
+            logo = get_logo_image()
+            if logo:
                 logo_width = 1.5 * inch
                 logo_height = 1.2 * inch
                 page_width = letter[0]
-                x = (page_width - logo_width) / 2  # Centrado
-                y = letter[1] - 1.4 * inch  # Desde arriba
-                
-                canvas.drawImage(logo_path, x, y, width=logo_width, height=logo_height, preserveAspectRatio=True, mask='auto')
-            except Exception as e:
-                print(f"Error dibujando logo: {e}")
+                x = (page_width - logo_width) / 2
+                y = letter[1] - 1.4 * inch
+                canvas.drawImage(logo, x, y, width=logo_width, height=logo_height, preserveAspectRatio=True, mask='auto')
+        except Exception as e:
+            print(f"Error dibujando logo: {e}")
 
     doc.build(elements, onFirstPage=draw_logo, onLaterPages=draw_logo)
     output.seek(0)
