@@ -2488,10 +2488,20 @@ def imprimir_expediente_pdf(id):
         wordWrap='CJK'
     )
 
+    # Estilo negrita para valores importantes
+    bold_wrap_style = ParagraphStyle(
+        'BoldWrapStyle',
+        parent=styles['Normal'],
+        fontSize=9,
+        leading=12,
+        wordWrap='CJK',
+        fontName='Helvetica-Bold'
+    )
+
     info_data = [
         ['Campo', 'Valor'],
         ['Tipo de Expediente', Paragraph(expediente.get_tipo_label(), wrap_style)],
-        ['N° de Expediente', Paragraph(expediente.numero_expediente if expediente.numero_expediente != '-' else 'N/A', wrap_style)],
+        ['N° de Expediente', Paragraph(f"<b>{expediente.numero_expediente if expediente.numero_expediente != '-' else 'N/A'}</b>", wrap_style)],
         ['Cliente', Paragraph(expediente.cliente, wrap_style)],
         ['DNI', Paragraph(expediente.dni or 'No aplica', wrap_style)],
         ['Teléfono', Paragraph(expediente.telefono or 'No registrado', wrap_style)],
@@ -2662,20 +2672,26 @@ def imprimir_expediente_pdf(id):
     ]))
     elements.append(footer_table)
 
-    def draw_logo(canvas, doc):
+    def draw_logo_first_page(canvas, doc):
+        """Dibuja logo SOLO en la primera página"""
         try:
             logo = get_logo_image()
             if logo:
-                logo_width = 1.5 * inch
-                logo_height = 1.2 * inch
+                # Logo más grande: 2.0 x 1.6 pulgadas
+                logo_width = 2.0 * inch
+                logo_height = 1.6 * inch
                 page_width = letter[0]
                 x = (page_width - logo_width) / 2
-                y = letter[1] - 1.4 * inch
+                y = letter[1] - 1.7 * inch
                 canvas.drawImage(logo, x, y, width=logo_width, height=logo_height, preserveAspectRatio=True, mask='auto')
         except Exception as e:
             print(f"Error dibujando logo: {e}")
 
-    doc.build(elements, onFirstPage=draw_logo, onLaterPages=draw_logo)
+    def draw_no_logo(canvas, doc):
+        """Páginas siguientes sin logo"""
+        pass
+
+    doc.build(elements, onFirstPage=draw_logo_first_page, onLaterPages=draw_no_logo)
     output.seek(0)
 
     return send_file(
@@ -2943,7 +2959,7 @@ def exportar_resumen_pdf(id):
 
     datos_principales = [
         ['INFORMACIÓN GENERAL', ''],
-        ['N° de Expediente:', expediente.numero_expediente if expediente.numero_expediente != '-' else 'No aplica (Administrativo)'],
+        ['N° de Expediente:', f"<b>{expediente.numero_expediente if expediente.numero_expediente != '-' else 'No aplica (Administrativo)'}</b>"],
         ['Tipo de Proceso:', expediente.get_tipo_label()],
         ['Estado Actual:', expediente.get_estado_label()],
         ['', ''],
@@ -3089,20 +3105,26 @@ def exportar_resumen_pdf(id):
         nota_estilo
     ))
 
-    def draw_logo(canvas, doc):
+    def draw_logo_first_page(canvas, doc):
+        """Dibuja logo SOLO en la primera página"""
         try:
             logo = get_logo_image()
             if logo:
-                logo_width = 1.5 * inch
-                logo_height = 1.2 * inch
+                # Logo más grande: 2.0 x 1.6 pulgadas
+                logo_width = 2.0 * inch
+                logo_height = 1.6 * inch
                 page_width = letter[0]
                 x = (page_width - logo_width) / 2
-                y = letter[1] - 1.4 * inch
+                y = letter[1] - 1.7 * inch
                 canvas.drawImage(logo, x, y, width=logo_width, height=logo_height, preserveAspectRatio=True, mask='auto')
         except Exception as e:
             print(f"Error dibujando logo: {e}")
 
-    doc.build(elements, onFirstPage=draw_logo, onLaterPages=draw_logo)
+    def draw_no_logo(canvas, doc):
+        """Páginas siguientes sin logo"""
+        pass
+
+    doc.build(elements, onFirstPage=draw_logo_first_page, onLaterPages=draw_no_logo)
     output.seek(0)
 
     return send_file(
