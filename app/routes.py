@@ -2296,7 +2296,15 @@ def exportar_excel(tipo):
 @requiere_login
 @no_cache
 def exportar_pdf(tipo):
-    """Exportar expedientes a PDF (solo Admin/Dev)"""
+    """
+    Exportar expedientes a PDF profesional (solo Admin/Dev)
+
+    Mejoras v2.0:
+    - Logo real del estudio en encabezado de cada página
+    - Tabla con anchos optimizados y estados con colores
+    - Encabezado/pie de página con número de página
+    - Diseño profesional con paleta de colores del estudio
+    """
     if not puede_exportar():
         flash('No tiene permisos para exportar datos', 'error')
         return redirect(url_for('main.index'))
@@ -2308,7 +2316,8 @@ def exportar_pdf(tipo):
 
     if tipo == 'todos':
         expedientes = Expediente.query.order_by(Expediente.fecha_registro.desc()).all()
-        titulo = 'Todos los Expedientes'
+        titulo_reporte = 'Todos los Expedientes'
+        subtitulo = 'Listado completo del estudio jurídico'
     else:
         expedientes = Expediente.query.filter_by(tipo=tipo).order_by(Expediente.fecha_registro.desc()).all()
         titulos = {
@@ -2318,104 +2327,437 @@ def exportar_pdf(tipo):
             'conciliacion': 'Expedientes de Conciliación',
             'archivo': 'Expedientes en Archivo'
         }
-        titulo = titulos.get(tipo, 'Expedientes')
+        titulo_reporte = titulos.get(tipo, 'Expedientes')
+        subtitulo = f'Módulo de {titulo_reporte}'
 
+    # ============================================
+    # CONFIGURACIÓN DEL DOCUMENTO
+    # ============================================
     output = io.BytesIO()
-    doc = SimpleDocTemplate(output, pagesize=letter, topMargin=0.5*inch, bottomMargin=0.5*inch)
-    elements = []
 
-    styles = getSampleStyleSheet()
-    title_style = ParagraphStyle(
-        'CustomTitle',
-        parent=styles['Heading1'],
-        fontSize=16,
-        textColor=colors.HexColor('#1e3a8a'),
-        spaceAfter=20,
-        alignment=1
+    # Márgenes ajustados para encabezado/pie
+    doc = SimpleDocTemplate(
+        output, 
+        pagesize=letter,
+        topMargin=1.4*inch,      # Espacio para header
+        bottomMargin=0.8*inch,   # Espacio para footer
+        leftMargin=0.6*inch,
+        rightMargin=0.6*inch
     )
 
-# --- LOGO DEL ESTUDIO ---
-    # Intentar cargar desde archivo local primero
-    logo_path = os.path.join(os.path.dirname(__file__), 'static', 'images', 'logo-quijandria.png')
-    logo = None
+    elements = []
+    styles = getSampleStyleSheet()
 
-    if os.path.exists(logo_path):
-        try:
-            logo = ImageReader(logo_path)
-        except Exception as e:
-            print(f"Error cargando logo local: {e}")
+    # ============================================
+    # ESTILOS PERSONALIZADOS
+    # ============================================
 
-    # Si no existe localmente, usar base64 incrustado
-    if logo is None:
-        try:
-            # Logo en base64 (reemplazar esta cadena con tu logo real convertido a base64)
-            LOGO_BASE64 = "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"
-            if LOGO_BASE64 != "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":
-                logo_bytes = base64.b64decode(LOGO_BASE64)
-                logo = ImageReader(io.BytesIO(logo_bytes))
-        except Exception as e:
-            print(f"Error cargando logo base64: {e}")
+    # Título principal del estudio
+    estudio_style = ParagraphStyle(
+        'EstudioTitle',
+        parent=styles['Heading1'],
+        fontSize=22,
+        textColor=colors.HexColor('#1e3a8a'),  # Azul corporativo
+        alignment=1,  # Centro
+        spaceAfter=4,
+        fontName='Helvetica-Bold',
+        leading=26
+    )
 
-    if logo:
-        try:
-            logo_img = Table([[logo]], colWidths=[1.5*inch], rowHeights=[1.2*inch])
-            logo_img.setStyle(TableStyle([
-                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-                ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-            ]))
-            elements.append(logo_img)
-            elements.append(Spacer(1, 8))
-        except Exception as e:
-            print(f"Error mostrando logo: {e}")
-    # -------------------------
+    # Subtítulo del sistema
+    sistema_style = ParagraphStyle(
+        'SistemaSubtitle',
+        parent=styles['Normal'],
+        fontSize=10,
+        textColor=colors.HexColor('#64748b'),
+        alignment=1,
+        spaceAfter=16,
+        fontName='Helvetica'
+    )
 
-    elements.append(Paragraph("QUIJANDRIA ABOGADOS EIRL", title_style))
-    elements.append(Paragraph(f"{titulo}", styles['Heading2']))
-    elements.append(Paragraph(f"Fecha de generación: {datetime.now().strftime('%d/%m/%Y %H:%M')}", styles['Normal']))
-    elements.append(Spacer(1, 20))
+    # Título del reporte
+    reporte_style = ParagraphStyle(
+        'ReporteTitle',
+        parent=styles['Heading2'],
+        fontSize=14,
+        textColor=colors.HexColor('#334155'),
+        alignment=1,
+        spaceAfter=6,
+        fontName='Helvetica-Bold',
+        leading=18
+    )
 
-    table_data = [['ID', 'Tipo', 'Identificación', 'Cliente', 'Materia', 'Estado', 'Fecha']]
+    # Subtítulo descriptivo
+    descripcion_style = ParagraphStyle(
+        'DescripcionStyle',
+        parent=styles['Normal'],
+        fontSize=9,
+        textColor=colors.HexColor('#94a3b8'),
+        alignment=1,
+        spaceAfter=12,
+        fontName='Helvetica-Oblique'
+    )
 
-    for exp in expedientes:
-        identificacion = exp.numero_expediente if exp.numero_expediente != '-' else f'DNI: {exp.dni}'
+    # Info de generación
+    info_style = ParagraphStyle(
+        'InfoStyle',
+        parent=styles['Normal'],
+        fontSize=8,
+        textColor=colors.HexColor('#64748b'),
+        alignment=1,
+        spaceAfter=20,
+        fontName='Helvetica'
+    )
+
+    # Estilo para celdas de tabla
+    cell_style = ParagraphStyle(
+        'CellStyle',
+        parent=styles['Normal'],
+        fontSize=8,
+        leading=11,
+        wordWrap='CJK',
+        fontName='Helvetica'
+    )
+
+    cell_bold_style = ParagraphStyle(
+        'CellBoldStyle',
+        parent=styles['Normal'],
+        fontSize=8,
+        leading=11,
+        wordWrap='CJK',
+        fontName='Helvetica-Bold',
+        textColor=colors.HexColor('#1e293b')
+    )
+
+    # ============================================
+    # CONTENIDO DEL ENCABEZADO (primera página)
+    # ============================================
+
+    # Línea decorativa superior
+    elements.append(Table([['']], colWidths=[7*inch], style=TableStyle([
+        ('LINEBELOW', (0, 0), (-1, 0), 2, colors.HexColor('#1e3a8a')),
+        ('BOTTOMPADDING', (0, 0), (-1, 0), 8),
+    ])))
+
+    elements.append(Paragraph("QUIJANDRIA ABOGADOS EIRL", estudio_style))
+    elements.append(Paragraph("Sistema de Gestión de Expedientes Legales", sistema_style))
+
+    # Línea separadora
+    elements.append(Table([['']], colWidths=[7*inch], style=TableStyle([
+        ('LINEBELOW', (0, 0), (-1, 0), 1, colors.HexColor('#cbd5e1')),
+        ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+    ])))
+
+    elements.append(Paragraph(titulo_reporte.upper(), reporte_style))
+    elements.append(Paragraph(subtitulo, descripcion_style))
+    elements.append(Paragraph(
+        f"Generado el {datetime.now().strftime('%d de %B de %Y a las %H:%M')} | "
+        f"Usuario: {session.get('nombre', 'Sistema')} | "
+        f"Total: {len(expedientes)} expedientes",
+        info_style
+    ))
+
+    elements.append(Spacer(1, 16))
+
+    # ============================================
+    # TABLA DE EXPEDIENTES
+    # ============================================
+
+    # Encabezados de tabla
+    headers = ['N°', 'Tipo', 'Identificación', 'Cliente', 'Materia', 'Estado', 'Registro']
+
+    # Datos de la tabla
+    table_data = [headers]
+
+    # Colores de estado
+    colores_estado = {
+        'ingresado': ('#10b981', '#ecfdf5', 'Ingresado'),
+        'en_proceso': ('#3b82f6', '#eff6ff', 'En Proceso'),
+        'audiencia_programada': ('#f59e0b', '#fffbeb', 'Audiencia Programada'),
+        'seguimiento': ('#8b5cf6', '#f5f3ff', 'Seguimiento'),
+        'derivado_juzgado': ('#6366f1', '#eef2ff', 'Derivado a Juzgado'),
+        'proceso_completado': ('#059669', '#d1fae5', 'Proceso Completado'),
+        'resuelto_favorable': ('#10b981', '#ecfdf5', 'Resuelto Favorable'),
+        'resuelto_desfavorable': ('#ef4444', '#fef2f2', 'Resuelto Desfavorable'),
+        'archivado': ('#6b7280', '#f3f4f6', 'Archivado'),
+        'enviado_a_archivo': ('#9ca3af', '#f9fafb', 'Enviado a Archivo'),
+    }
+
+    for idx, exp in enumerate(expedientes, 1):
+        # Identificación según tipo
+        if exp.tipo == 'administrativo':
+            identificacion = f"DNI: {exp.dni or 'N/A'}"
+        else:
+            identificacion = exp.numero_expediente or 'N/A'
+
+        # Cliente truncado si es muy largo
+        cliente = exp.cliente[:28] + '...' if len(exp.cliente) > 28 else exp.cliente
+
+        # Materia truncada
+        materia = exp.materia[:25] + '...' if len(exp.materia) > 25 else exp.materia
+
+        # Estado con color
+        estado_key = exp.estado_actual or 'ingresado'
+        color_info = colores_estado.get(estado_key, ('#6b7280', '#f3f4f6', estado_key.replace('_', ' ').title()))
+
+        # Fecha formateada
+        fecha_reg = exp.fecha_registro.strftime('%d/%m/%Y') if exp.fecha_registro else 'N/A'
+
         table_data.append([
-            str(exp.id),
-            exp.get_tipo_label(),
-            identificacion,
-            exp.cliente[:25] + '...' if len(exp.cliente) > 25 else exp.cliente,
-            exp.materia[:20] + '...' if len(exp.materia) > 20 else exp.materia,
-            exp.get_estado_label(),
-            exp.fecha_registro.strftime('%d/%m/%Y') if exp.fecha_registro else 'N/A'
+            str(idx),
+            Paragraph(exp.get_tipo_label(), cell_style),
+            Paragraph(identificacion, cell_bold_style),
+            Paragraph(cliente, cell_style),
+            Paragraph(materia, cell_style),
+            Paragraph(color_info[2], ParagraphStyle(
+                'EstadoStyle',
+                parent=cell_style,
+                textColor=colors.HexColor(color_info[0]),
+                fontName='Helvetica-Bold',
+                alignment=1
+            )),
+            Paragraph(fecha_reg, ParagraphStyle(
+                'FechaStyle',
+                parent=cell_style,
+                alignment=1
+            ))
         ])
 
-    table = Table(table_data, repeatRows=1)
-    table.setStyle(TableStyle([
+    # ============================================
+    # ESTILO DE TABLA PROFESIONAL
+    # ============================================
+
+    # Anchos de columna optimizados (total = 7.8 pulgadas aprox)
+    col_widths = [0.4*inch, 1.0*inch, 1.3*inch, 1.6*inch, 1.5*inch, 1.2*inch, 0.8*inch]
+
+    table = Table(table_data, colWidths=col_widths, repeatRows=1)
+
+    # Estilo base
+    table_style = TableStyle([
+        # Encabezado
         ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#1e3a8a')),
         ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
-        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
         ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-        ('FONTSIZE', (0, 0), (-1, 0), 10),
-        ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
-        ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
-        ('GRID', (0, 0), (-1, -1), 1, colors.black),
-        ('FONTSIZE', (0, 1), (-1, -1), 9),
-        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-    ]))
+        ('FONTSIZE', (0, 0), (-1, 0), 9),
+        ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
+        ('VALIGN', (0, 0), (-1, 0), 'MIDDLE'),
+        ('BOTTOMPADDING', (0, 0), (-1, 0), 10),
+        ('TOPPADDING', (0, 0), (-1, 0), 10),
 
+        # Cuerpo
+        ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
+        ('FONTSIZE', (0, 1), (-1, -1), 8),
+        ('ALIGN', (0, 1), (0, -1), 'CENTER'),      # N° centrado
+        ('ALIGN', (1, 1), (1, -1), 'CENTER'),      # Tipo centrado
+        ('ALIGN', (2, 1), (2, -1), 'LEFT'),        # Identificación izquierda
+        ('ALIGN', (3, 1), (3, -1), 'LEFT'),        # Cliente izquierda
+        ('ALIGN', (4, 1), (4, -1), 'LEFT'),        # Materia izquierda
+        ('ALIGN', (5, 1), (5, -1), 'CENTER'),      # Estado centrado
+        ('ALIGN', (6, 1), (6, -1), 'CENTER'),      # Fecha centrado
+        ('VALIGN', (0, 1), (-1, -1), 'MIDDLE'),
+        ('BOTTOMPADDING', (0, 1), (-1, -1), 6),
+        ('TOPPADDING', (0, 1), (-1, -1), 6),
+        ('LEFTPADDING', (0, 0), (-1, -1), 6),
+        ('RIGHTPADDING', (0, 0), (-1, -1), 6),
+
+        # Grid
+        ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#e2e8f0')),
+        ('BOX', (0, 0), (-1, -1), 1, colors.HexColor('#cbd5e1')),
+
+        # Filas alternadas
+        ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.HexColor('#ffffff'), colors.HexColor('#f8fafc')]),
+    ])
+
+    # Aplicar colores de estado a las celdas de estado
+    for row_idx, exp in enumerate(expedientes, 1):
+        estado_key = exp.estado_actual or 'ingresado'
+        color_info = colores_estado.get(estado_key, ('#6b7280', '#f3f4f6'))
+        table_style.add('BACKGROUND', (5, row_idx), (5, row_idx), colors.HexColor(color_info[1]))
+
+    table.setStyle(table_style)
     elements.append(table)
+
     elements.append(Spacer(1, 20))
 
-    elements.append(Paragraph(f"Total de expedientes: {len(expedientes)}", styles['Normal']))
-    elements.append(Paragraph("Sistema de Gestión de Expedientes Legales - Quijandria Abogados", styles['Italic']))
+    # ============================================
+    # RESUMEN INFERIOR
+    # ============================================
 
-    doc.build(elements)
+    # Línea separadora
+    elements.append(Table([['']], colWidths=[7*inch], style=TableStyle([
+        ('LINEBELOW', (0, 0), (-1, 0), 1, colors.HexColor('#cbd5e1')),
+        ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+    ])))
+
+    # Contadores por estado
+    resumen_data = [['RESUMEN POR ESTADO', '']]
+
+    from collections import Counter
+    estados_count = Counter([exp.estado_actual or 'ingresado' for exp in expedientes])
+
+    for estado_key, count in sorted(estados_count.items()):
+        color_info = colores_estado.get(estado_key, ('#6b7280', '#f3f4f6'))
+        label = color_info[2]
+        resumen_data.append([
+            Paragraph(f"<font color='{color_info[0]}'>●</font> {label}", cell_style),
+            Paragraph(str(count), ParagraphStyle('CountStyle', parent=cell_bold_style, alignment=1))
+        ])
+
+    resumen_data.append([
+        Paragraph('<b>TOTAL DE EXPEDIENTES</b>', ParagraphStyle('TotalStyle', parent=cell_bold_style, textColor=colors.HexColor('#1e3a8a'))),
+        Paragraph(str(len(expedientes)), ParagraphStyle('TotalCount', parent=cell_bold_style, alignment=1, textColor=colors.HexColor('#1e3a8a'), fontSize=10))
+    ])
+
+    resumen_table = Table(resumen_data, colWidths=[3*inch, 2*inch])
+    resumen_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#1e3a8a')),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, 0), 10),
+        ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
+        ('SPAN', (0, 0), (-1, 0)),
+        ('BOTTOMPADDING', (0, 0), (-1, 0), 8),
+        ('TOPPADDING', (0, 0), (-1, 0), 8),
+        ('FONTNAME', (0, 1), (-1, -2), 'Helvetica'),
+        ('FONTSIZE', (0, 1), (-1, -2), 9),
+        ('ALIGN', (0, 1), (0, -2), 'LEFT'),
+        ('ALIGN', (1, 1), (1, -2), 'CENTER'),
+        ('BOTTOMPADDING', (0, 1), (-1, -2), 4),
+        ('TOPPADDING', (0, 1), (-1, -2), 4),
+        ('BACKGROUND', (0, -1), (-1, -1), colors.HexColor('#f1f5f9')),
+        ('FONTNAME', (0, -1), (-1, -1), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, -1), (-1, -1), 10),
+        ('BOTTOMPADDING', (0, -1), (-1, -1), 8),
+        ('TOPPADDING', (0, -1), (-1, -1), 8),
+        ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#e2e8f0')),
+        ('BOX', (0, 0), (-1, -1), 1, colors.HexColor('#cbd5e1')),
+        ('LEFTPADDING', (0, 0), (-1, -1), 8),
+        ('RIGHTPADDING', (0, 0), (-1, -1), 8),
+    ]))
+
+    elements.append(resumen_table)
+
+    elements.append(Spacer(1, 30))
+
+    # Nota confidencial
+    elements.append(Paragraph(
+        "<i>Este documento es confidencial y de uso exclusivo del estudio jurídico Quijandria Abogados EIRL. "
+        "Su reproducción o distribución sin autorización está prohibida.</i>",
+        ParagraphStyle(
+            'Confidencial',
+            parent=styles['Normal'],
+            fontSize=7,
+            textColor=colors.HexColor('#94a3b8'),
+            alignment=1,
+            fontName='Helvetica-Oblique'
+        )
+    ))
+
+    # ============================================
+    # FUNCIONES DE ENCABEZADO Y PIE DE PÁGINA
+    # ============================================
+
+    def draw_header_footer(canvas, doc):
+        """Dibuja logo, línea decorativa y pie de página en cada hoja"""
+        canvas.saveState()
+
+        # --- LOGO EN ESQUINA SUPERIOR IZQUIERDA ---
+        try:
+            logo = get_logo_image()
+            if logo:
+                logo_width = 0.9 * inch
+                logo_height = 0.7 * inch
+                x = 0.6 * inch  # Margen izquierdo
+                y = letter[1] - 0.9 * inch  # Arriba
+                canvas.drawImage(
+                    logo, x, y, 
+                    width=logo_width, height=logo_height, 
+                    preserveAspectRatio=True, mask='auto'
+                )
+        except Exception as e:
+            print(f"Error dibujando logo en header: {e}")
+
+        # --- TEXTO DEL ESTUDIO (arriba derecha) ---
+        canvas.setFont('Helvetica-Bold', 9)
+        canvas.setFillColor(colors.HexColor('#1e3a8a'))
+        canvas.drawRightString(
+            letter[0] - 0.6*inch, 
+            letter[1] - 0.6*inch, 
+            "QUIJANDRIA ABOGADOS EIRL"
+        )
+
+        canvas.setFont('Helvetica', 7)
+        canvas.setFillColor(colors.HexColor('#64748b'))
+        canvas.drawRightString(
+            letter[0] - 0.6*inch, 
+            letter[1] - 0.75*inch, 
+            "Sistema de Gestión de Expedientes Legales"
+        )
+
+        # --- LÍNEA DECORATIVA SUPERIOR ---
+        canvas.setStrokeColor(colors.HexColor('#1e3a8a'))
+        canvas.setLineWidth(1.5)
+        canvas.line(
+            0.6*inch, 
+            letter[1] - 1.0*inch, 
+            letter[0] - 0.6*inch, 
+            letter[1] - 1.0*inch
+        )
+
+        # --- PIE DE PÁGINA ---
+        # Línea decorativa inferior
+        canvas.setStrokeColor(colors.HexColor('#cbd5e1'))
+        canvas.setLineWidth(0.5)
+        canvas.line(
+            0.6*inch, 
+            0.5*inch, 
+            letter[0] - 0.6*inch, 
+            0.5*inch
+        )
+
+        # Texto izquierdo del pie
+        canvas.setFont('Helvetica', 7)
+        canvas.setFillColor(colors.HexColor('#94a3b8'))
+        canvas.drawString(
+            0.6*inch, 
+            0.35*inch, 
+            f"Generado: {datetime.now().strftime('%d/%m/%Y %H:%M')} | Usuario: {session.get('nombre', 'Sistema')}"
+        )
+
+        # Texto centro del pie
+        canvas.setFont('Helvetica-Oblique', 7)
+        canvas.setFillColor(colors.HexColor('#94a3b8'))
+        canvas.drawCentredString(
+            letter[0] / 2, 
+            0.35*inch, 
+            "Documento Confidencial - Uso Exclusivo del Estudio"
+        )
+
+        # Número de página (derecha)
+        canvas.setFont('Helvetica-Bold', 8)
+        canvas.setFillColor(colors.HexColor('#1e3a8a'))
+        canvas.drawRightString(
+            letter[0] - 0.6*inch, 
+            0.35*inch, 
+            f"Página {doc.page}"
+        )
+
+        canvas.restoreState()
+
+    # ============================================
+    # CONSTRUIR PDF
+    # ============================================
+    doc.build(elements, onFirstPage=draw_header_footer, onLaterPages=draw_header_footer)
     output.seek(0)
+
+    # Nombre del archivo
+    nombre_archivo = titulo_reporte.replace(' ', '_')
 
     return send_file(
         output,
         mimetype='application/pdf',
         as_attachment=True,
-        download_name=f'{titulo.replace(" ", "_")}_{datetime.now().strftime("%Y%m%d")}.pdf'
+        download_name=f'{nombre_archivo}_{datetime.now().strftime("%Y%m%d_%H%M")}.pdf'
     )
 
 # ============================================
@@ -3300,3 +3642,5 @@ def oauth2callback():
 # ============================================
 # FIN DEL ARCHIVO
 # ============================================
+
+exportar_pdf
