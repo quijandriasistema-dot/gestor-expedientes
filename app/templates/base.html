@@ -34,13 +34,18 @@
             color: white !important;
         }
         
-        /* Logo en el navbar */
+        /* Logo en el navbar principal */
         .navbar-logo {
-            height: 40px;
-            width: 40px;
+            height: 55px;
+            width: 55px;
             object-fit: contain;
-            margin-right: 0.5rem;
-            filter: drop-shadow(0 2px 4px rgba(0,0,0,0.2));
+            margin-right: 0.75rem;
+            filter: drop-shadow(0 3px 6px rgba(0,0,0,0.3));
+            transition: transform 0.2s ease;
+        }
+        
+        .navbar-brand:hover .navbar-logo {
+            transform: scale(1.08);
         }
         
         .nav-link {
