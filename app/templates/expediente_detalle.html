@@ -15,7 +15,7 @@
         </div>
 
         <div class="header-actions">
-            {% if puede_exportar() %}
+            {% if rol in ['DESARROLLADOR', 'ADMINISTRADOR', 'USUARIO'] %}
             <div class="action-group">
                 <span class="action-label">Exportar:</span>
                 <a href="{{ url_for('main.exportar_resumen_pdf', id=expediente.id) }}" class="btn btn-action btn-resumen-pdf" title="Resumen PDF para cliente">
