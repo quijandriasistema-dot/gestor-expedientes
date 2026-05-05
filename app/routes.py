@@ -2903,19 +2903,10 @@ def imprimir_expediente_pdf(id):
     elif expediente.tipo == 'archivo':
         info_data.append(['Ubicación en Archivo', Paragraph(expediente.ubicacion_archivo or 'No especificada', wrap_style)])
 
-    # ========== DESCRIPCIÓN: RESUMEN EN TABLA, COMPLETA DESPUÉS ==========
+    # ========== DESCRIPCIÓN COMPLETA EN TABLA (FLUJO CONTINUO) ==========
     descripcion_texto = expediente.descripcion or 'Sin descripción'
-    descripcion_larga = len(descripcion_texto) > 400
-    
-    if descripcion_larga:
-        # Si es larga, poner solo un resumen en la tabla
-        resumen_desc = descripcion_texto[:400] + "...<br/><i>(Ver descripción completa en la siguiente página)</i>"
-        descripcion_formateada = '<br/>'.join(resumen_desc.split('\n'))
-        info_data.append(['Descripción', Paragraph(descripcion_formateada, wrap_style)])
-    else:
-        # Si es corta, va completa en la tabla
-        descripcion_formateada = '<br/>'.join(descripcion_texto.split('\n'))
-        info_data.append(['Descripción', Paragraph(descripcion_formateada, wrap_style)])
+    descripcion_formateada = '<br/>'.join(descripcion_texto.split('\n'))
+    info_data.append(['Descripción', Paragraph(descripcion_formateada, wrap_style)])
 
     info_table = Table(info_data, colWidths=[2*inch, 5*inch])
     info_table.setStyle(TableStyle([
@@ -2935,33 +2926,6 @@ def imprimir_expediente_pdf(id):
         ('BOTTOMPADDING', (0, 1), (-1, -1), 6),
     ]))
     elements.append(info_table)
-
-    # ========== DESCRIPCIÓN COMPLETA (SI ERA LARGA) ==========
-    if descripcion_larga and expediente.descripcion:
-        from reportlab.platypus import PageBreak
-        
-        elements.append(PageBreak())
-        elements.append(Paragraph("📄 DESCRIPCIÓN COMPLETA DEL CASO", section_style))
-        
-        desc_box_style = ParagraphStyle(
-            'DescBoxLarga',
-            parent=styles['Normal'],
-            fontSize=9,
-            textColor=colors.HexColor('#334155'),
-            leading=13,
-            wordWrap='CJK',
-            leftIndent=12,
-            rightIndent=12,
-            spaceBefore=10,
-            spaceAfter=10,
-            backColor=colors.HexColor('#f8fafc'),
-            borderColor=colors.HexColor('#e2e8f0'),
-            borderWidth=1,
-            borderPadding=10
-        )
-        
-        descripcion_formateada = '<br/>'.join(expediente.descripcion.split('\n'))
-        elements.append(Paragraph(descripcion_formateada, desc_box_style))
 
     if historial:
         elements.append(Spacer(1, 15))
@@ -3479,10 +3443,8 @@ def exportar_resumen_pdf(id):
     elements.append(tabla)
     elements.append(Spacer(1, 20))
 
-    # ========== SECCIÓN DESCRIPCIÓN CON SALTO DE PÁGINA AUTOMÁTICO ==========
+    # ========== SECCIÓN DESCRIPCIÓN CONTINUA CON RECUADRO ==========
     if expediente.descripcion:
-        from reportlab.platypus import PageBreak
-        
         desc_style = ParagraphStyle(
             'Desc',
             parent=styles['Normal'],
@@ -3494,7 +3456,7 @@ def exportar_resumen_pdf(id):
             wordWrap='CJK'
         )
         
-        # Estilo con recuadro visual profesional (simula la tabla anterior)
+        # Estilo con recuadro visual profesional
         desc_box_style = ParagraphStyle(
             'DescBox',
             parent=desc_style,
@@ -3513,14 +3475,7 @@ def exportar_resumen_pdf(id):
         descripcion_texto = expediente.descripcion
         descripcion_formateada = '<br/>'.join(descripcion_texto.split('\n')) if descripcion_texto else 'Sin descripción'
         
-        # Si la descripción es muy larga (>1500 caracteres), forzar salto de página antes
-        # para que no rompa el layout de la tabla anterior
-        if len(descripcion_texto) > 1500:
-            elements.append(PageBreak())
-            elements.append(Paragraph("<b>DESCRIPCIÓN DEL CASO (CONTINUACIÓN):</b>", desc_style))
-        
-        # Paragraph directo permite división automática entre páginas
-        # Mantiene el recuadro visual con fondo, borde y padding
+        # Paragraph maneja división automática entre páginas
         desc_para = Paragraph(descripcion_formateada, desc_box_style)
         elements.append(desc_para)
         
