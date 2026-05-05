@@ -1,0 +1,621 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="dashboard">
+    <!-- Header -->
+    <div class="dashboard-header">
+        <div class="studio-display">
+            <span class="scales-icon">⚖️</span>
+            <div class="studio-name-main">Quijandria Abogados</div>
+        </div>
+        <div class="welcome-text">Sistema de Gestión de Expedientes Legales</div>
+    </div>
+    
+    <!-- Título de la página -->
+    <h1 style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.5rem;">
+        <span>➕</span>
+        <span>Nuevo Expediente</span>
+    </h1>
+    <p style="color: var(--color-text-light); margin-bottom: 1.5rem;">
+        Complete los datos en el orden indicado. Los campos con * son obligatorios.
+    </p>
+    
+    <!-- Formulario -->
+    <div class="form-container">
+        <form method="POST" action="{{ url_for('main.nuevo_expediente') }}" novalidate>
+            {{ form.hidden_tag() }}
+            
+            <!-- Campo oculto: estado inicial -->
+            <input type="hidden" name="estado_actual" value="ingresado">
+            
+            <!-- Campo oculto: usuario que registra -->
+            <input type="hidden" name="usuario_registro" value="{{ session.get('usuario', 'sistema') }}">
+            
+            <!-- ============================================ -->
+            <!-- SECCIÓN 1: Tipo de Expediente -->
+            <!-- ============================================ -->
+            <div class="form-section">
+                <h3><span>📋</span> Tipo de Expediente *</h3>
+                <div class="form-row">
+                    <div class="form-col-2">
+                        <div class="form-group">
+                            {{ form.tipo.label }}
+                            {{ form.tipo(class="form-control", id="tipo") }}
+                            {% if form.tipo.errors %}
+                                {% for error in form.tipo.errors %}
+                                    <span class="error">{{ error }}</span>
+                                {% endfor %}
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- ============================================ -->
+            <!-- SECCIÓN 2: Identificación del Caso -->
+            <!-- ============================================ -->
+            <div class="form-section" id="seccion-identificacion">
+                <h3><span>🆔</span> Identificación del Caso</h3>
+                
+                <!-- DNI - Visible para: Administrativo, Penal, Conciliación, Archivo -->
+                <div class="form-row" id="campo-dni-container" style="display: none;">
+                    <div class="form-col-2">
+                        <div class="form-group">
+                            <label for="dni" id="label-dni">DNI</label>
+                            <div style="display: flex; gap: 0.5rem; align-items: center;">
+                                {{ form.dni(class="form-control", id="dni", placeholder="Ingrese DNI y presione Tab o Enter para buscar") }}
+                                <span id="icono-busqueda" style="display: none; color: var(--color-accent);">🔍</span>
+                            </div>
+                            <small id="ayuda-dni" style="color: var(--color-text-light); font-size: 0.85rem; display: none;">
+                                Ingrese un DNI y presione <strong>Tab</strong> o <strong>Enter</strong> para autocompletar
+                            </small>
+                            {% if form.dni.errors %}
+                                {% for error in form.dni.errors %}
+                                    <span class="error">{{ error }}</span>
+                                {% endfor %}
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- N° Expediente - Visible para: Civil, Penal, Conciliación, Archivo -->
+                <!-- Oculto pero presente para Administrativo (envía vacío) -->
+                <div class="form-row" id="campo-expediente-container" style="display: none;">
+                    <div class="form-col-2">
+                        <div class="form-group">
+                            <label for="numero_expediente" id="label-expediente">N° de Expediente <span id="required-expediente" style="color: #dc2626;">*</span></label>
+                            {{ form.numero_expediente(class="form-control", id="numero_expediente") }}
+                            {% if form.numero_expediente.errors %}
+                                {% for error in form.numero_expediente.errors %}
+                                    <span class="error">{{ error }}</span>
+                                {% endfor %}
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- ============================================ -->
+            <!-- SECCIÓN 3: Materia / Asunto (ÚNICA - para todos los tipos) -->
+            <!-- ============================================ -->
+            <div class="form-section" id="seccion-materia">
+                <h3><span>📄</span> Materia / Asunto *</h3>
+                
+                <div class="form-row">
+                    <div class="form-col-2">
+                        <div class="form-group">
+                            {{ form.materia.label }}
+                            {{ form.materia(class="form-control", id="materia") }}
+                            {% if form.materia.errors %}
+                                {% for error in form.materia.errors %}
+                                    <span class="error">{{ error }}</span>
+                                {% endfor %}
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- ============================================ -->
+            <!-- SECCIÓN 4: Campos Específicos por Tipo -->
+            <!-- ============================================ -->
+            
+            <!-- 4A: Ubicación Física (solo Archivo) -->
+            <div class="form-section campos-especificos" id="campos-archivo-ubicacion" style="display: none;">
+                <h3><span>📦</span> Ubicación Física del Expediente</h3>
+                <div class="form-group">
+                    {{ form.ubicacion_archivo.label }}
+                    {{ form.ubicacion_archivo(class="form-control", id="ubicacion_archivo", placeholder="Ej: Estante A - Fila 3 - Caja 12") }}
+                    <small style="color: var(--color-text-light); font-size: 0.85rem;">
+                        Indique la ubicación física exacta donde se encuentra el expediente archivado
+                    </small>
+                </div>
+            </div>
+            
+            <!-- 4B: Información de Conciliación -->
+            <div class="form-section campos-especificos" id="campos-conciliacion" style="display: none;">
+                <h3><span>🤝</span> Información de Conciliación</h3>
+                
+                <div class="form-row">
+                    <div class="form-col-2">
+                        <div class="form-group">
+                            {{ form.conciliador.label }}
+                            {{ form.conciliador(class="form-control", id="conciliador") }}
+                        </div>
+                    </div>
+                    
+                    <div class="form-col-2">
+                        <div class="form-group">
+                            {{ form.solicitante.label }}
+                            {{ form.solicitante(class="form-control", id="solicitante") }}
+                            <small style="color: var(--color-text-light); font-size: 0.85rem;">
+                                Este nombre se copiará automáticamente al campo Cliente
+                            </small>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    {{ form.invitados.label }}
+                    {{ form.invitados(class="form-control", rows=2, id="invitados") }}
+                </div>
+            </div>
+            
+            <!-- 4C: Información Administrativa -->
+            <div class="form-section campos-especificos" id="campos-administrativo" style="display: none;">
+                <h3><span>🏛️</span> Información Administrativa</h3>
+                
+                <div class="form-row">
+                    <div class="form-col-2">
+                        <div class="form-group">
+                            {{ form.entidad_receptora.label }}
+                            {{ form.entidad_receptora(class="form-control") }}
+                        </div>
+                    </div>
+                    
+                    <div class="form-col-2">
+                        <div class="form-group">
+                            {{ form.tramite.label }}
+                            {{ form.tramite(class="form-control") }}
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 4D: Información Judicial (Civil) -->
+            <div class="form-section campos-especificos" id="campos-civil" style="display: none;">
+                <h3><span>⚖️</span> Información Judicial</h3>
+                
+                <div class="form-row">
+                    <div class="form-col-2">
+                        <div class="form-group">
+                            {{ form.secretario.label }}
+                            {{ form.secretario(class="form-control") }}
+                        </div>
+                    </div>
+                    
+                    <div class="form-col-2">
+                        <div class="form-group">
+                            {{ form.juez.label }}
+                            {{ form.juez(class="form-control") }}
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    {{ form.juzgado.label }}
+                    {{ form.juzgado(class="form-control", placeholder="Ej: Juzgado Civil de Lima") }}
+                </div>
+            </div>
+            
+            <!-- 4E: Información Penal -->
+            <div class="form-section campos-especificos" id="campos-penal" style="display: none;">
+                <h3><span>🚔</span> Información Penal</h3>
+                
+                <div class="form-row">
+                    <div class="form-col-2">
+                        <div class="form-group">
+                            {{ form.numero_cf.label }}
+                            {{ form.numero_cf(class="form-control") }}
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="form-row">
+                    <div class="form-col-2">
+                        <div class="form-group">
+                            {{ form.fiscal.label }}
+                            {{ form.fiscal(class="form-control") }}
+                        </div>
+                    </div>
+                    
+                    <div class="form-col-2">
+                        <div class="form-group">
+                            {{ form.juzgado.label }}
+                            {{ form.juzgado(class="form-control", placeholder="Ej: Juzgado Penal de Lima") }}
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- ============================================ -->
+            <!-- SECCIÓN 5: Datos del Cliente (para todos) -->
+            <!-- ============================================ -->
+            <div class="form-section" id="seccion-cliente">
+                <h3><span>👤</span> Datos del Cliente</h3>
+                
+                <div class="form-row">
+                    <div class="form-col-2">
+                        <div class="form-group">
+                            <label for="cliente" id="label-cliente">Cliente / Interesado *</label>
+                            {{ form.cliente(class="form-control", id="cliente") }}
+                            {% if form.cliente.errors %}
+                                {% for error in form.cliente.errors %}
+                                    <span class="error">{{ error }}</span>
+                                {% endfor %}
+                            {% endif %}
+                            <small id="ayuda-cliente" style="color: var(--color-text-light); font-size: 0.85rem;">
+                                Ingrese los apellidos y nombres completos
+                            </small>
+                        </div>
+                    </div>
+                    
+                    <div class="form-col-2">
+                        <div class="form-group">
+                            {{ form.telefono.label }}
+                            {{ form.telefono(class="form-control", id="telefono") }}
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- ============================================ -->
+            <!-- SECCIÓN 6: Descripción / Notas (AL FINAL) -->
+            <!-- ============================================ -->
+            <div class="form-section">
+                <h3><span>📝</span> Descripción / Notas Adicionales</h3>
+                
+                <div class="form-group">
+                    {{ form.descripcion.label }}
+                    {{ form.descripcion(class="form-control", rows=4) }}
+                    <small style="color: var(--color-text-light); font-size: 0.85rem;">
+                        Ingrese datos adicionales, notas, observaciones o cualquier información complementaria
+                    </small>
+                </div>
+            </div>
+            
+            <!-- ============================================ -->
+            <!-- BOTONES DE ACCIÓN -->
+            <!-- ============================================ -->
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary btn-lg" id="btn-guardar">
+                    💾 Guardar Expediente
+                </button>
+                <a href="{{ url_for('main.expedientes') }}" class="btn btn-secondary btn-lg">
+                    ❌ Cancelar
+                </a>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+    // ============================================
+    // CONFIGURACIÓN DE CAMPOS SEGÚN TIPO
+    // ============================================
+    const configuracionTipos = {
+        'administrativo': {
+            muestraDNI: true,
+            dniObligatorio: true,
+            muestraExpediente: false,
+            labelDNI: 'DNI *',
+            labelCliente: 'Cliente / Interesado *',
+            placeholderDNI: 'Ingrese DNI y presione Tab o Enter para buscar cliente...',
+            ayudaDNI: 'Ingrese un DNI y presione <strong>Tab</strong> o <strong>Enter</strong> para autocompletar',
+            ayudaCliente: 'Ingrese los apellidos y nombres completos',
+            camposEspecificos: ['campos-administrativo'],
+            sincronizarSolicitanteCliente: false
+        },
+        'civil': {
+            muestraDNI: false,
+            dniObligatorio: false,
+            muestraExpediente: true,
+            labelDNI: 'DNI',
+            labelCliente: 'Cliente / Interesado *',
+            placeholderDNI: '',
+            ayudaDNI: '',
+            ayudaCliente: 'Ingrese los apellidos y nombres completos',
+            camposEspecificos: ['campos-civil'],
+            sincronizarSolicitanteCliente: false
+        },
+        'penal': {
+            muestraDNI: true,
+            dniObligatorio: false,
+            muestraExpediente: true,
+            labelDNI: 'DNI (Opcional)',
+            labelCliente: 'Cliente / Interesado *',
+            placeholderDNI: 'Ingrese DNI y presione Tab o Enter para buscar...',
+            ayudaDNI: 'Ingrese un DNI y presione <strong>Tab</strong> o <strong>Enter</strong> para autocompletar (opcional)',
+            ayudaCliente: 'Ingrese los apellidos y nombres completos',
+            camposEspecificos: ['campos-penal'],
+            sincronizarSolicitanteCliente: false
+        },
+        'conciliacion': {
+            muestraDNI: true,
+            dniObligatorio: false,
+            muestraExpediente: true,
+            labelDNI: 'DNI (Opcional)',
+            labelCliente: 'Solicitante Principal *',
+            placeholderDNI: 'Ingrese DNI y presione Tab o Enter para buscar...',
+            ayudaDNI: 'Ingrese un DNI y presione <strong>Tab</strong> o <strong>Enter</strong> para autocompletar (opcional)',
+            ayudaCliente: 'Se copia automáticamente del campo Solicitante (puede editarlo si es necesario)',
+            camposEspecificos: ['campos-conciliacion'],
+            sincronizarSolicitanteCliente: true
+        },
+        'archivo': {
+            muestraDNI: true,
+            dniObligatorio: false,
+            muestraExpediente: true,
+            labelDNI: 'DNI (Opcional)',
+            labelCliente: 'Cliente / Interesado *',
+            placeholderDNI: 'Ingrese DNI y presione Tab o Enter para buscar...',
+            ayudaDNI: 'Ingrese un DNI y presione <strong>Tab</strong> o <strong>Enter</strong> para autocompletar (opcional)',
+            ayudaCliente: 'Ingrese los apellidos y nombres completos',
+            camposEspecificos: ['campos-archivo-ubicacion'],
+            sincronizarSolicitanteCliente: false
+        }
+    };
+    
+    // ============================================
+    // FUNCIÓN PRINCIPAL: Actualizar campos según tipo
+    // ============================================
+    function actualizarCamposSegunTipo() {
+        const tipo = document.getElementById('tipo').value;
+        const config = configuracionTipos[tipo];
+        
+        if (!config) return;
+        
+        // --- DNI ---
+        const dniContainer = document.getElementById('campo-dni-container');
+        const dniLabel = document.getElementById('label-dni');
+        const dniInput = document.getElementById('dni');
+        const dniAyuda = document.getElementById('ayuda-dni');
+        
+        if (config.muestraDNI) {
+            dniContainer.style.display = 'flex';
+            dniLabel.textContent = config.labelDNI;
+            dniInput.placeholder = config.placeholderDNI;
+            dniAyuda.innerHTML = config.ayudaDNI;
+            dniAyuda.style.display = 'block';
+            configurarBusquedaAutomatica(dniInput);
+        } else {
+            dniContainer.style.display = 'none';
+            dniInput.value = '';
+        }
+        
+        // --- N° Expediente ---
+        const expedienteContainer = document.getElementById('campo-expediente-container');
+        const expedienteInput = document.getElementById('numero_expediente');
+        const requiredExpediente = document.getElementById('required-expediente');
+        
+        if (config.muestraExpediente) {
+            expedienteContainer.style.display = 'flex';
+            expedienteInput.value = '';
+            if (requiredExpediente) requiredExpediente.style.display = 'inline';
+        } else {
+            expedienteContainer.style.display = 'none';
+            expedienteInput.value = '';  // ✅ Enviar vacío, no '-'
+            if (requiredExpediente) requiredExpediente.style.display = 'none';
+        }
+        
+        // --- Cliente ---
+        const clienteLabel = document.getElementById('label-cliente');
+        const clienteAyuda = document.getElementById('ayuda-cliente');
+        if (clienteLabel) clienteLabel.textContent = config.labelCliente;
+        if (clienteAyuda) clienteAyuda.textContent = config.ayudaCliente;
+        
+        // --- Campos específicos ---
+        document.querySelectorAll('.campos-especificos').forEach(el => el.style.display = 'none');
+        if (config.camposEspecificos) {
+            config.camposEspecificos.forEach(id => {
+                const el = document.getElementById(id);
+                if (el) el.style.display = 'block';
+            });
+        }
+        
+        // --- Sincronización Solicitante → Cliente ---
+        configurarSincronizacionSolicitanteCliente(config.sincronizarSolicitanteCliente);
+    }
+    
+    // ============================================
+    // SINCRONIZAR SOLICITANTE → CLIENTE
+    // ============================================
+    function configurarSincronizacionSolicitanteCliente(activar) {
+        const solicitanteInput = document.getElementById('solicitante');
+        const clienteInput = document.getElementById('cliente');
+        
+        if (!solicitanteInput || !clienteInput) return;
+        
+        solicitanteInput.removeEventListener('input', sincronizarCliente);
+        
+        if (activar) {
+            clienteInput.readOnly = true;
+            clienteInput.style.backgroundColor = '#f3f4f6';
+            clienteInput.title = 'Este campo se copia automáticamente del Solicitante.';
+            solicitanteInput.addEventListener('input', sincronizarCliente);
+            sincronizarCliente();
+        } else {
+            clienteInput.readOnly = false;
+            clienteInput.style.backgroundColor = '';
+            clienteInput.title = '';
+        }
+    }
+    
+    function sincronizarCliente() {
+        const solicitanteInput = document.getElementById('solicitante');
+        const clienteInput = document.getElementById('cliente');
+        if (solicitanteInput && clienteInput) {
+            clienteInput.value = solicitanteInput.value;
+        }
+    }
+    
+    // ============================================
+    // BÚSQUEDA AUTOMÁTICA POR DNI
+    // ============================================
+    let busquedaEnProgreso = false;
+    
+    function configurarBusquedaAutomatica(inputDNI) {
+        const nuevoInput = inputDNI.cloneNode(true);
+        inputDNI.parentNode.replaceChild(nuevoInput, inputDNI);
+        
+        nuevoInput.addEventListener('keydown', function(e) {
+            if (e.key === 'Tab' || e.key === 'Enter') {
+                const dni = this.value.trim();
+                if (dni && !busquedaEnProgreso) {
+                    e.preventDefault();
+                    realizarBusquedaDNI(dni, this, e.key);
+                }
+            }
+        });
+        
+        let valorAnterior = nuevoInput.value;
+        nuevoInput.addEventListener('blur', function() {
+            const dni = this.value.trim();
+            if (dni && dni !== valorAnterior && !busquedaEnProgreso) {
+                valorAnterior = dni;
+                realizarBusquedaDNI(dni, this, 'blur');
+            }
+        });
+    }
+    
+    function realizarBusquedaDNI(dni, inputElement, teclaPresionada) {
+        busquedaEnProgreso = true;
+        inputElement.style.backgroundColor = '#fef3c7';
+        inputElement.placeholder = '⏳ Buscando cliente...';
+        
+        fetch('/api/buscar-cliente/' + encodeURIComponent(dni))
+            .then(response => response.json())
+            .then(data => {
+                inputElement.style.backgroundColor = '';
+                inputElement.placeholder = configuracionTipos[document.getElementById('tipo').value].placeholderDNI;
+                
+                if (data.encontrado) {
+                    const tipo = document.getElementById('tipo').value;
+                    
+                    if (tipo === 'conciliacion') {
+                        const solicitanteInput = document.getElementById('solicitante');
+                        if (solicitanteInput) {
+                            solicitanteInput.value = data.cliente;
+                            solicitanteInput.dispatchEvent(new Event('input'));
+                        }
+                        document.getElementById('telefono').value = data.telefono || '';
+                    } else {
+                        document.getElementById('cliente').value = data.cliente;
+                        document.getElementById('telefono').value = data.telefono || '';
+                    }
+                    
+                    mostrarMensajeTemporal('✅ Cliente encontrado: ' + data.cliente, 'success');
+                    
+                    if (teclaPresionada === 'Tab') {
+                        if (tipo === 'conciliacion') {
+                            document.getElementById('conciliador')?.focus();
+                        } else if (document.getElementById('telefono').value) {
+                            document.getElementById('materia')?.focus();
+                        } else {
+                            document.getElementById('telefono').focus();
+                        }
+                    }
+                } else {
+                    const tipo = document.getElementById('tipo').value;
+                    
+                    if (tipo === 'conciliacion') {
+                        const solicitanteInput = document.getElementById('solicitante');
+                        if (solicitanteInput) {
+                            solicitanteInput.value = '';
+                            solicitanteInput.dispatchEvent(new Event('input'));
+                            solicitanteInput.focus();
+                        }
+                        document.getElementById('telefono').value = '';
+                    } else {
+                        document.getElementById('cliente').value = '';
+                        document.getElementById('telefono').value = '';
+                    }
+                    
+                    if (teclaPresionada !== 'blur') {
+                        mostrarMensajeTemporal('ℹ️ Cliente nuevo. Ingrese los datos manualmente.', 'info');
+                    }
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                inputElement.style.backgroundColor = '';
+                inputElement.placeholder = configuracionTipos[document.getElementById('tipo').value].placeholderDNI;
+                
+                if (teclaPresionada !== 'blur') {
+                    mostrarMensajeTemporal('❌ Error al buscar. Intente nuevamente.', 'error');
+                }
+            })
+            .finally(function() {
+                busquedaEnProgreso = false;
+            });
+    }
+    
+    // ============================================
+    // MENSAJES TEMPORALES
+    // ============================================
+    function mostrarMensajeTemporal(mensaje, tipo) {
+        const mensajeDiv = document.createElement('div');
+        mensajeDiv.textContent = mensaje;
+        mensajeDiv.style.cssText = `
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 1rem 1.5rem;
+            border-radius: 8px;
+            font-weight: 500;
+            z-index: 1000;
+            animation: slideIn 0.3s ease;
+            max-width: 300px;
+            word-wrap: break-word;
+        `;
+        
+        if (tipo === 'success') {
+            mensajeDiv.style.backgroundColor = '#d1fae5';
+            mensajeDiv.style.color = '#059669';
+        } else if (tipo === 'error') {
+            mensajeDiv.style.backgroundColor = '#fee2e2';
+            mensajeDiv.style.color = '#dc2626';
+        } else {
+            mensajeDiv.style.backgroundColor = '#e0f2fe';
+            mensajeDiv.style.color = '#0369a1';
+        }
+        
+        document.body.appendChild(mensajeDiv);
+        
+        setTimeout(() => {
+            mensajeDiv.style.animation = 'slideOut 0.3s ease';
+            setTimeout(() => mensajeDiv.remove(), 300);
+        }, 3000);
+    }
+    
+    // ============================================
+    // INICIALIZAR
+    // ============================================
+    document.getElementById('tipo').addEventListener('change', actualizarCamposSegunTipo);
+    actualizarCamposSegunTipo();
+    
+    // Estilos de animación
+    const style = document.createElement('style');
+    style.textContent = `
+        @keyframes slideIn {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+        @keyframes slideOut {
+            from { transform: translateX(0); opacity: 1; }
+            to { transform: translateX(100%); opacity: 0; }
+        }
+    `;
+    document.head.appendChild(style);
+</script>
+{% endblock %}

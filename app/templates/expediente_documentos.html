@@ -1,0 +1,166 @@
+{% extends "base.html" %}
+
+{% block title %}Documentos del Expediente - Quijandria Abogados{% endblock %}
+
+{% block content %}
+<div class="dashboard">
+    <!-- Header -->
+    <div class="dashboard-header">
+        <div class="studio-display">
+            <span class="scales-icon">⚖️</span>
+            <div class="studio-name-main">Quijandria Abogados</div>
+        </div>
+        <div class="welcome-text">Sistema de Gestión de Expedientes Legales</div>
+    </div>
+    
+    <!-- Info del expediente -->
+    <div style="background: #e0f2fe; border-left: 4px solid #0369a1; padding: 1rem; margin-bottom: 1.5rem; border-radius: 4px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
+            <div>
+                <strong>📁 Expediente:</strong> {{ expediente.get_identificador_principal() }}<br>
+                <strong>👤 Cliente:</strong> {{ expediente.cliente }}
+            </div>
+            <div>
+                <a href="{{ url_for('main.ver_expediente', id=expediente.id) }}" class="btn btn-secondary" style="text-decoration: none;">
+                    👁️ Ver Expediente
+                </a>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Título -->
+    <h1 style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.5rem;">
+        <span>📂</span>
+        <span>Documentos del Expediente</span>
+        <span style="background: var(--color-accent); color: white; padding: 0.25rem 0.75rem; border-radius: 20px; font-size: 0.9rem;">
+            {{ documentos|length }}
+        </span>
+    </h1>
+    
+    <!-- Acciones -->
+    <div style="display: flex; gap: 1rem; margin-bottom: 1.5rem; flex-wrap: wrap;">
+        <a href="{{ url_for('main.subir_documento_drive', expediente_id=expediente.id) }}" class="btn btn-success btn-lg" style="text-decoration: none;">
+            <span>☁️</span> Subir a Google Drive
+        </a>
+        {% if rol in ['ADMINISTRADOR', 'DESARROLLADOR'] %}
+        <a href="{{ url_for('main.gestionar_espacio') }}" class="btn btn-warning btn-lg" style="background: #f59e0b; color: white; text-decoration: none;">
+            <span>💾</span> Gestionar Espacio
+        </a>
+        {% endif %}
+        <a href="{{ url_for('main.documentos') }}" class="btn btn-secondary btn-lg" style="text-decoration: none;">
+            📁 Todos los Documentos
+        </a>
+    </div>
+    
+    <!-- Listado -->
+    {% if documentos %}
+    <div class="table-container">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>📄 Documento</th>
+                    <th>☁️ Ubicación</th>
+                    <th>🏷️ Tipo</th>
+                    <th>📅 Fecha</th>
+                    <th>👤 Subido por</th>
+                    <th>💾 Tamaño</th>
+                    <th>⚙️ Acciones</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for doc in documentos %}
+                <tr>
+                    <td>
+                        <div style="display: flex; align-items: center; gap: 0.5rem;">
+                            <span style="font-size: 1.5rem;">{{ doc.get_icono() }}</span>
+                            <div>
+                                <strong>{{ doc.titulo }}</strong>
+                                <br>
+                                <small style="color: var(--color-text-light);">{{ doc.nombre_archivo }}</small>
+                                {% if doc.descripcion %}
+                                    <br>
+                                    <small style="color: #6b7280;">{{ doc.descripcion[:50] }}{% if doc.descripcion|length > 50 %}...{% endif %}</small>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </td>
+                    <td style="text-align: center;">
+                        {% if doc.ubicacion == 'drive' %}
+                            <span class="badge badge-primary" title="En Google Drive">
+                                <i class="fab fa-google-drive"></i> Nube
+                            </span>
+                        {% elif doc.ubicacion == 'local' %}
+                            <span class="badge badge-secondary" title="Solo en oficina">
+                                <i class="fas fa-desktop"></i> Local
+                            </span>
+                        {% elif doc.ubicacion == 'ambos' %}
+                            <span class="badge badge-success" title="En ambos lugares">
+                                <i class="fas fa-cloud"></i> Ambos
+                            </span>
+                        {% elif doc.ubicacion == 'archivado_local' %}
+                            <span class="badge badge-warning" title="Documento archivado en oficina">
+                                <i class="fas fa-archive"></i> Archivado
+                            </span>
+                            <div style="margin-top: 0.5rem; padding: 0.5rem; background: #fef3c7; border-radius: 4px; font-size: 0.85rem; color: #92400e;">
+                                ⚠️ Solo oficina
+                            </div>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <span class="badge badge-info">{{ doc.get_tipo_label() }}</span>
+                        {% if doc.fecha_documento %}
+                            <br>
+                            <small style="color: #6b7280;">Doc: {{ doc.fecha_documento.strftime('%d/%m/%Y') }}</small>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {{ doc.fecha_subida.strftime('%d/%m/%Y') if doc.fecha_subida else '-' }}
+                    </td>
+                    <td>{{ doc.usuario_subida or '-' }}</td>
+                    <td>{{ doc.get_tamaño_formateado() }}</td>
+                    <td>
+                        <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+                            <!-- VER: Solo si tiene ID de Drive y está en Drive -->
+                            {% if doc.drive_file_id and doc.ubicacion == 'drive' %}
+                            <a href="{{ url_for('main.ver_documento', id=doc.id) }}" target="_blank" 
+                               class="btn btn-small btn-success" title="Visualizar en Drive" 
+                               style="text-decoration: none;">
+                                👁️ Ver
+                            </a>
+                            {% elif doc.ubicacion == 'archivado_local' %}
+                            <span class="btn btn-small btn-secondary" style="opacity: 0.6; cursor: not-allowed;" title="Documento archivado en oficina">
+                                📁 Archivado
+                            </span>
+                            {% endif %}
+                            
+                            <!-- BOTÓN ELIMINAR COMPLETO (Drive + Supabase) - Solo Admin/Dev -->
+                            {% if rol in ['ADMINISTRADOR', 'DESARROLLADOR'] %}
+                            <form method="POST" action="{{ url_for('main.eliminar_documento', id=doc.id) }}" 
+                                  onsubmit="return confirm('⚠️ ¿ELIMINAR COMPLETAMENTE?\n\nEsta acción eliminará el documento de:\n• Google Drive\n• Base de datos (Supabase)\n\n¿Está seguro? Esta acción NO se puede deshacer.');" 
+                                  style="display: inline;">
+                                <button type="submit" class="btn btn-small btn-danger" title="Eliminar completamente (Drive + Sistema)">
+                                    🗑️ Eliminar
+                                </button>
+                            </form>
+                            {% endif %}
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div style="text-align: center; padding: 3rem; background: white; border-radius: 12px; border: 2px dashed #e5e7eb;">
+        <div style="font-size: 4rem; margin-bottom: 1rem;">📂</div>
+        <h3>No hay documentos en este expediente</h3>
+        <p style="color: var(--color-text-light);">Agregue el primer documento.</p>
+        <div style="display: flex; gap: 1rem; justify-content: center; flex-wrap: wrap;">
+            <a href="{{ url_for('main.subir_documento_drive', expediente_id=expediente.id) }}" class="btn btn-success btn-lg" style="text-decoration: none;">
+                <span>☁️</span> Subir a Google Drive
+            </a>
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

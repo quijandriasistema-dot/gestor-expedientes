@@ -1,0 +1,189 @@
+{% extends "base.html" %}
+
+{% block title %}{{ title }}{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-8">
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="{{ url_for('main.index') }}">Inicio</a></li>
+                <li class="breadcrumb-item"><a href="{{ url_for('main.audiencias') }}">Audiencias</a></li>
+                <li class="breadcrumb-item active">Detalle</li>
+            </ol>
+        </nav>
+        
+        <div class="card mb-4">
+            <div class="card-header d-flex justify-content-between align-items-center 
+                {% if audiencia.estado == 'programada' %}bg-primary text-white
+                {% elif audiencia.estado == 'realizada' %}bg-success text-white
+                {% elif audiencia.estado == 'aplazada' %}bg-warning
+                {% elif audiencia.estado == 'cancelada' %}bg-danger text-white
+                {% else %}bg-secondary text-white{% endif %}">
+                <h4 class="mb-0">
+                    {{ audiencia.get_tipo_label() }}
+                </h4>
+                <span class="badge bg-light text-dark fs-6">
+                    {{ audiencia.get_estado_label() }}
+                </span>
+            </div>
+            <div class="card-body">
+                <div class="row mb-4">
+                    <div class="col-md-6 text-center border-end">
+                        <h1 class="display-4 text-primary mb-0">
+                            {{ audiencia.fecha.strftime('%d') }}
+                        </h1>
+                        <h4 class="text-muted">{{ audiencia.fecha.strftime('%B %Y') }}</h4>
+                        <h3 class="text-primary">
+                            <i class="bi bi-clock"></i> {{ audiencia.hora.strftime('%H:%M') }} hrs
+                        </h3>
+                        {% if audiencia.es_hoy() %}
+                            <span class="badge bg-success fs-5 mt-2">¡ES HOY!</span>
+                        {% elif audiencia.es_proxima() %}
+                            <span class="badge bg-warning fs-6 mt-2">Próximamente</span>
+                        {% endif %}
+                    </div>
+                    <div class="col-md-6">
+                        <h5>Información del Expediente</h5>
+                        <p>
+                            <strong><i class="bi bi-folder"></i> Expediente:</strong><br>
+                            <a href="{{ url_for('main.ver_expediente', id=audiencia.expediente.id) }}" class="fs-5">
+                                {{ audiencia.expediente.get_identificador_principal() }}
+                            </a>
+                        </p>
+                        <p>
+                            <strong><i class="bi bi-person"></i> Cliente:</strong><br>
+                            {{ audiencia.expediente.cliente }}
+                        </p>
+                        <p>
+                            <strong><i class="bi bi-tag"></i> Tipo:</strong><br>
+                            {{ audiencia.expediente.get_tipo_label() }}
+                        </p>
+                        <p>
+                            <strong><i class="bi bi-telephone"></i> Teléfono:</strong><br>
+                            {{ audiencia.expediente.telefono or 'No registrado' }}
+                        </p>
+                    </div>
+                </div>
+                
+                <hr>
+                
+                <div class="row">
+                    <div class="col-md-6">
+                        <h5><i class="bi bi-geo-alt"></i> Ubicación</h5>
+                        <p>
+                            {% if audiencia.lugar %}
+                                <strong>{{ audiencia.lugar }}</strong><br>
+                            {% else %}
+                                <span class="text-muted">No especificado</span>
+                            {% endif %}
+                            {% if audiencia.sala %}
+                                <br>Sala: {{ audiencia.sala }}
+                            {% endif %}
+                        </p>
+                    </div>
+                    <div class="col-md-6">
+                        <h5><i class="bi bi-person-badge"></i> Magistrado</h5>
+                        <p>
+                            {% if audiencia.magistrado %}
+                                {{ audiencia.magistrado }}
+                            {% else %}
+                                <span class="text-muted">No especificado</span>
+                            {% endif %}
+                        </p>
+                    </div>
+                </div>
+                
+                {% if audiencia.link_videollamada %}
+                <div class="alert alert-info">
+                    <h5><i class="bi bi-camera-video"></i> Videollamada</h5>
+                    <a href="{{ audiencia.link_videollamada }}" target="_blank" class="btn btn-primary">
+                        <i class="bi bi-box-arrow-up-right"></i> Unirse a la reunión
+                    </a>
+                    <br>
+                    <small class="text-muted">{{ audiencia.link_videollamada }}</small>
+                </div>
+                {% endif %}
+                
+                {% if audiencia.observaciones %}
+                <div class="alert alert-light border">
+                    <h5><i class="bi bi-chat-left-text"></i> Observaciones</h5>
+                    <p class="mb-0">{{ audiencia.observaciones }}</p>
+                </div>
+                {% endif %}
+                
+                <div class="row text-muted small">
+                    <div class="col-md-6">
+                        <i class="bi bi-person"></i> Registrado por: {{ audiencia.usuario_registro }}
+                    </div>
+                    <div class="col-md-6 text-end">
+                        <i class="bi bi-clock-history"></i> Fecha registro: {{ audiencia.fecha_registro.strftime('%d/%m/%Y %H:%M') }}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-4">
+        <!-- Acciones -->
+        <div class="card mb-3">
+            <div class="card-header bg-light">
+                <h5 class="mb-0"><i class="bi bi-gear"></i> Acciones</h5>
+            </div>
+            <div class="card-body">
+                <a href="{{ url_for('main.editar_audiencia', id=audiencia.id) }}" class="btn btn-warning w-100 mb-2">
+                    <i class="bi bi-pencil"></i> Editar Audiencia
+                </a>
+                
+                {% if audiencia.estado == 'programada' %}
+                <form method="POST" action="{{ url_for('main.cambiar_estado_audiencia', id=audiencia.id) }}" class="mb-2">
+                    <input type="hidden" name="estado" value="realizada">
+                    <button type="submit" class="btn btn-success w-100" onclick="return confirm('¿Confirmar que la audiencia se realizó?')">
+                        <i class="bi bi-check-circle"></i> Marcar como Realizada
+                    </button>
+                </form>
+                
+                <form method="POST" action="{{ url_for('main.cambiar_estado_audiencia', id=audiencia.id) }}" class="mb-2">
+                    <input type="hidden" name="estado" value="aplazada">
+                    <button type="submit" class="btn btn-warning w-100" onclick="return confirm('¿Marcar como aplazada? Deberá programar nueva fecha.')">
+                        <i class="bi bi-pause-circle"></i> Aplazar
+                    </button>
+                </form>
+                
+                <form method="POST" action="{{ url_for('main.cambiar_estado_audiencia', id=audiencia.id) }}" class="mb-2">
+                    <input type="hidden" name="estado" value="cancelada">
+                    <button type="submit" class="btn btn-danger w-100" onclick="return confirm('¿Cancelar esta audiencia?')">
+                        <i class="bi bi-x-circle"></i> Cancelar
+                    </button>
+                </form>
+                {% endif %}
+                
+                {% if rol in ['ADMINISTRADOR', 'DESARROLLADOR'] %}
+                <form method="POST" action="{{ url_for('main.eliminar_audiencia', id=audiencia.id) }}">
+                    <button type="submit" class="btn btn-outline-danger w-100" onclick="return confirm('¿ELIMINAR permanentemente esta audiencia?')">
+                        <i class="bi bi-trash"></i> Eliminar
+                    </button>
+                </form>
+                {% endif %}
+            </div>
+        </div>
+        
+        <!-- Enlace al expediente -->
+        <div class="card">
+            <div class="card-header bg-light">
+                <h5 class="mb-0"><i class="bi bi-folder"></i> Expediente Relacionado</h5>
+            </div>
+            <div class="card-body">
+                <p>
+                    <strong>{{ audiencia.expediente.get_identificador_principal() }}</strong><br>
+                    {{ audiencia.expediente.cliente }}<br>
+                    <span class="badge bg-secondary">{{ audiencia.expediente.get_tipo_label() }}</span>
+                </p>
+                <a href="{{ url_for('main.ver_expediente', id=audiencia.expediente.id) }}" class="btn btn-outline-primary btn-sm w-100">
+                    <i class="bi bi-eye"></i> Ver Expediente
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

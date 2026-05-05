@@ -1,0 +1,828 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="expediente-detalle-container">
+    <!-- Header con acciones -->
+    <div class="detalle-header">
+        <div class="header-info">
+            <h1 class="page-title">
+                <span>📁</span>
+                Expediente {{ expediente.get_identificador_principal() }}
+            </h1>
+            <span class="tipo-badge tipo-{{ expediente.tipo }}">
+                {{ expediente.get_tipo_label() }}
+            </span>
+        </div>
+
+        <div class="header-actions">
+            {% if rol in ['DESARROLLADOR', 'ADMINISTRADOR'] %}
+            <div class="action-group">
+                <span class="action-label">Exportar:</span>
+                <a href="{{ url_for('main.exportar_resumen_pdf', id=expediente.id) }}" class="btn btn-action btn-resumen-pdf" title="Resumen PDF para cliente">
+                    <span>📄</span> Resumen PDF
+                </a>
+                <a href="{{ url_for('main.imprimir_expediente_pdf', id=expediente.id) }}" class="btn btn-action btn-print" target="_blank" title="Imprimir completo">
+                    <span>🖨️</span> Imprimir
+                </a>
+                <a href="{{ url_for('main.exportar_seguimiento_excel', id=expediente.id) }}" class="btn btn-action btn-excel" title="Exportar seguimiento">
+                    <span>📊</span> Excel
+                </a>
+            </div>
+            {% endif %}
+
+            <a href="{{ url_for('main.editar_expediente', id=expediente.id) }}" class="btn btn-action btn-edit">
+                <span>✏️</span> Editar
+            </a>
+
+            <!-- BOTÓN ELIMINAR (solo ADMINISTRADOR y DESARROLLADOR) -->
+            {% if rol in ['ADMINISTRADOR', 'DESARROLLADOR'] %}
+            <form method="POST" action="{{ url_for('main.eliminar_expediente', id=expediente.id) }}" 
+                style="display: inline;" 
+                onsubmit="return confirm('¿Está seguro de eliminar el expediente {{ expediente.get_identificador_principal() }}? Esta acción no se puede deshacer y se eliminarán todos los historiales, audiencias y documentos asociados.');">
+                <button type="submit" class="btn btn-action btn-danger" style="background: #dc2626; color: white; border: none;">
+                    <span>🗑️</span> Eliminar
+                </button>
+            </form>
+            {% endif %}
+
+            <!-- BOTÓN ENVIAR A ARCHIVO (solo si no es archivo y está concluido) -->
+            {% if expediente.tipo != 'archivo' and expediente.estado_actual in ['proceso_completado', 'resuelto_favorable', 'resuelto_desfavorable', 'archivado', 'enviado_a_archivo'] %}
+            <a href="{{ url_for('main.enviar_a_archivo', id=expediente.id) }}" class="btn btn-action btn-archivo" title="Enviar expediente concluido al archivo">
+                <span>🗂️</span> Enviar a Archivo
+            </a>
+            {% endif %}
+
+            <a href="{{ url_for('main.expedientes') }}" class="btn btn-action btn-back">
+                <span>←</span> Volver
+            </a>
+        </div>
+    </div>
+
+    <!-- Información General -->
+    <div class="detalle-section">
+        <h2 class="section-title">
+            <span>📋</span> Información General
+        </h2>
+
+        <div class="info-grid">
+            <div class="info-item">
+                <label>Cliente:</label>
+                <span class="info-value">{{ expediente.cliente }}</span>
+            </div>
+
+            <div class="info-item">
+                <label>DNI:</label>
+                <span class="info-value">{{ expediente.dni or 'No aplica' }}</span>
+            </div>
+
+            <div class="info-item">
+                <label>Teléfono:</label>
+                <span class="info-value">{{ expediente.telefono or 'No registrado' }}</span>
+            </div>
+
+            <div class="info-item">
+                <label>Materia:</label>
+                <span class="info-value">{{ expediente.materia }}</span>
+            </div>
+
+            <div class="info-item">
+                <label>Estado:</label>
+                <span class="badge badge-{{ expediente.get_estado_color() }}">
+                    {{ expediente.get_estado_label() }}
+                </span>
+            </div>
+
+            <div class="info-item">
+                <label>Fecha Registro:</label>
+                <span class="info-value">{{ expediente.fecha_registro | fecha_hora }}</span>
+            </div>
+
+            {% if expediente.tipo == 'civil' %}
+            <div class="info-item">
+                <label>Juez:</label>
+                <span class="info-value">{{ expediente.juez or 'No asignado' }}</span>
+            </div>
+            <div class="info-item">
+                <label>Secretario:</label>
+                <span class="info-value">{{ expediente.secretario or 'No asignado' }}</span>
+            </div>
+            {% endif %}
+
+            {% if expediente.tipo == 'penal' %}
+            <div class="info-item">
+                <label>N° Caso Fiscal:</label>
+                <span class="info-value">{{ expediente.numero_cf or 'No asignado' }}</span>
+            </div>
+            <div class="info-item">
+                <label>Fiscal:</label>
+                <span class="info-value">{{ expediente.fiscal or 'No asignado' }}</span>
+            </div>
+            <div class="info-item">
+                <label>Juzgado:</label>
+                <span class="info-value">{{ expediente.juzgado or 'No asignado' }}</span>
+            </div>
+            {% endif %}
+
+            {% if expediente.tipo == 'administrativo' %}
+            <div class="info-item">
+                <label>Entidad Receptora:</label>
+                <span class="info-value">{{ expediente.entidad_receptora or 'No especificada' }}</span>
+            </div>
+            <div class="info-item">
+                <label>Trámite:</label>
+                <span class="info-value">{{ expediente.tramite or 'No especificado' }}</span>
+            </div>
+            {% endif %}
+
+            {% if expediente.tipo == 'conciliacion' %}
+            <div class="info-item">
+                <label>Conciliador:</label>
+                <span class="info-value">{{ expediente.conciliador or 'No asignado' }}</span>
+            </div>
+            <div class="info-item">
+                <label>Solicitante:</label>
+                <span class="info-value">{{ expediente.solicitante or 'No especificado' }}</span>
+            </div>
+            <div class="info-item">
+                <label>Invitados:</label>
+                <span class="info-value">{{ expediente.invitados or 'No especificados' }}</span>
+            </div>
+            {% endif %}
+
+            {% if expediente.tipo == 'archivo' %}
+            <div class="info-item">
+                <label>Ubicación en Archivo:</label>
+                <span class="info-value">{{ expediente.ubicacion_archivo or 'No especificada' }}</span>
+            </div>
+            <div class="info-item">
+                <label>Fecha de Archivado:</label>
+                <span class="info-value">{{ expediente.fecha_archivado | fecha }}</span>
+            </div>
+            {% endif %}
+        </div>
+
+        <div class="descripcion-box">
+            <label>Descripción:</label>
+            <p>{{ expediente.descripcion or 'Sin descripción' }}</p>
+        </div>
+    </div>
+
+    <!-- ============================================ -->
+    <!-- FORMULARIO: NUEVA ACTUALIZACIÓN DE ESTADO -->
+    <!-- ============================================ -->
+    <div class="detalle-section">
+        <div class="section-header">
+            <h2 class="section-title">
+                <span>➕</span> Nueva Actualización
+            </h2>
+        </div>
+        
+        <form method="POST" action="{{ url_for('main.agregar_estado', id=expediente.id) }}" class="form-actualizacion" novalidate>
+            {{ form_estado.hidden_tag() }}
+            
+            <div class="form-row-actualizacion">
+                <div class="form-group-actualizacion">
+                    <label for="estado">Nuevo Estado *</label>
+                    {{ form_estado.estado(class="form-control", id="estado") }}
+                </div>
+                
+                <div class="form-group-actualizacion flex-grow">
+                    <label for="descripcion">¿Qué se realizó? *</label>
+                    {{ form_estado.descripcion(class="form-control", id="descripcion", placeholder="Ej: Cliente trajo documento X para presentar. Se programó audiencia para el 15/05...") }}
+                </div>
+                
+                <div class="form-group-actualizacion btn-container">
+                    <button type="submit" class="btn btn-primary">
+                        <span>💾</span> Guardar Actualización
+                    </button>
+                </div>
+            </div>
+            <small class="form-hint">
+                💡 <strong>Tip:</strong> Describe detalladamente lo que ocurrió en esta actualización. Esto alimenta el historial completo del caso.
+            </small>
+        </form>
+    </div>
+
+    <!-- ============================================ -->
+    <!-- HISTORIAL DE ESTADOS (TIMELINE MEJORADO) -->
+    <!-- ============================================ -->
+    <div class="detalle-section">
+        <div class="section-header">
+            <h2 class="section-title">
+                <span>📈</span> Historial de Estados y Actuaciones
+            </h2>
+            <span class="count-badge">{{ historial|length }} registros</span>
+        </div>
+
+        {% if historial %}
+        <div class="timeline">
+            {% for h in historial %}
+            <div class="timeline-item">
+                <div class="timeline-marker"></div>
+                <div class="timeline-content">
+                    <div class="timeline-header">
+                        <span class="timeline-estado">{{ h.estado }}</span>
+                        <span class="timeline-fecha">{{ h.fecha | fecha_hora }}</span>
+                    </div>
+                    
+                    <!-- NOTA DESCRIPTIVA (lo importante) -->
+                    <div class="timeline-nota">
+                        <span class="nota-label">📝 Actuación realizada:</span>
+                        <p class="nota-texto">{{ h.descripcion or 'Sin descripción de actuación' }}</p>
+                    </div>
+                    
+                    <div class="timeline-footer">
+                        <span class="timeline-usuario">👤 {{ h.usuario or 'Sistema' }}</span>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="empty-state">
+            <span>📭</span>
+            <p>No hay historial de estados registrado</p>
+            <p class="empty-hint">Use el formulario de arriba para registrar la primera actualización</p>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Audiencias -->
+    <div class="detalle-section">
+        <div class="section-header">
+            <h2 class="section-title">
+                <span>📅</span> Audiencias
+            </h2>
+            <a href="{{ url_for('main.nueva_audiencia_expediente', id=expediente.id) }}" class="btn btn-small btn-primary">
+                <span>➕</span> Nueva
+            </a>
+        </div>
+
+        {% if audiencias %}
+        <div class="audiencias-list">
+            {% for a in audiencias %}
+            <div class="audiencia-card">
+                <div class="audiencia-header">
+                    <span class="audiencia-fecha">
+                        📅 {{ a.fecha | fecha }} a las {{ a.hora | hora }}
+                    </span>
+                    <span class="badge badge-{{ a.get_estado_color() }}">
+                        {{ a.get_estado_label() }}
+                    </span>
+                </div>
+                <div class="audiencia-body">
+                    <p><strong>Tipo:</strong> {{ a.get_tipo_label() }}</p>
+                    <p><strong>Lugar:</strong> {{ a.lugar or 'No especificado' }}</p>
+                    {% if a.sala %}<p><strong>Sala:</strong> {{ a.sala }}</p>{% endif %}
+                    {% if a.magistrado %}<p><strong>Magistrado:</strong> {{ a.magistrado }}</p>{% endif %}
+                </div>
+                <div class="audiencia-actions">
+                    <a href="{{ url_for('main.ver_audiencia', id=a.id) }}" class="btn btn-small">Ver</a>
+                    <a href="{{ url_for('main.editar_audiencia', id=a.id) }}" class="btn btn-small btn-edit">Editar</a>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="empty-state">
+            <span>📭</span>
+            <p>No hay audiencias programadas</p>
+            <a href="{{ url_for('main.nueva_audiencia_expediente', id=expediente.id) }}" class="btn btn-primary">
+                Programar primera audiencia
+            </a>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Documentos -->
+    <div class="detalle-section">
+        <div class="section-header">
+            <h2 class="section-title">
+                <span>📄</span> Documentos
+            </h2>
+            <a href="{{ url_for('main.expediente_documentos', id=expediente.id) }}" class="btn btn-small btn-primary">
+                <span>📁</span> Ver todos
+            </a>
+        </div>
+
+        <div class="documentos-preview" style="display: flex; gap: 1rem; flex-wrap: wrap;">
+            <!-- ✅ CORREGIDO: Link a subir_documento_drive (no subir_documento local) -->
+            <a href="{{ url_for('main.subir_documento_drive', expediente_id=expediente.id) }}" class="btn btn-success" style="text-decoration: none;">
+                <span>☁️</span> Subir a Google Drive
+            </a>
+            <a href="{{ url_for('main.archivar_documentos') }}" class="btn btn-warning" style="background: #f59e0b; color: white; text-decoration: none;">
+                <span>📦</span> Archivar Documentos
+            </a>
+        </div>
+    </div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+/* ============================================
+   ESTILOS PARA DETALLE DE EXPEDIENTE
+   ============================================ */
+
+.expediente-detalle-container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 1.5rem;
+}
+
+/* Header del detalle */
+.detalle-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    flex-wrap: wrap;
+    gap: 1rem;
+    margin-bottom: 2rem;
+    padding-bottom: 1rem;
+    border-bottom: 2px solid var(--color-border);
+}
+
+.header-info {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    flex-wrap: wrap;
+}
+
+.page-title {
+    font-size: 1.5rem;
+    color: var(--color-primary);
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.tipo-badge {
+    padding: 0.4rem 1rem;
+    border-radius: 20px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    text-transform: uppercase;
+}
+
+.tipo-civil { background: #dbeafe; color: #1e40af; }
+.tipo-penal { background: #fee2e2; color: #991b1b; }
+.tipo-administrativo { background: #d1fae5; color: #065f46; }
+.tipo-conciliacion { background: #fef3c7; color: #92400e; }
+.tipo-archivo { background: #f3f4f6; color: #374151; }
+
+/* Acciones del header */
+.header-actions {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    align-items: center;
+}
+
+/* Grupo de acciones de exportación */
+.action-group {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.25rem 0.5rem;
+    background: #f8fafc;
+    border-radius: 8px;
+    border: 1px solid #e2e8f0;
+}
+
+.action-label {
+    font-size: 0.75rem;
+    color: #64748b;
+    font-weight: 500;
+    margin-right: 0.25rem;
+}
+
+.btn-action {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.6rem 1rem;
+    border-radius: 6px;
+    font-size: 0.9rem;
+    font-weight: 500;
+    text-decoration: none;
+    border: none;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+/* Botón Resumen PDF - Destacado */
+.btn-resumen-pdf {
+    background: #dc2626;
+    color: white;
+    box-shadow: 0 2px 4px rgba(220, 38, 38, 0.2);
+}
+
+.btn-resumen-pdf:hover {
+    background: #b91c1c;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(220, 38, 38, 0.3);
+}
+
+.btn-print {
+    background: #7c3aed;
+    color: white;
+}
+
+.btn-print:hover {
+    background: #6d28d9;
+    transform: translateY(-1px);
+}
+
+.btn-excel {
+    background: #059669;
+    color: white;
+}
+
+.btn-excel:hover {
+    background: #047857;
+    transform: translateY(-1px);
+}
+
+.btn-edit {
+    background: #f59e0b;
+    color: white;
+}
+
+.btn-edit:hover {
+    background: #d97706;
+}
+
+/* Botón Eliminar */
+.btn-danger {
+    background: #dc2626;
+    color: white;
+}
+
+.btn-danger:hover {
+    background: #b91c1c;
+    transform: translateY(-1px);
+}
+
+/* Botón Enviar a Archivo */
+.btn-archivo {
+    background: #6b7280;
+    color: white;
+    border: 2px dashed #9ca3af;
+}
+
+.btn-archivo:hover {
+    background: #4b5563;
+    transform: translateY(-1px);
+}
+
+.btn-back {
+    background: #6b7280;
+    color: white;
+}
+
+.btn-back:hover {
+    background: #4b5563;
+}
+
+/* Secciones */
+.detalle-section {
+    background: white;
+    border-radius: 12px;
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+.section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+}
+
+.count-badge {
+    background: var(--color-primary);
+    color: white;
+    padding: 0.25rem 0.75rem;
+    border-radius: 12px;
+    font-size: 0.85rem;
+}
+
+/* Grid de información */
+.info-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+.info-item {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.info-item label {
+    font-size: 0.85rem;
+    color: var(--color-text-light);
+    font-weight: 500;
+}
+
+.info-value {
+    font-size: 1rem;
+    color: var(--color-text);
+    font-weight: 600;
+}
+
+.descripcion-box {
+    background: #f9fafb;
+    padding: 1rem;
+    border-radius: 8px;
+    border-left: 4px solid var(--color-primary);
+}
+
+.descripcion-box label {
+    font-size: 0.85rem;
+    color: var(--color-text-light);
+    font-weight: 600;
+    display: block;
+    margin-bottom: 0.5rem;
+}
+
+.descripcion-box p {
+    margin: 0;
+    color: var(--color-text);
+    line-height: 1.5;
+}
+
+/* ============================================
+   FORMULARIO DE ACTUALIZACIÓN
+   ============================================ */
+
+.form-actualizacion {
+    background: #f8fafc;
+    padding: 1.25rem;
+    border-radius: 10px;
+    border: 1px solid #e2e8f0;
+}
+
+.form-row-actualizacion {
+    display: flex;
+    gap: 1rem;
+    align-items: flex-end;
+    flex-wrap: wrap;
+}
+
+.form-group-actualizacion {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+}
+
+.form-group-actualizacion label {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: #475569;
+}
+
+.form-group-actualizacion .form-control {
+    padding: 0.6rem 0.8rem;
+    border: 1px solid #cbd5e1;
+    border-radius: 6px;
+    font-size: 0.95rem;
+    background: white;
+}
+
+.form-group-actualizacion .form-control:focus {
+    outline: none;
+    border-color: var(--color-primary);
+    box-shadow: 0 0 0 3px rgba(30, 58, 138, 0.1);
+}
+
+.form-group-actualizacion select.form-control {
+    min-width: 180px;
+}
+
+.form-group-actualizacion input[type="text"].form-control {
+    min-width: 350px;
+}
+
+.flex-grow {
+    flex: 1;
+    min-width: 300px;
+}
+
+.btn-container {
+    padding-bottom: 0.1rem;
+}
+
+.form-hint {
+    display: block;
+    margin-top: 0.75rem;
+    color: #64748b;
+    font-size: 0.85rem;
+}
+
+/* ============================================
+   TIMELINE MEJORADO
+   ============================================ */
+
+.timeline {
+    position: relative;
+    padding-left: 2rem;
+}
+
+.timeline::before {
+    content: '';
+    position: absolute;
+    left: 0.5rem;
+    top: 0;
+    bottom: 0;
+    width: 2px;
+    background: var(--color-border);
+}
+
+.timeline-item {
+    position: relative;
+    margin-bottom: 1.5rem;
+}
+
+.timeline-marker {
+    position: absolute;
+    left: -1.85rem;
+    top: 0.25rem;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: var(--color-primary);
+    border: 2px solid white;
+    box-shadow: 0 0 0 2px var(--color-primary);
+}
+
+.timeline-content {
+    background: #f9fafb;
+    padding: 1rem;
+    border-radius: 8px;
+    border: 1px solid #e2e8f0;
+}
+
+.timeline-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.75rem;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+.timeline-estado {
+    font-weight: 700;
+    color: var(--color-primary);
+    font-size: 1rem;
+}
+
+.timeline-fecha {
+    font-size: 0.85rem;
+    color: var(--color-text-light);
+    font-weight: 500;
+}
+
+/* Nota descriptiva (el elemento clave) */
+.timeline-nota {
+    background: white;
+    padding: 0.75rem 1rem;
+    border-radius: 6px;
+    border-left: 3px solid #059669;
+    margin: 0.5rem 0;
+}
+
+.nota-label {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: #059669;
+    display: block;
+    margin-bottom: 0.3rem;
+}
+
+.nota-texto {
+    margin: 0;
+    color: #334155;
+    line-height: 1.5;
+    font-size: 0.95rem;
+    white-space: pre-wrap;
+}
+
+.timeline-footer {
+    margin-top: 0.75rem;
+    padding-top: 0.5rem;
+    border-top: 1px dashed #e2e8f0;
+}
+
+.timeline-usuario {
+    font-size: 0.85rem;
+    color: var(--color-text-light);
+}
+
+/* Estados vacíos */
+.empty-state {
+    text-align: center;
+    padding: 3rem;
+    color: var(--color-text-light);
+}
+
+.empty-state span {
+    font-size: 3rem;
+    display: block;
+    margin-bottom: 1rem;
+}
+
+.empty-hint {
+    font-size: 0.9rem;
+    margin-top: 0.5rem;
+    color: #94a3b8;
+}
+
+/* Tarjetas de audiencia */
+.audiencias-list {
+    display: grid;
+    gap: 1rem;
+}
+
+.audiencia-card {
+    background: #f9fafb;
+    border-radius: 8px;
+    padding: 1rem;
+    border: 1px solid var(--color-border);
+}
+
+.audiencia-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.75rem;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+.audiencia-fecha {
+    font-weight: 600;
+    color: var(--color-text);
+}
+
+.audiencia-body {
+    margin-bottom: 1rem;
+}
+
+.audiencia-body p {
+    margin: 0.25rem 0;
+    font-size: 0.95rem;
+}
+
+.audiencia-actions {
+    display: flex;
+    gap: 0.5rem;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .detalle-header {
+        flex-direction: column;
+    }
+
+    .header-actions {
+        width: 100%;
+        justify-content: stretch;
+        flex-wrap: wrap;
+    }
+
+    .action-group {
+        width: 100%;
+        justify-content: center;
+        flex-wrap: wrap;
+    }
+
+    .btn-action {
+        flex: 1;
+        justify-content: center;
+    }
+
+    .info-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .form-row-actualizacion {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .form-group-actualizacion input[type="text"].form-control {
+        min-width: 100%;
+    }
+
+    .flex-grow {
+        min-width: 100%;
+    }
+}
+</style>
+{% endblock %}

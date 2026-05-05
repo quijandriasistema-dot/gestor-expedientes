@@ -1,0 +1,197 @@
+{% extends "base.html" %}
+
+{% block title %}Gestión de Documentos - Quijandria Abogados{% endblock %}
+
+{% block content %}
+<div class="dashboard">
+    <!-- Header -->
+    <div class="dashboard-header">
+        <div class="studio-display">
+            <span class="scales-icon">⚖️</span>
+            <div class="studio-name-main">Quijandria Abogados</div>
+        </div>
+        <div class="welcome-text">Sistema de Gestión de Expedientes Legales</div>
+    </div>
+
+    <!-- Breadcrumb -->
+    <div style="margin-bottom: 1rem;">
+        <a href="{{ url_for('main.index') }}" style="color: var(--color-primary); text-decoration: none;">Inicio</a>
+        <span style="color: #94a3b8;"> / </span>
+        <span style="color: #64748b;">Documentos</span>
+    </div>
+
+    <h1 style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.5rem;">
+        <span>📄</span>
+        <span>Gestión de Documentos</span>
+    </h1>
+    <p style="color: var(--color-text-light); margin-bottom: 1.5rem;">
+        Administre todos los documentos del estudio jurídico. Los archivos se almacenan en Google Drive.
+    </p>
+
+    <!-- Barra de acciones -->
+    <div style="display: flex; gap: 0.75rem; margin-bottom: 1.5rem; flex-wrap: wrap; align-items: center;">
+        <a href="{{ url_for('main.subir_documento_drive') }}" class="btn btn-success">
+            <span>☁️</span> Subir a Drive
+        </a>
+        
+        <!-- BOTÓN GESTIONAR ESPACIO: Solo Admin/Dev -->
+        {% if rol in ['ADMINISTRADOR', 'DESARROLLADOR'] %}
+        <a href="{{ url_for('main.gestionar_espacio') }}" class="btn btn-warning" style="background: #f59e0b; color: white; border: none;">
+            <span>💾</span> Gestionar Espacio
+        </a>
+        {% endif %}
+        
+        <a href="{{ url_for('main.documentos') }}" class="btn btn-secondary">
+            <span>🔄</span> Limpiar
+        </a>
+    </div>
+
+    <!-- Filtros de búsqueda -->
+    <div class="form-container" style="margin-bottom: 1.5rem;">
+        <form method="GET" action="{{ url_for('main.documentos') }}">
+            <div class="form-row">
+                <div class="form-col-3">
+                    <div class="form-group">
+                        <label>Buscar por título</label>
+                        <input type="text" name="q" class="form-control" value="{{ termino_busqueda }}" placeholder="Nombre del documento...">
+                    </div>
+                </div>
+                <div class="form-col-3">
+                    <div class="form-group">
+                        <label>Categoría</label>
+                        <select name="categoria" class="form-control">
+                            <option value="">Todas</option>
+                            <option value="escrito" {% if categoria_filtro == 'escrito' %}selected{% endif %}>Escrito</option>
+                            <option value="resolucion" {% if categoria_filtro == 'resolucion' %}selected{% endif %}>Resolución</option>
+                            <option value="contrato" {% if categoria_filtro == 'contrato' %}selected{% endif %}>Contrato</option>
+                            <option value="evidencia" {% if categoria_filtro == 'evidencia' %}selected{% endif %}>Evidencia</option>
+                            <option value="poder" {% if categoria_filtro == 'poder' %}selected{% endif %}>Poder</option>
+                            <option value="notificacion" {% if categoria_filtro == 'notificacion' %}selected{% endif %}>Notificación</option>
+                            <option value="otros" {% if categoria_filtro == 'otros' %}selected{% endif %}>Otros</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-col-3">
+                    <div class="form-group">
+                        <label>Expediente</label>
+                        {{ form_busqueda.expediente_id(class="form-control") }}
+                    </div>
+                </div>
+            </div>
+            <div style="display: flex; gap: 0.5rem;">
+                <button type="submit" class="btn btn-primary">
+                    <span>🔍</span> Buscar
+                </button>
+                <a href="{{ url_for('main.documentos') }}" class="btn btn-secondary">Limpiar</a>
+            </div>
+        </form>
+    </div>
+
+    <!-- Tabla de documentos -->
+    {% if documentos.items %}
+    <div class="table-container">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Documento</th>
+                    <th>Categoría</th>
+                    <th>Expediente</th>
+                    <th>Fecha</th>
+                    <th>Tamaño</th>
+                    <th>Ubicación</th>
+                    <th>Acciones</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for doc in documentos.items %}
+                <tr>
+                    <td>{{ doc.id }}</td>
+                    <td>
+                        <strong>{{ doc.titulo }}</strong><br>
+                        <small style="color: #64748b;">{{ doc.nombre_archivo }}</small>
+                        {% if doc.descripcion %}
+                            <br><small style="color: #94a3b8;">{{ doc.descripcion[:60] }}{% if doc.descripcion|length > 60 %}...{% endif %}</small>
+                        {% endif %}
+                    </td>
+                    <td>{{ doc.categoria|title if doc.categoria else 'Otro' }}</td>
+                    <td>
+                        {% if doc.expediente %}
+                            <a href="{{ url_for('main.ver_expediente', id=doc.expediente_id) }}">
+                                {{ doc.expediente.get_identificador_principal() }}
+                            </a>
+                        {% else %}
+                            <span style="color: #94a3b8;">General</span>
+                        {% endif %}
+                    </td>
+                    <td>{{ doc.fecha_subida.strftime('%d/%m/%Y') if doc.fecha_subida else '-' }}</td>
+                    <td>{{ doc.get_tamaño_formateado() if doc.get_tamaño_formateado else '-' }}</td>
+                    <td>
+                        {% if doc.ubicacion == 'drive' %}
+                            <span style="color: #10b981;">☁️ Drive</span>
+                        {% elif doc.ubicacion == 'archivado_local' %}
+                            <span style="color: #f59e0b;">📁 Archivado</span>
+                        {% else %}
+                            <span style="color: #6b7280;">{{ doc.ubicacion }}</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <div style="display: flex; gap: 0.3rem;">
+                            <!-- VER: Solo si está en Drive -->
+                            {% if doc.drive_file_id and doc.ubicacion == 'drive' %}
+                            <a href="{{ url_for('main.ver_documento', id=doc.id) }}" target="_blank" class="btn btn-sm btn-info" title="Ver en Drive">
+                                👁️
+                            </a>
+                            {% elif doc.ubicacion == 'archivado_local' %}
+                            <span class="btn btn-sm btn-secondary" style="opacity: 0.6; cursor: not-allowed;" title="Documento archivado en oficina">
+                                📁
+                            </span>
+                            {% endif %}
+                            
+                            <!-- BOTÓN ELIMINAR COMPLETO (Drive + Supabase) - Solo Admin/Dev -->
+                            {% if rol in ['ADMINISTRADOR', 'DESARROLLADOR'] %}
+                            <form method="POST" action="{{ url_for('main.eliminar_documento', id=doc.id) }}" 
+                                  style="display: inline;" 
+                                  onsubmit="return confirm('⚠️ ¿ELIMINAR COMPLETAMENTE?\n\nEsta acción eliminará el documento de:\n• Google Drive\n• Registro del sistema\n\n¿Está seguro? Esta acción NO se puede deshacer.');">
+                                <button type="submit" class="btn btn-sm btn-danger" title="Eliminar completamente">
+                                    🗑️
+                                </button>
+                            </form>
+                            {% endif %}
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Paginación -->
+    {% if documentos.pages > 1 %}
+    <div style="display: flex; justify-content: center; gap: 0.5rem; margin-top: 1.5rem;">
+        {% if documentos.has_prev %}
+            <a href="{{ url_for('main.documentos', page=documentos.prev_num, q=termino_busqueda, categoria=categoria_filtro, expediente_id=expediente_filtro) }}" class="btn btn-secondary">← Anterior</a>
+        {% endif %}
+        
+        <span style="padding: 0.5rem 1rem; background: #f1f5f9; border-radius: 6px;">
+            Página {{ documentos.page }} de {{ documentos.pages }}
+        </span>
+        
+        {% if documentos.has_next %}
+            <a href="{{ url_for('main.documentos', page=documentos.next_num, q=termino_busqueda, categoria=categoria_filtro, expediente_id=expediente_filtro) }}" class="btn btn-secondary">Siguiente →</a>
+        {% endif %}
+    </div>
+    {% endif %}
+
+    {% else %}
+    <div style="text-align: center; padding: 3rem; background: #f9fafb; border-radius: 12px;">
+        <div style="font-size: 4rem; margin-bottom: 1rem;">📁</div>
+        <h3>No hay documentos</h3>
+        <p style="color: #6b7280;">Comience subiendo su primer documento a Google Drive.</p>
+        <a href="{{ url_for('main.subir_documento_drive') }}" class="btn btn-success" style="margin-top: 1rem;">
+            <span>☁️</span> Subir Documento
+        </a>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

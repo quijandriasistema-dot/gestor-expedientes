@@ -1,0 +1,170 @@
+{% extends "base.html" %}
+
+{% block title %}Archivar Documentos - Quijandria Abogados{% endblock %}
+
+{% block content %}
+<div class="dashboard">
+    <!-- Header -->
+    <div class="dashboard-header">
+        <div class="studio-display">
+            <span class="scales-icon">⚖️</span>
+            <div class="studio-name-main">Quijandria Abogados</div>
+        </div>
+        <div class="welcome-text">Sistema de Gestión de Expedientes Legales</div>
+    </div>
+
+    <!-- Breadcrumb -->
+    <div style="margin-bottom: 1rem;">
+        <a href="{{ url_for('main.index') }}" style="color: var(--color-primary); text-decoration: none;">Inicio</a>
+        <span style="color: #94a3b8;"> / </span>
+        <a href="{{ url_for('main.documentos') }}" style="color: var(--color-primary); text-decoration: none;">Documentos</a>
+        <span style="color: #94a3b8;"> / </span>
+        <a href="{{ url_for('main.gestionar_espacio') }}" style="color: var(--color-primary); text-decoration: none;">Gestionar Espacio</a>
+        <span style="color: #94a3b8;"> / </span>
+        <span style="color: #64748b;">Archivar Documentos</span>
+    </div>
+
+    <h1 style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.5rem;">
+        <span>📦</span>
+        <span>Archivar Documentos por Período</span>
+    </h1>
+
+    <!-- Advertencia -->
+    <div style="background: #fef3c7; border: 2px solid #f59e0b; border-radius: 12px; padding: 1.5rem; margin-bottom: 1.5rem;">
+        <h3 style="color: #92400e; margin-bottom: 0.5rem;">⚠️ Advertencia Importante</h3>
+        <p style="color: #78350f; margin-bottom: 1rem;">
+            Esta acción descargará los documentos seleccionados en un archivo ZIP y los eliminará de Google Drive.
+            Los documentos ya no estarán disponibles en la nube, solo en el archivo ZIP descargado.
+        </p>
+        <p style="color: #78350f; font-weight: bold;">
+            Total de documentos en Drive: {{ documentos_drive|length }}
+        </p>
+    </div>
+
+    <form method="POST" action="{{ url_for('main.archivar_documentos') }}">
+        <!-- Confirmación -->
+        <div style="background: white; border-radius: 12px; padding: 1.5rem; margin-bottom: 1.5rem; border: 1px solid #e2e8f0;">
+            <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                <input type="checkbox" name="confirmar" value="1" required>
+                <span>He leído y entiendo que los documentos serán eliminados de Google Drive y solo quedarán en el ZIP descargado.</span>
+            </label>
+        </div>
+
+        <!-- Selección de período -->
+        <div style="background: white; border-radius: 12px; padding: 1.5rem; margin-bottom: 1.5rem; border: 1px solid #e2e8f0;">
+            <h3 style="margin-bottom: 1rem;">📅 Seleccionar Período</h3>
+            
+            <div style="margin-bottom: 1rem;">
+                <label style="display: block; margin-bottom: 0.5rem; font-weight: bold;">Tipo de Período:</label>
+                <select name="tipo_periodo" id="tipo_periodo" onchange="cambiarPeriodo()" style="width: 100%; padding: 0.5rem; border-radius: 6px; border: 1px solid #d1d5db;">
+                    <option value="mes">Por Mes</option>
+                    <option value="dia">Por Día</option>
+                    <option value="semana">Por Semana</option>
+                    <option value="año">Por Año</option>
+                </select>
+            </div>
+
+            <!-- Selector de Mes (default) -->
+            <div id="selector_mes" style="margin-bottom: 1rem;">
+                <label style="display: block; margin-bottom: 0.5rem; font-weight: bold;">Mes:</label>
+                <input type="month" name="mes" value="{{ fecha_hoy[:4] + '-' + fecha_hoy[4:6] }}" 
+                       style="width: 100%; padding: 0.5rem; border-radius: 6px; border: 1px solid #d1d5db;">
+            </div>
+
+            <!-- Selector de Día -->
+            <div id="selector_dia" style="margin-bottom: 1rem; display: none;">
+                <label style="display: block; margin-bottom: 0.5rem; font-weight: bold;">Fecha:</label>
+                <input type="date" name="fecha" 
+                       style="width: 100%; padding: 0.5rem; border-radius: 6px; border: 1px solid #d1d5db;">
+            </div>
+
+            <!-- Selector de Semana -->
+            <div id="selector_semana" style="margin-bottom: 1rem; display: none;">
+                <label style="display: block; margin-bottom: 0.5rem; font-weight: bold;">Semana:</label>
+                <input type="week" name="semana" 
+                       style="width: 100%; padding: 0.5rem; border-radius: 6px; border: 1px solid #d1d5db;">
+            </div>
+
+            <!-- Selector de Año -->
+            <div id="selector_año" style="margin-bottom: 1rem; display: none;">
+                <label style="display: block; margin-bottom: 0.5rem; font-weight: bold;">Año:</label>
+                <input type="number" name="año" value="{{ fecha_hoy[:4] }}" min="2020" max="2030"
+                       style="width: 100%; padding: 0.5rem; border-radius: 6px; border: 1px solid #d1d5db;">
+            </div>
+
+            <div style="margin-bottom: 1rem;">
+                <label style="display: block; margin-bottom: 0.5rem; font-weight: bold;">Nombre de Carpeta/Archivo:</label>
+                <input type="text" name="carpeta_destino" value="Archivos_Expedientes" 
+                       style="width: 100%; padding: 0.5rem; border-radius: 6px; border: 1px solid #d1d5db;">
+            </div>
+        </div>
+
+        <!-- Botones -->
+        <div style="display: flex; gap: 1rem; justify-content: center; flex-wrap: wrap; margin-bottom: 2rem;">
+            <button type="submit" class="btn btn-warning btn-lg" style="background: #f59e0b; color: white;">
+                📦 Generar Paquete ZIP
+            </button>
+            <a href="{{ url_for('main.gestionar_espacio') }}" class="btn btn-secondary btn-lg" style="text-decoration: none;">
+                ❌ Cancelar
+            </a>
+        </div>
+    </form>
+
+    <!-- Lista de documentos disponibles -->
+    {% if documentos_drive %}
+    <h3 style="margin-bottom: 1rem;">📁 Documentos disponibles para archivar</h3>
+    <div class="table-container">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Documento</th>
+                    <th>Expediente</th>
+                    <th>Fecha Subida</th>
+                    <th>Tamaño</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for doc in documentos_drive %}
+                <tr>
+                    <td>
+                        <strong>{{ doc.titulo }}</strong><br>
+                        <small style="color: #64748b;">{{ doc.nombre_archivo }}</small>
+                    </td>
+                    <td>{{ doc.expediente.get_identificador_principal() if doc.expediente else 'General' }}</td>
+                    <td>{{ doc.fecha_subida.strftime('%d/%m/%Y %H:%M') if doc.fecha_subida else '-' }}</td>
+                    <td>{{ doc.get_tamaño_formateado() if doc.get_tamaño_formateado else '-' }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div style="text-align: center; padding: 3rem; background: #f9fafb; border-radius: 12px;">
+        <div style="font-size: 4rem; margin-bottom: 1rem;">☁️</div>
+        <h3>No hay documentos en Google Drive</h3>
+        <p style="color: #6b7280;">No hay documentos para archivar.</p>
+    </div>
+    {% endif %}
+</div>
+
+<script>
+function cambiarPeriodo() {
+    var tipo = document.getElementById('tipo_periodo').value;
+    
+    document.getElementById('selector_mes').style.display = 'none';
+    document.getElementById('selector_dia').style.display = 'none';
+    document.getElementById('selector_semana').style.display = 'none';
+    document.getElementById('selector_año').style.display = 'none';
+    
+    if (tipo === 'mes') {
+        document.getElementById('selector_mes').style.display = 'block';
+    } else if (tipo === 'dia') {
+        document.getElementById('selector_dia').style.display = 'block';
+    } else if (tipo === 'semana') {
+        document.getElementById('selector_semana').style.display = 'block';
+    } else if (tipo === 'año') {
+        document.getElementById('selector_año').style.display = 'block';
+    }
+}
+</script>
+{% endblock %}

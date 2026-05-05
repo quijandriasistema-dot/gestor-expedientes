@@ -1,0 +1,282 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="dashboard">
+    <!-- Header -->
+    <div class="dashboard-header">
+        <div class="studio-display">
+            <span class="scales-icon">⚖️</span>
+            <div class="studio-name-main">Quijandria Abogados</div>
+        </div>
+        <div class="welcome-text">Sistema de Gestión de Expedientes Legales</div>
+    </div>
+    
+    <!-- Título de la página -->
+    <h1 style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.5rem;">
+        <span>✏️</span>
+        <span>Editar Expediente</span>
+    </h1>
+    <p style="color: var(--color-text-light); margin-bottom: 1.5rem;">
+        Modificando: <strong>{{ expediente.numero_expediente or 'N/A' }}</strong> | 
+        Tipo: <strong>{{ expediente.get_tipo_label() }}</strong> | 
+        Cliente: <strong>{{ expediente.cliente }}</strong>
+    </p>
+    
+    <!-- Formulario -->
+    <div class="form-container">
+        <form method="POST" action="{{ url_for('main.editar_expediente', id=expediente.id) }}" novalidate>
+            {{ form.hidden_tag() }}
+            
+            <!-- Campo oculto ID -->
+            <input type="hidden" name="id" value="{{ expediente.id }}">
+            
+            <!-- Campo oculto: tipo original (no se puede cambiar) -->
+            <input type="hidden" name="tipo" id="tipo-expediente" value="{{ expediente.tipo }}">
+            
+            <!-- Sección 1: Tipo de Expediente (SOLO LECTURA) -->
+            <div class="form-section">
+                <h3><span>📋</span> Tipo de Expediente</h3>
+                <div class="form-row">
+                    <div class="form-col-2">
+                        <div class="form-group">
+                            <label>Tipo de Expediente</label>
+                            <input type="text" class="form-control" value="{{ expediente.get_tipo_label() }}" disabled style="background-color: #f3f4f6;">
+                            <small style="color: var(--color-text-light);">El tipo de expediente no se puede cambiar una vez creado</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Sección 2: Identificación del Caso -->
+            <div class="form-section" id="seccion-identificacion">
+                <h3><span>🆔</span> Identificación del Caso</h3>
+                
+                <!-- DNI -->
+                <div class="form-row" id="campo-dni-container" style="display: {% if expediente.tipo in ['administrativo', 'penal', 'conciliacion', 'archivo'] %}flex{% else %}none{% endif %};">
+                    <div class="form-col-2">
+                        <div class="form-group">
+                            <label for="dni">
+                                DNI
+                                {% if expediente.tipo == 'administrativo' %}<span style="color: #dc2626;">*</span>{% endif %}
+                                {% if expediente.tipo in ['penal', 'conciliacion', 'archivo'] %}(Opcional){% endif %}
+                            </label>
+                            <input type="text" name="dni" id="dni" class="form-control" value="{{ expediente.dni or '' }}">
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- N° Expediente -->
+                <div class="form-row" id="campo-expediente-container" style="display: {% if expediente.tipo in ['civil', 'penal', 'conciliacion', 'archivo'] %}flex{% else %}none{% endif %};">
+                    <div class="form-col-2">
+                        <div class="form-group">
+                            <label for="numero_expediente">N° de Expediente {% if expediente.tipo != 'administrativo' %}<span style="color: #dc2626;">*</span>{% endif %}</label>
+                            <input type="text" name="numero_expediente" id="numero_expediente" class="form-control" value="{{ expediente.numero_expediente or '' }}" {% if expediente.tipo != 'administrativo' %}required{% endif %}>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- ============================================ -->
+            <!-- SECCIÓN ÚNICA: Materia / Asunto (todos los tipos) -->
+            <!-- ============================================ -->
+            <div class="form-section" id="seccion-materia">
+                <h3><span>📄</span> Materia / Asunto *</h3>
+                <div class="form-row">
+                    <div class="form-col-2">
+                        <div class="form-group">
+                            <label for="materia">Materia / Asunto <span style="color: #dc2626;">*</span></label>
+                            <input type="text" name="materia" id="materia" class="form-control" value="{{ expediente.materia or '' }}" required>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Sección: Ubicación Física (solo Archivo) -->
+            <div class="form-section" id="campos-archivo-ubicacion" style="display: {% if expediente.tipo == 'archivo' %}block{% else %}none{% endif %};">
+                <h3><span>📦</span> Ubicación Física del Expediente</h3>
+                <div class="form-group">
+                    <label for="ubicacion_archivo">Ubicación Física</label>
+                    <input type="text" name="ubicacion_archivo" id="ubicacion_archivo" class="form-control" value="{{ expediente.ubicacion_archivo or '' }}" placeholder="Ej: Estante A - Fila 3 - Caja 12">
+                </div>
+            </div>
+            
+            <!-- Sección: Campos Conciliación -->
+            <div class="form-section" id="campos-conciliacion" style="display: {% if expediente.tipo == 'conciliacion' %}block{% else %}none{% endif %};">
+                <h3><span>🤝</span> Información de Conciliación</h3>
+                <div class="form-row">
+                    <div class="form-col-2">
+                        <div class="form-group">
+                            <label for="conciliador">Conciliador</label>
+                            <input type="text" name="conciliador" id="conciliador" class="form-control" value="{{ expediente.conciliador or '' }}">
+                        </div>
+                    </div>
+                    <div class="form-col-2">
+                        <div class="form-group">
+                            <label for="solicitante">Solicitante</label>
+                            <input type="text" name="solicitante" id="solicitante" class="form-control" value="{{ expediente.solicitante or '' }}">
+                            <small style="color: var(--color-text-light); font-size: 0.85rem;">
+                                Este nombre se sincronizará con el campo Cliente
+                            </small>
+                        </div>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="invitados">Invitados / Otras Partes</label>
+                    <textarea name="invitados" id="invitados" class="form-control" rows="2">{{ expediente.invitados or '' }}</textarea>
+                </div>
+            </div>
+            
+            <!-- Sección: Datos del Cliente -->
+            <div class="form-section" id="seccion-cliente">
+                <h3><span>👤</span> Datos del Cliente</h3>
+                <div class="form-row">
+                    <div class="form-col-2">
+                        <div class="form-group">
+                            <label for="cliente" id="label-cliente">
+                                {% if expediente.tipo == 'conciliacion' %}Solicitante Principal{% else %}Cliente / Interesado{% endif %} 
+                                <span style="color: #dc2626;">*</span>
+                            </label>
+                            <input type="text" name="cliente" id="cliente" class="form-control" value="{{ expediente.cliente or '' }}" required {% if expediente.tipo == 'conciliacion' %}readonly style="background-color: #f3f4f6;"{% endif %}>
+                            <small id="ayuda-cliente" style="color: var(--color-text-light); font-size: 0.85rem;">
+                                {% if expediente.tipo == 'conciliacion' %}
+                                    Se copia automáticamente del campo Solicitante (doble clic para editar)
+                                {% else %}
+                                    Ingrese los apellidos y nombres completos
+                                {% endif %}
+                            </small>
+                        </div>
+                    </div>
+                    <div class="form-col-2">
+                        <div class="form-group">
+                            <label for="telefono">Teléfono</label>
+                            <input type="text" name="telefono" id="telefono" class="form-control" value="{{ expediente.telefono or '' }}">
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Sección: Campos Administrativos -->
+            <div class="form-section" id="campos-administrativo" style="display: {% if expediente.tipo == 'administrativo' %}block{% else %}none{% endif %};">
+                <h3><span>🏛️</span> Información Administrativa</h3>
+                <div class="form-row">
+                    <div class="form-col-2">
+                        <div class="form-group">
+                            <label for="entidad_receptora">Entidad Receptora</label>
+                            <input type="text" name="entidad_receptora" id="entidad_receptora" class="form-control" value="{{ expediente.entidad_receptora or '' }}">
+                        </div>
+                    </div>
+                    <div class="form-col-2">
+                        <div class="form-group">
+                            <label for="tramite">Tipo de Trámite</label>
+                            <input type="text" name="tramite" id="tramite" class="form-control" value="{{ expediente.tramite or '' }}">
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Sección: Campos Civiles -->
+            <div class="form-section" id="campos-civil" style="display: {% if expediente.tipo == 'civil' %}block{% else %}none{% endif %};">
+                <h3><span>⚖️</span> Información Judicial</h3>
+                <div class="form-row">
+                    <div class="form-col-2">
+                        <div class="form-group">
+                            <label for="secretario">Secretario del Juzgado</label>
+                            <input type="text" name="secretario" id="secretario" class="form-control" value="{{ expediente.secretario or '' }}">
+                        </div>
+                    </div>
+                    <div class="form-col-2">
+                        <div class="form-group">
+                            <label for="juez">Juez</label>
+                            <input type="text" name="juez" id="juez" class="form-control" value="{{ expediente.juez or '' }}">
+                        </div>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="juzgado">Juzgado / Sala</label>
+                    <input type="text" name="juzgado" id="juzgado" class="form-control" value="{{ expediente.juzgado or '' }}" placeholder="Ej: Juzgado Civil de Lima">
+                </div>
+            </div>
+            
+            <!-- Sección: Campos Penales -->
+            <div class="form-section" id="campos-penal" style="display: {% if expediente.tipo == 'penal' %}block{% else %}none{% endif %};">
+                <h3><span>🚔</span> Información Penal</h3>
+                <div class="form-row">
+                    <div class="form-col-2">
+                        <div class="form-group">
+                            <label for="numero_cf">N° Cuaderno Fiscalía</label>
+                            <input type="text" name="numero_cf" id="numero_cf" class="form-control" value="{{ expediente.numero_cf or '' }}">
+                        </div>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-col-2">
+                        <div class="form-group">
+                            <label for="fiscal">Fiscal</label>
+                            <input type="text" name="fiscal" id="fiscal" class="form-control" value="{{ expediente.fiscal or '' }}">
+                        </div>
+                    </div>
+                    <div class="form-col-2">
+                        <div class="form-group">
+                            <label for="juzgado">Juzgado / Sala</label>
+                            <input type="text" name="juzgado" id="juzgado" class="form-control" value="{{ expediente.juzgado or '' }}" placeholder="Ej: Juzgado Penal de Lima">
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Sección: Descripción -->
+            <div class="form-section">
+                <h3><span>📝</span> Descripción / Notas Adicionales</h3>
+                <div class="form-group">
+                    <label for="descripcion">Descripción Detallada</label>
+                    <textarea name="descripcion" id="descripcion" class="form-control" rows="4">{{ expediente.descripcion or '' }}</textarea>
+                </div>
+            </div>
+            
+            <!-- Botones de acción -->
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary btn-lg">
+                    💾 Guardar Cambios
+                </button>
+                <a href="{{ url_for('main.ver_expediente', id=expediente.id) }}" class="btn btn-secondary btn-lg">
+                    ❌ Cancelar
+                </a>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+    // ============================================
+    // SINCRONIZACIÓN SOLICITANTE → CLIENTE (CONCILIACIÓN)
+    // ============================================
+    document.addEventListener('DOMContentLoaded', function() {
+        const tipoExpediente = document.getElementById('tipo-expediente').value;
+        
+        if (tipoExpediente === 'conciliacion') {
+            const solicitanteInput = document.getElementById('solicitante');
+            const clienteInput = document.getElementById('cliente');
+            
+            if (solicitanteInput && clienteInput) {
+                solicitanteInput.addEventListener('input', function() {
+                    clienteInput.value = this.value;
+                });
+                
+                solicitanteInput.addEventListener('blur', function() {
+                    clienteInput.value = this.value;
+                });
+                
+                clienteInput.addEventListener('dblclick', function() {
+                    this.readOnly = false;
+                    this.style.backgroundColor = '';
+                    this.title = 'Campo desbloqueado. Puede editar manualmente.';
+                });
+                
+                if (solicitanteInput.value) {
+                    clienteInput.value = solicitanteInput.value;
+                }
+            }
+        }
+    });
+</script>
+{% endblock %}

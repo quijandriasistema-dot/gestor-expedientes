@@ -1,0 +1,209 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="dashboard">
+    <!-- Header -->
+    <div class="dashboard-header">
+        <div class="studio-display">
+            <span class="scales-icon">⚖️</span>
+            <div class="studio-name-main">Quijandria Abogados</div>
+        </div>
+        <div class="welcome-text">Sistema de Gestión de Expedientes Legales</div>
+    </div>
+    
+    <!-- Título -->
+    <h1 style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.5rem;">
+        <span>🗂️</span>
+        <span>Enviar Expediente a Archivo</span>
+    </h1>
+    
+    <!-- Info del expediente original -->
+    <div class="info-original">
+        <p>
+            <strong>Expediente origen:</strong> 
+            <span class="badge tipo-{{ expediente_original.tipo }}">{{ expediente_original.get_tipo_label() }}</span>
+            <strong>{{ expediente_original.get_identificador_principal() }}</strong> — 
+            {{ expediente_original.cliente }}
+        </p>
+        <p class="estado-actual">
+            Estado actual: <span class="badge badge-{{ expediente_original.get_estado_color() }}">{{ expediente_original.get_estado_label() }}</span>
+        </p>
+    </div>
+    
+    <p style="color: var(--color-text-light); margin-bottom: 1.5rem;">
+        Se creará un nuevo registro en el módulo <strong>Archivo</strong> con los datos principales del expediente. 
+        Complete los campos faltantes.
+    </p>
+    
+    <!-- Formulario -->
+    <div class="form-container">
+                <form method="POST" action="{{ url_for('main.enviar_a_archivo', id=expediente_original.id) }}" novalidate>
+            
+            <!-- ============================================ -->
+            <!-- DATOS HEREDADOS (solo lectura) -->
+            <!-- ============================================ -->
+            <div class="form-section section-heredados">
+                <h3><span>📋</span> Datos Heredados del Expediente Original</h3>
+                <p class="section-hint">Estos datos se copian automáticamente y no se pueden editar</p>
+                
+                <div class="info-grid-heredados">
+                    <div class="info-item-heredado">
+                        <label>N° Expediente:</label>
+                        <span class="valor-heredado">{{ expediente_original.numero_expediente or 'N/A' }}</span>
+                        <input type="hidden" name="numero_expediente" value="{{ expediente_original.numero_expediente or '' }}">
+                    </div>
+                    
+                    <div class="info-item-heredado">
+                        <label>Cliente:</label>
+                        <span class="valor-heredado">{{ expediente_original.cliente }}</span>
+                        <input type="hidden" name="cliente" value="{{ expediente_original.cliente }}">
+                    </div>
+                    
+                    <div class="info-item-heredado">
+                        <label>DNI:</label>
+                        <span class="valor-heredado">{{ expediente_original.dni or 'No aplica' }}</span>
+                        <input type="hidden" name="dni" value="{{ expediente_original.dni or '' }}">
+                    </div>
+                    
+                    <div class="info-item-heredado">
+                        <label>Teléfono:</label>
+                        <span class="valor-heredado">{{ expediente_original.telefono or 'No registrado' }}</span>
+                        <input type="hidden" name="telefono" value="{{ expediente_original.telefono or '' }}">
+                    </div>
+                    
+                    <div class="info-item-heredado">
+                        <label>Materia:</label>
+                        <span class="valor-heredado">{{ expediente_original.materia }}</span>
+                        <input type="hidden" name="materia" value="{{ expediente_original.materia }}">
+                    </div>
+                    
+                    <div class="info-item-heredado full-width">
+                        <label>Descripción original:</label>
+                        <span class="valor-heredado descripcion-heredada">{{ expediente_original.descripcion or 'Sin descripción' }}</span>
+                        <input type="hidden" name="descripcion_original" value="{{ expediente_original.descripcion or '' }}">
+                    </div>
+                </div>
+            </div>
+            
+            <!-- ============================================ -->
+            <!-- CAMPOS A COMPLETAR -->
+            <!-- ============================================ -->
+            <div class="form-section">
+                <h3><span>📝</span> Datos del Archivo</h3>
+                
+                <div class="form-row">
+                    <div class="form-col-2">
+                        <div class="form-group">
+                            <label for="ubicacion_archivo">📦 Ubicación Física *</label>
+                            <input type="text" name="ubicacion_archivo" id="ubicacion_archivo" class="form-control" 
+                                   placeholder="Ej: Estante A - Fila 3 - Caja 12" required>
+                            <small style="color: var(--color-text-light); font-size: 0.85rem;">
+                                Indique la ubicación exacta donde se archivará el expediente
+                            </small>
+                        </div>
+                    </div>
+                    
+                    <div class="form-col-2">
+                        <div class="form-group">
+                            <label for="fecha_archivado">📅 Fecha de Archivado *</label>
+                            <input type="date" name="fecha_archivado" id="fecha_archivado" class="form-control" 
+                                   value="{{ hoy }}" required>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label for="nota_final">📝 Nota Final / Resumen de Conclusión</label>
+                    <textarea name="nota_final" id="nota_final" class="form-control" rows="4" 
+                              placeholder="Describa el resultado final del caso, por qué se archiva, acuerdos alcanzados, sentencia, etc."></textarea>
+                    <small style="color: var(--color-text-light); font-size: 0.85rem;">
+                        Esta nota se agregará al historial y será visible en el PDF de resumen
+                    </small>
+                </div>
+            </div>
+            
+            <!-- ============================================ -->
+            <!-- BOTONES -->
+            <!-- ============================================ -->
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary btn-lg">
+                    🗂️ Archivar Expediente
+                </button>
+                <a href="{{ url_for('main.ver_expediente', id=expediente_original.id) }}" class="btn btn-secondary btn-lg">
+                    ❌ Cancelar
+                </a>
+            </div>
+        </form>
+    </div>
+</div>
+
+<style>
+.info-original {
+    background: #f0f9ff;
+    border: 1px solid #bae6fd;
+    border-radius: 8px;
+    padding: 1rem 1.25rem;
+    margin-bottom: 1.5rem;
+}
+
+.info-original p {
+    margin: 0.25rem 0;
+    color: #0c4a6e;
+}
+
+.estado-actual {
+    font-size: 0.9rem;
+    margin-top: 0.5rem !important;
+}
+
+.section-heredados {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+}
+
+.section-hint {
+    color: #64748b;
+    font-size: 0.85rem;
+    margin-top: -0.5rem;
+    margin-bottom: 1rem;
+}
+
+.info-grid-heredados {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+    gap: 1rem;
+}
+
+.info-item-heredado {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+}
+
+.info-item-heredado.full-width {
+    grid-column: 1 / -1;
+}
+
+.info-item-heredado label {
+    font-size: 0.8rem;
+    color: #64748b;
+    font-weight: 500;
+}
+
+.valor-heredado {
+    font-size: 1rem;
+    color: #1e293b;
+    font-weight: 600;
+    padding: 0.5rem 0.75rem;
+    background: white;
+    border-radius: 6px;
+    border: 1px solid #e2e8f0;
+}
+
+.descripcion-heredada {
+    font-weight: normal;
+    line-height: 1.5;
+    min-height: 60px;
+}
+</style>
+{% endblock %}

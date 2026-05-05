@@ -1,0 +1,73 @@
+# ============================================
+# CREDENCIALES Y SECRETOS - NUNCA SUBIR A GIT
+# ============================================
+service-account.json
+*.json.key
+google-credentials.json
+credentials.json
+client_secret*.json
+
+# ============================================
+# PYTHON
+# ============================================
+__pycache__/
+*.py[cod]
+*.class
+*.so
+.Python
+env/
+venv/
+.venv/
+ENV/
+
+# ============================================
+# FLASK / BASE DE DATOS
+# ============================================
+instance/
+*.db
+*.sqlite
+*.sqlite3
+
+# ============================================
+# CONFIGURACIÓN SENSIBLE
+# ============================================
+/config.py
+.env
+*.env
+config.py
+
+# ============================================
+# SUBIDAS DE ARCHIVOS
+# ============================================
+uploads/
+static/uploads/
+
+# ============================================
+# IDE
+# ============================================
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# ============================================
+# SISTEMA OPERATIVO
+# ============================================
+.DS_Store
+Thumbs.db
+
+# ============================================
+# LOGS
+# ============================================
+*.log
+
+# ============================================
+# SCRIPTS DE PRUEBA (opcional)
+# ============================================
+generar_datos_prueba.py
+insertar_datos.py
+test_audiencia.py
+actualizar_estados.py
+notificaciones.py
+
+script_obtener_token.py
