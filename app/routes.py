@@ -2934,8 +2934,6 @@ def imprimir_expediente_pdf(id):
             spaceAfter=6
         )))
         
-        # Dividir por líneas y crear Paragraph individual por cada una
-        # Esto respeta los espacios en blanco entre párrafos
         lineas = expediente.descripcion.split('\n')
         desc_line_style = ParagraphStyle(
             'DescLine',
@@ -2954,7 +2952,6 @@ def imprimir_expediente_pdf(id):
             if linea_limpia:
                 elements.append(Paragraph(linea_limpia, desc_line_style))
             else:
-                # Línea en blanco = espacio entre párrafos
                 elements.append(Spacer(1, 8))
 
     if historial:
@@ -3066,8 +3063,9 @@ def imprimir_expediente_pdf(id):
     ])))
     elements.append(Spacer(1, 10))
 
+    # ========== PIE DE PÁGINA CON RUC Y CELULAR ==========
     footer_data = [
-        [f"Generado el: {ahora_peru().strftime('%d/%m/%Y %H:%M')}", "QUIADIL EIRL"],
+        [f"Generado el: {ahora_peru().strftime('%d/%m/%Y %H:%M')}", "QUIADIL EIRL - RUC: 20604913480 - Cel: 984 377 509"],
         [f"Usuario: {session.get('nombre', 'Sistema')}", "Sistema de Gestión de Expedientes v1.0"]
     ]
     footer_table = Table(footer_data, colWidths=[3.5*inch, 3.5*inch])
