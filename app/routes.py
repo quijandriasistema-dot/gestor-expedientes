@@ -2903,11 +2903,6 @@ def imprimir_expediente_pdf(id):
     elif expediente.tipo == 'archivo':
         info_data.append(['Ubicación en Archivo', Paragraph(expediente.ubicacion_archivo or 'No especificada', wrap_style)])
 
-    # ========== DESCRIPCIÓN COMPLETA EN TABLA (FLUJO CONTINUO) ==========
-    descripcion_texto = expediente.descripcion or 'Sin descripción'
-    descripcion_formateada = '<br/>'.join(descripcion_texto.split('\n'))
-    info_data.append(['Descripción', Paragraph(descripcion_formateada, wrap_style)])
-
     info_table = Table(info_data, colWidths=[2*inch, 5*inch])
     info_table.setStyle(TableStyle([
         ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#1e3a8a')),
@@ -2926,6 +2921,35 @@ def imprimir_expediente_pdf(id):
         ('BOTTOMPADDING', (0, 1), (-1, -1), 6),
     ]))
     elements.append(info_table)
+
+    # ========== DESCRIPCIÓN COMPLETA FUERA DE TABLA (FLUJO CONTINUO) ==========
+    if expediente.descripcion:
+        elements.append(Spacer(1, 12))
+        elements.append(Paragraph("<b>📝 DESCRIPCIÓN DEL CASO:</b>", ParagraphStyle(
+            'DescTitle',
+            parent=styles['Normal'],
+            fontSize=10,
+            textColor=colors.HexColor('#1e3a8a'),
+            fontName='Helvetica-Bold',
+            spaceAfter=6
+        )))
+        
+        descripcion_texto = expediente.descripcion
+        descripcion_formateada = '<br/>'.join(descripcion_texto.split('\n'))
+        elements.append(Paragraph(descripcion_formateada, ParagraphStyle(
+            'DescContent',
+            parent=wrap_style,
+            fontSize=9,
+            leading=13,
+            leftIndent=12,
+            rightIndent=12,
+            spaceBefore=6,
+            spaceAfter=6,
+            backColor=colors.HexColor('#f8fafc'),
+            borderColor=colors.HexColor('#e2e8f0'),
+            borderWidth=1,
+            borderPadding=10
+        )))
 
     if historial:
         elements.append(Spacer(1, 15))
