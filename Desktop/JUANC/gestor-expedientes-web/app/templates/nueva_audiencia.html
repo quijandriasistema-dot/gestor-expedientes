@@ -1,0 +1,109 @@
+{% extends "base.html" %}
+
+{% block title %}{{ title }}{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header bg-primary text-white">
+                <h4 class="mb-0">
+                    <i class="bi bi-calendar-plus"></i> 
+                    {% if expediente %}
+                        Programar Audiencia - {{ expediente.get_identificador_principal() }}
+                    {% else %}
+                        Programar Nueva Audiencia
+                    {% endif %}
+                </h4>
+            </div>
+            <div class="card-body">
+                <form method="POST" action="">
+                    {{ form.hidden_tag() }}
+                    
+                    {% if not expediente %}
+                    <!-- Selección de Expediente -->
+                    <div class="mb-3">
+                        <label class="form-label">Expediente *</label>
+                        <select name="expediente_id" class="form-select" required>
+                            <option value="0">Seleccione un expediente...</option>
+                            {% for exp in expedientes %}
+                            <option value="{{ exp.id }}">
+                                {{ exp.get_identificador_principal() }} - {{ exp.cliente }} ({{ exp.get_tipo_label() }})
+                            </option>
+                            {% endfor %}
+                        </select>
+                        <div class="form-text">Seleccione el expediente al que pertenece esta audiencia</div>
+                    </div>
+                    {% endif %}
+                    
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            {{ form.fecha.label(class="form-label") }}
+                            {{ form.fecha(class="form-control", type="date") }}
+                            {% if form.fecha.errors %}
+                                <div class="text-danger">{{ form.fecha.errors[0] }}</div>
+                            {% endif %}
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            {{ form.hora.label(class="form-label") }}
+                            {{ form.hora(class="form-control", type="time") }}
+                            {% if form.hora.errors %}
+                                <div class="text-danger">{{ form.hora.errors[0] }}</div>
+                            {% endif %}
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        {{ form.tipo_audiencia.label(class="form-label") }}
+                        {{ form.tipo_audiencia(class="form-select") }}
+                        {% if form.tipo_audiencia.errors %}
+                            <div class="text-danger">{{ form.tipo_audiencia.errors[0] }}</div>
+                        {% endif %}
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-8 mb-3">
+                            {{ form.lugar.label(class="form-label") }}
+                            {{ form.lugar(class="form-control") }}
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            {{ form.sala.label(class="form-label") }}
+                            {{ form.sala(class="form-control") }}
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        {{ form.magistrado.label(class="form-label") }}
+                        {{ form.magistrado(class="form-control") }}
+                    </div>
+                    
+                    <div class="mb-3">
+                        {{ form.link_videollamada.label(class="form-label") }}
+                        {{ form.link_videollamada(class="form-control") }}
+                        <div class="form-text">Opcional. Para audiencias virtuales</div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        {{ form.observaciones.label(class="form-label") }}
+                        {{ form.observaciones(class="form-control", rows="3") }}
+                    </div>
+                    
+                    <div class="mb-3">
+                        {{ form.recordatorio_dias.label(class="form-label") }}
+                        {{ form.recordatorio_dias(class="form-select") }}
+                    </div>
+                    
+                    <hr>
+                    
+                    <div class="d-flex justify-content-between">
+                        <a href="{% if expediente %}{{ url_for('main.ver_expediente', id=expediente.id) }}{% else %}{{ url_for('main.audiencias') }}{% endif %}" class="btn btn-secondary">
+                            <i class="bi bi-arrow-left"></i> Cancelar
+                        </a>
+                        {{ form.submit(class="btn btn-primary") }}
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

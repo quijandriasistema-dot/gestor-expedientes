@@ -1,0 +1,138 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="dashboard">
+    <!-- Header -->
+    <div class="dashboard-header">
+        <div class="studio-display">
+            <span class="scales-icon">⚖️</span>
+            <div class="studio-name-main">Quijandria Abogados</div>
+        </div>
+        <div class="welcome-text">Sistema de Gestión de Expedientes Legales</div>
+    </div>
+    
+    <!-- Título -->
+    <h1 style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.5rem;">
+        <span>📤</span>
+        <span>Subir Nuevo Documento</span>
+    </h1>
+    <p style="color: var(--color-text-light); margin-bottom: 1.5rem;">
+        Complete la información y seleccione el archivo a subir.
+    </p>
+    
+    <!-- Información si viene de un expediente -->
+    {% if expediente %}
+    <div style="background: #e0f2fe; border-left: 4px solid #0369a1; padding: 1rem; margin-bottom: 1.5rem; border-radius: 4px;">
+        <strong>📁 Expediente seleccionado:</strong> {{ expediente.get_identificador_principal() }} - {{ expediente.cliente }}
+    </div>
+    {% endif %}
+    
+    <!-- Formulario -->
+    <div class="form-container">
+        <form method="POST" action="" enctype="multipart/form-data">
+            {{ form.hidden_tag() }}
+            
+            <!-- Sección 1: Expediente relacionado -->
+            <div class="form-section">
+                <h3><span>📁</span> Expediente Relacionado</h3>
+                
+                <div class="form-row">
+                    <div class="form-col-2">
+                        <div class="form-group">
+                            {{ form.expediente_id.label }}
+                            {% if expediente %}
+                                {{ form.expediente_id(class="form-control", disabled=true) }}
+                                <input type="hidden" name="expediente_id" value="{{ expediente.id }}">
+                            {% else %}
+                                {{ form.expediente_id(class="form-control") }}
+                            {% endif %}
+                            <small style="color: var(--color-text-light);">Seleccione "Ninguno" para documentos generales</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Sección 2: Información del documento -->
+            <div class="form-section">
+                <h3><span>📝</span> Información del Documento</h3>
+                
+                <div class="form-row">
+                    <div class="form-col-2">
+                        <div class="form-group">
+                            {{ form.titulo.label }}
+                            {{ form.titulo(class="form-control", placeholder="Ej: Escrito de Demanda, Resolución N° 123...") }}
+                            {% if form.titulo.errors %}
+                                {% for error in form.titulo.errors %}
+                                    <span class="error">{{ error }}</span>
+                                {% endfor %}
+                            {% endif %}
+                        </div>
+                    </div>
+                    
+                    <div class="form-col-2">
+                        <div class="form-group">
+                            {{ form.categoria.label }}
+                            {{ form.categoria(class="form-control") }}
+                            {% if form.categoria.errors %}
+                                {% for error in form.categoria.errors %}
+                                    <span class="error">{{ error }}</span>
+                                {% endfor %}
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="form-row">
+                    <div class="form-col-2">
+                        <div class="form-group">
+                            {{ form.fecha_documento.label }}
+                            {{ form.fecha_documento(class="form-control", type="date") }}
+                            <small style="color: var(--color-text-light);">Fecha que indica el documento (opcional)</small>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    {{ form.descripcion.label }}
+                    {{ form.descripcion(class="form-control", rows=3, placeholder="Descripción o observaciones sobre el documento...") }}
+                </div>
+            </div>
+            
+            <!-- Sección 3: Archivo -->
+            <div class="form-section">
+                <h3><span>📎</span> Archivo</h3>
+                
+                <div class="form-group">
+                    {{ form.archivo.label }}
+                    {{ form.archivo(class="form-control", accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png,.gif,.mp4,.mp3,.zip,.rar,.txt") }}
+                    {% if form.archivo.errors %}
+                        {% for error in form.archivo.errors %}
+                            <span class="error">{{ error }}</span>
+                        {% endfor %}
+                    {% endif %}
+                    
+                    <div style="margin-top: 0.5rem; padding: 0.75rem; background: #f0f9ff; border-radius: 6px; border-left: 3px solid #0ea5e9;">
+                        <small style="color: #0369a1;">
+                            <strong>📋 Formatos permitidos:</strong><br>
+                            PDF, Word (.doc, .docx), Excel (.xls, .xlsx),<br>
+                            Imágenes (.jpg, .png, .gif), Audio/Video (.mp3, .mp4),<br>
+                            Comprimidos (.zip, .rar), Texto (.txt)
+                        </small>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Botones -->
+            <div class="form-actions">
+                {{ form.submit(class="btn btn-primary btn-lg") }}
+                
+                {% if expediente %}
+                    <a href="{{ url_for('main.expediente_documentos', id=expediente.id) }}" class="btn btn-secondary btn-lg">❌ Cancelar</a>
+                {% else %}
+                    <a href="{{ url_for('main.documentos') }}" class="btn btn-secondary btn-lg">❌ Cancelar</a>
+                {% endif %}
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,90 @@
+{% extends "base.html" %}
+
+{% block title %}{{ title }}{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header bg-warning">
+                <h4 class="mb-0">
+                    <i class="bi bi-pencil-square"></i> Editar Audiencia
+                </h4>
+            </div>
+            <div class="card-body">
+                <div class="alert alert-info">
+                    <strong>Expediente:</strong> {{ audiencia.expediente.get_identificador_principal() }} - {{ audiencia.expediente.cliente }}
+                </div>
+                
+                <form method="POST" action="">
+                    {{ form.hidden_tag() }}
+                    
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            {{ form.fecha.label(class="form-label") }}
+                            {{ form.fecha(class="form-control", type="date") }}
+                            {% if form.fecha.errors %}
+                                <div class="text-danger">{{ form.fecha.errors[0] }}</div>
+                            {% endif %}
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            {{ form.hora.label(class="form-label") }}
+                            {{ form.hora(class="form-control", type="time") }}
+                            {% if form.hora.errors %}
+                                <div class="text-danger">{{ form.hora.errors[0] }}</div>
+                            {% endif %}
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        {{ form.tipo_audiencia.label(class="form-label") }}
+                        {{ form.tipo_audiencia(class="form-select") }}
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-8 mb-3">
+                            {{ form.lugar.label(class="form-label") }}
+                            {{ form.lugar(class="form-control") }}
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            {{ form.sala.label(class="form-label") }}
+                            {{ form.sala(class="form-control") }}
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        {{ form.magistrado.label(class="form-label") }}
+                        {{ form.magistrado(class="form-control") }}
+                    </div>
+                    
+                    <div class="mb-3">
+                        {{ form.link_videollamada.label(class="form-label") }}
+                        {{ form.link_videollamada(class="form-control") }}
+                    </div>
+                    
+                    <div class="mb-3">
+                        {{ form.observaciones.label(class="form-label") }}
+                        {{ form.observaciones(class="form-control", rows="3") }}
+                    </div>
+                    
+                    <div class="mb-3">
+                        {{ form.recordatorio_dias.label(class="form-label") }}
+                        {{ form.recordatorio_dias(class="form-select") }}
+                    </div>
+                    
+                    <hr>
+                    
+                    <div class="d-flex justify-content-between">
+                        <a href="{{ url_for('main.ver_audiencia', id=audiencia.id) }}" class="btn btn-secondary">
+                            <i class="bi bi-arrow-left"></i> Cancelar
+                        </a>
+                        <button type="submit" class="btn btn-warning">
+                            <i class="bi bi-check-circle"></i> Guardar Cambios
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

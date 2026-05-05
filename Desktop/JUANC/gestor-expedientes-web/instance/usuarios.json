@@ -1,0 +1,37 @@
+{
+  "dev": {
+    "password": "dev123",
+    "nombre": "Desarrollador Principal",
+    "rol": "DESARROLLADOR",
+    "modulos": [
+      "todo"
+    ]
+  },
+  "admin": {
+    "password": "admin123",
+    "nombre": "Administrador Sistema",
+    "rol": "ADMINISTRADOR",
+    "modulos": [
+      "expedientes",
+      "civil",
+      "penal",
+      "administrativo",
+      "conciliacion",
+      "audiencias",
+      "archivo",
+      "reportes",
+      "usuarios"
+    ]
+  },
+  "usuario1": {
+    "password": "user123",
+    "nombre": "Asistente Legal",
+    "rol": "USUARIO",
+    "modulos": [
+      "expedientes",
+      "civil",
+      "penal",
+      "audiencias"
+    ]
+  }
+}
