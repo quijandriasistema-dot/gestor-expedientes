@@ -2922,7 +2922,7 @@ def imprimir_expediente_pdf(id):
     ]))
     elements.append(info_table)
 
-    # ========== DESCRIPCIÓN COMPLETA FUERA DE TABLA (FLUJO CONTINUO) ==========
+    # ========== DESCRIPCIÓN COMPLETA FUERA DE TABLA (FLUJO CONTINUO CON ESPACIOS) ==========
     if expediente.descripcion:
         elements.append(Spacer(1, 12))
         elements.append(Paragraph("<b>📝 DESCRIPCIÓN DEL CASO:</b>", ParagraphStyle(
@@ -2934,22 +2934,28 @@ def imprimir_expediente_pdf(id):
             spaceAfter=6
         )))
         
-        descripcion_texto = expediente.descripcion
-        descripcion_formateada = '<br/>'.join(descripcion_texto.split('\n'))
-        elements.append(Paragraph(descripcion_formateada, ParagraphStyle(
-            'DescContent',
-            parent=wrap_style,
+        # Dividir por líneas y crear Paragraph individual por cada una
+        # Esto respeta los espacios en blanco entre párrafos
+        lineas = expediente.descripcion.split('\n')
+        desc_line_style = ParagraphStyle(
+            'DescLine',
+            parent=styles['Normal'],
             fontSize=9,
-            leading=13,
-            leftIndent=12,
-            rightIndent=12,
-            spaceBefore=6,
-            spaceAfter=6,
-            backColor=colors.HexColor('#f8fafc'),
-            borderColor=colors.HexColor('#e2e8f0'),
-            borderWidth=1,
-            borderPadding=10
-        )))
+            leading=14,
+            wordWrap='CJK',
+            leftIndent=6,
+            rightIndent=6,
+            spaceBefore=2,
+            spaceAfter=2
+        )
+        
+        for linea in lineas:
+            linea_limpia = linea.strip()
+            if linea_limpia:
+                elements.append(Paragraph(linea_limpia, desc_line_style))
+            else:
+                # Línea en blanco = espacio entre párrafos
+                elements.append(Spacer(1, 8))
 
     if historial:
         elements.append(Spacer(1, 15))
