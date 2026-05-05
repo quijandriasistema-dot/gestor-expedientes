@@ -139,12 +139,21 @@
                             </td>
                             <td>{{ exp.fecha_registro | fecha }}</td>
                             <td>
-                                <a href="{{ url_for('main.ver_expediente', id=exp.id) }}" class="btn" style="font-size: 0.8rem;">Ver</a>
+                                <!-- BOTÓN VER - USA TU CSS PERSONALIZADO -->
+                                <a href="{{ url_for('main.ver_expediente', id=exp.id) }}" 
+                                   class="btn btn-success btn-small">
+                                    👁️ Ver
+                                </a>
+                                
                                 {% if rol in ['ADMINISTRADOR', 'DESARROLLADOR'] %}
-                                <form method="POST" action="{{ url_for('main.eliminar_expediente', id=exp.id) }}" 
-                                    style="display: inline;" 
-                                    onsubmit="return confirm('¿Está seguro de eliminar el expediente {{ exp.numero_expediente }}? Esta acción no se puede deshacer.');">
-                                    <button type="submit" class="btn btn-danger" style="font-size: 0.8rem; margin-left: 0.3rem;">
+                                <!-- FORMULARIO ELIMINAR CON CONFIRMACIÓN -->
+                                <form method="POST" 
+                                      action="{{ url_for('main.eliminar_expediente', id=exp.id) }}" 
+                                      style="display: inline;" 
+                                      onsubmit="return confirm('¿Está seguro de eliminar el expediente {{ exp.numero_expediente }}? Esta acción no se puede deshacer.');">
+                                    <button type="submit" 
+                                            class="btn btn-danger btn-small" 
+                                            style="margin-left: 0.3rem;">
                                         🗑️ Eliminar
                                     </button>
                                 </form>
