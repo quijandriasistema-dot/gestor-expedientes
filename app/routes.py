@@ -4,7 +4,7 @@
 
 from flask import Blueprint, render_template, request, redirect, url_for, flash, session, jsonify, after_this_request, send_file
 from functools import wraps
-from datetime import datetime, timedelta, date
+from datetime import datetime, timedelta, date, timezone
 from app import db
 from app.models import Expediente, EstadoHistorial, Audiencia, Documento, Notificacion, Usuario
 from app.forms import ExpedienteForm, EstadoForm, BusquedaForm, AudienciaForm, BusquedaAudienciaForm, DocumentoForm, BusquedaDocumentoForm
@@ -27,6 +27,23 @@ from reportlab.lib.units import inch
 from reportlab.lib.utils import ImageReader
 from reportlab.platypus import Image as RLImage
 from logo_config import get_logo_image
+
+# ============================================
+# CONFIGURACIÓN DE ZONA HORARIA (Perú UTC-5)
+# ============================================
+try:
+    import pytz
+    LIMA_TZ = pytz.timezone('America/Lima')
+except ImportError:
+    LIMA_TZ = None
+
+def ahora_peru():
+    """Retorna la hora actual de Perú (UTC-5)"""
+    if LIMA_TZ:
+        return datetime.now(LIMA_TZ).replace(tzinfo=None)
+    # Fallback sin pytz: forma moderna sin datetime.utcnow()
+    peru_offset = timezone(timedelta(hours=-5))
+    return datetime.now(peru_offset).replace(tzinfo=None)
 
 # ============================================
 # IMPORTS PARA GOOGLE DRIVE - SERVICE ACCOUNT
@@ -142,8 +159,8 @@ def puede_ver_modulo(modulo):
     return False
 
 def puede_exportar():
-    """Verifica si el usuario puede exportar (Admin o Desarrollador)"""
-    return session.get('rol') in ['ADMINISTRADOR', 'DESARROLLADOR']
+    """Verifica si el usuario puede exportar (Admin, Desarrollador o Usuario)"""
+    return session.get('rol') in ['ADMINISTRADOR', 'DESARROLLADOR', 'USUARIO']
 
 # ============================================
 # FUNCIONES DE NOTIFICACIONES
@@ -1683,6 +1700,7 @@ def subir_documento():
 
 @bp.route('/subir-documento-drive', methods=['GET', 'POST'])
 @requiere_login
+@no_cache
 def subir_documento_drive():
     """
     Sube documento al Drive corporativo del estudio.
@@ -2439,7 +2457,15 @@ def exportar_pdf(tipo):
         ('BOTTOMPADDING', (0, 0), (-1, 0), 8),
     ])))
 
-    elements.append(Paragraph("QUIJANDRIA ABOGADOS EIRL", estudio_style))
+    elements.append(Paragraph("QUIADIL EIRL", estudio_style))
+    elements.append(Paragraph("RUC: 20604913480", ParagraphStyle(
+        'RUCStyle',
+        parent=sistema_style,
+        fontSize=11,
+        textColor=colors.HexColor('#1e3a8a'),
+        fontName='Helvetica-Bold',
+        spaceAfter=4
+    )))
     elements.append(Paragraph("Sistema de Gestión de Expedientes Legales", sistema_style))
 
     # Línea separadora
@@ -2451,7 +2477,7 @@ def exportar_pdf(tipo):
     elements.append(Paragraph(titulo_reporte.upper(), reporte_style))
     elements.append(Paragraph(subtitulo, descripcion_style))
     elements.append(Paragraph(
-        f"Generado el {datetime.now().strftime('%d de %B de %Y a las %H:%M')} | "
+        f"Generado el {ahora_peru().strftime('%d de %B de %Y a las %H:%M')} | "
         f"Usuario: {session.get('nombre', 'Sistema')} | "
         f"Total: {len(expedientes)} expedientes",
         info_style
@@ -2683,7 +2709,7 @@ def exportar_pdf(tipo):
         canvas.drawRightString(
             letter[0] - 0.6*inch, 
             letter[1] - 0.6*inch, 
-            "QUIJANDRIA ABOGADOS EIRL"
+            "QUIADIL EIRL"
         )
 
         canvas.setFont('Helvetica', 7)
@@ -2721,7 +2747,7 @@ def exportar_pdf(tipo):
         canvas.drawString(
             0.6*inch, 
             0.35*inch, 
-            f"Generado: {datetime.now().strftime('%d/%m/%Y %H:%M')} | Usuario: {session.get('nombre', 'Sistema')}"
+            f"Generado: {ahora_peru().strftime('%d/%m/%Y %H:%M')} | Usuario: {session.get('nombre', 'Sistema')}"
         )
 
         # Texto centro del pie
@@ -2757,7 +2783,7 @@ def exportar_pdf(tipo):
         output,
         mimetype='application/pdf',
         as_attachment=True,
-        download_name=f'{nombre_archivo}_{datetime.now().strftime("%Y%m%d_%H%M")}.pdf'
+        download_name=f'{nombre_archivo}_{ahora_peru().strftime("%Y%m%d_%H%M")}.pdf'
     )
 
 # ============================================
@@ -2768,7 +2794,7 @@ def exportar_pdf(tipo):
 @requiere_login
 @no_cache
 def imprimir_expediente_pdf(id):
-    """Generar PDF del detalle de expediente con historial y audiencias (solo Admin/Dev)"""
+    """Generar PDF del detalle de expediente con historial y audiencias (Admin/Dev/Usuario)"""
 
     if not puede_exportar():
         flash('No tiene permisos para imprimir expedientes', 'error')
@@ -2810,7 +2836,16 @@ def imprimir_expediente_pdf(id):
         spaceBefore=12
     )
 
-    elements.append(Paragraph("QUIJANDRIA ABOGADOS EIRL", title_style))
+    elements.append(Paragraph("QUIADIL EIRL", title_style))
+    elements.append(Paragraph("RUC: 20604913480", ParagraphStyle(
+        'RUCStyleDetalle',
+        parent=styles['Normal'],
+        fontSize=10,
+        textColor=colors.HexColor('#1e3a8a'),
+        fontName='Helvetica-Bold',
+        alignment=1,
+        spaceAfter=6
+    )))
     elements.append(Paragraph("Sistema de Gestión de Expedientes Legales", styles['Normal']))
     elements.append(Paragraph("<b>Reporte de Expediente</b>", styles['Heading3']))
     elements.append(Spacer(1, 10))
@@ -2830,7 +2865,6 @@ def imprimir_expediente_pdf(id):
         wordWrap='CJK'
     )
 
-    # Estilo negrita para valores importantes
     bold_wrap_style = ParagraphStyle(
         'BoldWrapStyle',
         parent=styles['Normal'],
@@ -2869,9 +2903,19 @@ def imprimir_expediente_pdf(id):
     elif expediente.tipo == 'archivo':
         info_data.append(['Ubicación en Archivo', Paragraph(expediente.ubicacion_archivo or 'No especificada', wrap_style)])
 
+    # ========== DESCRIPCIÓN: RESUMEN EN TABLA, COMPLETA DESPUÉS ==========
     descripcion_texto = expediente.descripcion or 'Sin descripción'
-    descripcion_formateada = '<br/>'.join(descripcion_texto.split('\n')) if descripcion_texto else 'Sin descripción'
-    info_data.append(['Descripción', Paragraph(descripcion_formateada, wrap_style)])
+    descripcion_larga = len(descripcion_texto) > 400
+    
+    if descripcion_larga:
+        # Si es larga, poner solo un resumen en la tabla
+        resumen_desc = descripcion_texto[:400] + "...<br/><i>(Ver descripción completa en la siguiente página)</i>"
+        descripcion_formateada = '<br/>'.join(resumen_desc.split('\n'))
+        info_data.append(['Descripción', Paragraph(descripcion_formateada, wrap_style)])
+    else:
+        # Si es corta, va completa en la tabla
+        descripcion_formateada = '<br/>'.join(descripcion_texto.split('\n'))
+        info_data.append(['Descripción', Paragraph(descripcion_formateada, wrap_style)])
 
     info_table = Table(info_data, colWidths=[2*inch, 5*inch])
     info_table.setStyle(TableStyle([
@@ -2891,6 +2935,33 @@ def imprimir_expediente_pdf(id):
         ('BOTTOMPADDING', (0, 1), (-1, -1), 6),
     ]))
     elements.append(info_table)
+
+    # ========== DESCRIPCIÓN COMPLETA (SI ERA LARGA) ==========
+    if descripcion_larga and expediente.descripcion:
+        from reportlab.platypus import PageBreak
+        
+        elements.append(PageBreak())
+        elements.append(Paragraph("📄 DESCRIPCIÓN COMPLETA DEL CASO", section_style))
+        
+        desc_box_style = ParagraphStyle(
+            'DescBoxLarga',
+            parent=styles['Normal'],
+            fontSize=9,
+            textColor=colors.HexColor('#334155'),
+            leading=13,
+            wordWrap='CJK',
+            leftIndent=12,
+            rightIndent=12,
+            spaceBefore=10,
+            spaceAfter=10,
+            backColor=colors.HexColor('#f8fafc'),
+            borderColor=colors.HexColor('#e2e8f0'),
+            borderWidth=1,
+            borderPadding=10
+        )
+        
+        descripcion_formateada = '<br/>'.join(expediente.descripcion.split('\n'))
+        elements.append(Paragraph(descripcion_formateada, desc_box_style))
 
     if historial:
         elements.append(Spacer(1, 15))
@@ -3002,7 +3073,7 @@ def imprimir_expediente_pdf(id):
     elements.append(Spacer(1, 10))
 
     footer_data = [
-        [f"Generado el: {datetime.now().strftime('%d/%m/%Y %H:%M')}", "Quijandria Abogados EIRL"],
+        [f"Generado el: {ahora_peru().strftime('%d/%m/%Y %H:%M')}", "QUIADIL EIRL"],
         [f"Usuario: {session.get('nombre', 'Sistema')}", "Sistema de Gestión de Expedientes v1.0"]
     ]
     footer_table = Table(footer_data, colWidths=[3.5*inch, 3.5*inch])
@@ -3019,7 +3090,6 @@ def imprimir_expediente_pdf(id):
         try:
             logo = get_logo_image()
             if logo:
-                # Logo más grande: 2.0 x 1.6 pulgadas
                 logo_width = 2.0 * inch
                 logo_height = 1.6 * inch
                 page_width = letter[0]
@@ -3040,7 +3110,7 @@ def imprimir_expediente_pdf(id):
         output,
         mimetype='application/pdf',
         as_attachment=True,
-        download_name=f'Expediente_{expediente.numero_expediente.replace("/", "_")}_{datetime.now().strftime("%Y%m%d")}.pdf'
+        download_name=f'Expediente_{expediente.numero_expediente.replace("/", "_")}_{ahora_peru().strftime("%Y%m%d")}.pdf'
     )
 # ============================================
 # RUTA PARA EXPORTAR SEGUIMIENTO A EXCEL
@@ -3220,7 +3290,7 @@ def exportar_seguimiento_excel(id):
 @requiere_login
 @no_cache
 def exportar_resumen_pdf(id):
-    """Generar PDF resumen profesional del expediente (solo Admin/Dev)"""
+    """Generar PDF resumen profesional del expediente (Admin/Dev/Usuario)"""
 
     if not puede_exportar():
         flash('No tiene permisos para exportar expedientes', 'error')
@@ -3288,7 +3358,15 @@ def exportar_resumen_pdf(id):
         wordWrap='CJK'
     )
 
-    elements.append(Paragraph("QUIJANDRIA ABOGADOS EIRL", titulo_estudio))
+    elements.append(Paragraph("QUIADIL EIRL", titulo_estudio))
+    elements.append(Paragraph("RUC: 20604913480", ParagraphStyle(
+        'RUCStyleResumen',
+        parent=subtitulo_sistema,
+        fontSize=11,
+        textColor=colors.HexColor('#1e3a8a'),
+        fontName='Helvetica-Bold',
+        spaceAfter=18
+    )))
     elements.append(Paragraph("Sistema de Gestión de Expedientes Legales", subtitulo_sistema))
 
     elements.append(Table([['']], colWidths=[6.5*inch], style=TableStyle([
@@ -3401,7 +3479,10 @@ def exportar_resumen_pdf(id):
     elements.append(tabla)
     elements.append(Spacer(1, 20))
 
+    # ========== SECCIÓN DESCRIPCIÓN CON SALTO DE PÁGINA AUTOMÁTICO ==========
     if expediente.descripcion:
+        from reportlab.platypus import PageBreak
+        
         desc_style = ParagraphStyle(
             'Desc',
             parent=styles['Normal'],
@@ -3412,27 +3493,38 @@ def exportar_resumen_pdf(id):
             leading=14,
             wordWrap='CJK'
         )
+        
+        # Estilo con recuadro visual profesional (simula la tabla anterior)
+        desc_box_style = ParagraphStyle(
+            'DescBox',
+            parent=desc_style,
+            leftIndent=12,
+            rightIndent=12,
+            spaceBefore=10,
+            spaceAfter=10,
+            backColor=colors.HexColor('#f8fafc'),
+            borderColor=colors.HexColor('#e2e8f0'),
+            borderWidth=1,
+            borderPadding=10
+        )
+        
         elements.append(Paragraph("<b>DESCRIPCIÓN DEL CASO:</b>", desc_style))
 
         descripcion_texto = expediente.descripcion
         descripcion_formateada = '<br/>'.join(descripcion_texto.split('\n')) if descripcion_texto else 'Sin descripción'
         
-        desc_data = [[Paragraph(descripcion_formateada, desc_style)]]
-        desc_tabla = Table(desc_data, colWidths=[6.5*inch])
-        desc_tabla.setStyle(TableStyle([
-            ('FONTNAME', (0, 0), (-1, -1), 'Helvetica'),
-            ('FONTSIZE', (0, 0), (-1, -1), 10),
-            ('TEXTCOLOR', (0, 0), (-1, -1), colors.HexColor('#334155')),
-            ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor('#f8fafc')),
-            ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
-            ('VALIGN', (0, 0), (-1, -1), 'TOP'),
-            ('LEFTPADDING', (0, 0), (-1, -1), 12),
-            ('RIGHTPADDING', (0, 0), (-1, -1), 12),
-            ('TOPPADDING', (0, 0), (-1, -1), 10),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 10),
-            ('BOX', (0, 0), (-1, -1), 1, colors.HexColor('#e2e8f0')),
-        ]))
-        elements.append(desc_tabla)
+        # Si la descripción es muy larga (>1500 caracteres), forzar salto de página antes
+        # para que no rompa el layout de la tabla anterior
+        if len(descripcion_texto) > 1500:
+            elements.append(PageBreak())
+            elements.append(Paragraph("<b>DESCRIPCIÓN DEL CASO (CONTINUACIÓN):</b>", desc_style))
+        
+        # Paragraph directo permite división automática entre páginas
+        # Mantiene el recuadro visual con fondo, borde y padding
+        desc_para = Paragraph(descripcion_formateada, desc_box_style)
+        elements.append(desc_para)
+        
+        elements.append(Spacer(1, 20))
 
     elements.append(Spacer(1, 40))
     elements.append(Table([['']], colWidths=[6.5*inch], style=TableStyle([
@@ -3442,7 +3534,7 @@ def exportar_resumen_pdf(id):
 
     elements.append(Paragraph(
         "Este documento es confidencial y de uso exclusivo del estudio jurídico. "
-        "Generado el " + datetime.now().strftime('%d/%m/%Y a las %H:%M') + 
+        "Generado el " + ahora_peru().strftime('%d/%m/%Y a las %H:%M') + 
         " por " + session.get('nombre', 'Sistema'),
         nota_estilo
     ))
@@ -3452,7 +3544,6 @@ def exportar_resumen_pdf(id):
         try:
             logo = get_logo_image()
             if logo:
-                # Logo más grande: 2.0 x 1.6 pulgadas
                 logo_width = 2.0 * inch
                 logo_height = 1.6 * inch
                 page_width = letter[0]
@@ -3473,7 +3564,7 @@ def exportar_resumen_pdf(id):
         output,
         mimetype='application/pdf',
         as_attachment=True,
-        download_name=f'Resumen_{expediente.numero_expediente.replace("/", "_")}_{datetime.now().strftime("%Y%m%d")}.pdf'
+        download_name=f'Resumen_{expediente.numero_expediente.replace("/", "_")}_{ahora_peru().strftime("%Y%m%d")}.pdf'
     )
 
 # RUTA: ENVIAR EXPEDIENTE A ARCHIVO
@@ -3642,5 +3733,3 @@ def oauth2callback():
 # ============================================
 # FIN DEL ARCHIVO
 # ============================================
-
-exportar_pdf
