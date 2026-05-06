@@ -52,13 +52,13 @@
                 <h3><span>🆔</span> Identificación del Caso</h3>
                 
                 <!-- DNI -->
-                <div class="form-row" id="campo-dni-container" style="display: {% if expediente.tipo in ['administrativo', 'penal', 'conciliacion', 'archivo'] %}flex{% else %}none{% endif %};">
+                <div class="form-row" id="campo-dni-container" style="display: {% if expediente.tipo in ['administrativo', 'penal', 'conciliacion', 'archivo', 'civil'] %}flex{% else %}none{% endif %};">
                     <div class="form-col-2">
                         <div class="form-group">
                             <label for="dni">
                                 DNI
                                 {% if expediente.tipo == 'administrativo' %}<span style="color: #dc2626;">*</span>{% endif %}
-                                {% if expediente.tipo in ['penal', 'conciliacion', 'archivo'] %}(Opcional){% endif %}
+                                {% if expediente.tipo in ['penal', 'conciliacion', 'archivo', 'civil'] %}(Opcional){% endif %}
                             </label>
                             <input type="text" name="dni" id="dni" class="form-control" value="{{ expediente.dni or '' }}">
                         </div>
