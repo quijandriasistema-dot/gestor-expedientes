@@ -681,7 +681,7 @@ def eliminar_expediente(id):
     expediente = Expediente.query.get_or_404(id)
 
     try:
-        # Eliminar documentos de Drive primero
+        # 1. Eliminar documentos de Drive primero
         documentos = Documento.query.filter_by(expediente_id=id).all()
         for doc in documentos:
             if doc.drive_file_id:
@@ -690,12 +690,27 @@ def eliminar_expediente(id):
                 except Exception as e:
                     print(f"Error eliminando doc {doc.id} de Drive: {e}")
 
-        # Eliminar registros relacionados
-        EstadoHistorial.query.filter_by(expediente_id=id).delete()
-        Audiencia.query.filter_by(expediente_id=id).delete()
-        Documento.query.filter_by(expediente_id=id).delete()
-        Notificacion.query.filter_by(expediente_id=id).delete()
+        # 2. Obtener IDs de audiencias para eliminar notificaciones relacionadas
+        audiencias = Audiencia.query.filter_by(expediente_id=id).all()
+        audiencias_ids = [a.id for a in audiencias]
 
+        # 3. Eliminar NOTIFICACIONES que referencian a las audiencias (hijos primero)
+        if audiencias_ids:
+            Notificacion.query.filter(Notificacion.audiencia_id.in_(audiencias_ids)).delete(synchronize_session=False)
+
+        # 4. Eliminar NOTIFICACIONES que referencian al expediente directamente
+        Notificacion.query.filter_by(expediente_id=id).delete(synchronize_session=False)
+
+        # 5. Ahora eliminar AUDIENCIAS (ya no tienen referencias en notificaciones)
+        Audiencia.query.filter_by(expediente_id=id).delete(synchronize_session=False)
+
+        # 6. Eliminar ESTADOS del historial
+        EstadoHistorial.query.filter_by(expediente_id=id).delete(synchronize_session=False)
+
+        # 7. Eliminar DOCUMENTOS de la base de datos
+        Documento.query.filter_by(expediente_id=id).delete(synchronize_session=False)
+
+        # 8. Finalmente eliminar el EXPEDIENTE
         identificador = expediente.get_identificador_principal()
         db.session.delete(expediente)
         db.session.commit()
