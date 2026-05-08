@@ -79,7 +79,6 @@
                 </div>
                 
                 <!-- N° Expediente - Visible para: Civil, Penal, Conciliación, Archivo -->
-                <!-- Oculto pero presente para Administrativo (envía vacío) -->
                 <div class="form-row" id="campo-expediente-container" style="display: none;">
                     <div class="form-col-2">
                         <div class="form-group">
@@ -402,10 +401,13 @@
             expedienteContainer.style.display = 'flex';
             expedienteInput.value = '';
             if (requiredExpediente) requiredExpediente.style.display = 'inline';
+            // Activar validación en tiempo real
+            configurarValidacionExpediente(expedienteInput);
         } else {
             expedienteContainer.style.display = 'none';
-            expedienteInput.value = '';  // ✅ Enviar vacío, no '-'
+            expedienteInput.value = '';
             if (requiredExpediente) requiredExpediente.style.display = 'none';
+            limpiarValidacionExpediente();
         }
         
         // --- Cliente ---
@@ -425,6 +427,148 @@
         
         // --- Sincronización Solicitante → Cliente ---
         configurarSincronizacionSolicitanteCliente(config.sincronizarSolicitanteCliente);
+    }
+    
+    // ============================================
+    // VALIDACIÓN EN TIEMPO REAL DEL N° EXPEDIENTE
+    // ============================================
+    let validacionEnProgreso = false;
+    let numeroExpedienteValidado = null;
+    
+    function configurarValidacionExpediente(input) {
+        // Remover listeners anteriores
+        const nuevoInput = input.cloneNode(true);
+        input.parentNode.replaceChild(nuevoInput, input);
+        
+        nuevoInput.addEventListener('blur', function() {
+            const numero = this.value.trim();
+            const tipo = document.getElementById('tipo').value;
+            
+            if (!numero) {
+                limpiarValidacionExpediente();
+                return;
+            }
+            
+            // Evitar validar el mismo número dos veces
+            if (numero === numeroExpedienteValidado) return;
+            
+            validarExpedienteEnTiempoReal(numero, tipo, nuevoInput);
+        });
+        
+        nuevoInput.addEventListener('input', function() {
+            // Limpiar validación al editar
+            limpiarValidacionExpediente();
+            numeroExpedienteValidado = null;
+        });
+    }
+    
+    function validarExpedienteEnTiempoReal(numero, tipo, inputElement) {
+        validacionEnProgreso = true;
+        inputElement.style.backgroundColor = '#fef3c7';
+        inputElement.placeholder = '⏳ Validando...';
+        
+        fetch(`/api/validar-expediente?numero=${encodeURIComponent(numero)}&tipo=${encodeURIComponent(tipo)}`)
+            .then(response => response.json())
+            .then(data => {
+                inputElement.style.backgroundColor = '';
+                inputElement.placeholder = 'Ingrese N° de Expediente';
+                numeroExpedienteValidado = numero;
+                
+                if (!data.valido && data.bloquear) {
+                    // ❌ DUPLICADO DEL MISMO TIPO - BLOQUEAR
+                    mostrarValidacionExpediente('error', data.mensaje);
+                    bloquearBotonGuardar(true);
+                    inputElement.style.borderColor = '#dc2626';
+                    inputElement.style.backgroundColor = '#fef2f2';
+                    
+                } else if (data.advertencia) {
+                    // ⚠️ DUPLICADO EN OTRO TIPO - ADVERTENCIA PERMITIR
+                    mostrarValidacionExpediente('warning', data.mensaje);
+                    bloquearBotonGuardar(false);
+                    inputElement.style.borderColor = '#f59e0b';
+                    inputElement.style.backgroundColor = '#fffbeb';
+                    
+                } else {
+                    // ✅ VÁLIDO
+                    limpiarValidacionExpediente();
+                    bloquearBotonGuardar(false);
+                    inputElement.style.borderColor = '#10b981';
+                    inputElement.style.backgroundColor = '#ecfdf5';
+                }
+            })
+            .catch(error => {
+                console.error('Error validando expediente:', error);
+                inputElement.style.backgroundColor = '';
+                inputElement.placeholder = 'Ingrese N° de Expediente';
+            })
+            .finally(() => {
+                validacionEnProgreso = false;
+            });
+    }
+    
+    function mostrarValidacionExpediente(tipo, mensaje) {
+        // Remover mensaje anterior
+        limpiarValidacionExpediente();
+        
+        const container = document.getElementById('campo-expediente-container');
+        const mensajeDiv = document.createElement('div');
+        mensajeDiv.id = 'mensaje-validacion-expediente';
+        
+        const colores = {
+            'error': { bg: '#fef2f2', border: '#dc2626', text: '#991b1b', icon: '❌' },
+            'warning': { bg: '#fffbeb', border: '#f59e0b', text: '#92400e', icon: '⚠️' }
+        };
+        
+        const estilo = colores[tipo];
+        
+        mensajeDiv.style.cssText = `
+            margin-top: 0.5rem;
+            padding: 0.75rem 1rem;
+            background: ${estilo.bg};
+            border-left: 4px solid ${estilo.border};
+            border-radius: 6px;
+            color: ${estilo.text};
+            font-size: 0.9rem;
+            line-height: 1.5;
+            display: flex;
+            align-items: start;
+            gap: 0.5rem;
+            animation: slideIn 0.3s ease;
+        `;
+        
+        mensajeDiv.innerHTML = `<span style="font-size: 1.1rem;">${estilo.icon}</span><span>${mensaje}</span>`;
+        
+        // Insertar después del input
+        const formGroup = container.querySelector('.form-group');
+        formGroup.appendChild(mensajeDiv);
+    }
+    
+    function limpiarValidacionExpediente() {
+        const mensaje = document.getElementById('mensaje-validacion-expediente');
+        if (mensaje) mensaje.remove();
+        
+        const input = document.getElementById('numero_expediente');
+        if (input) {
+            input.style.borderColor = '';
+            input.style.backgroundColor = '';
+        }
+    }
+    
+    function bloquearBotonGuardar(bloquear) {
+        const btn = document.getElementById('btn-guardar');
+        if (!btn) return;
+        
+        if (bloquear) {
+            btn.disabled = true;
+            btn.style.opacity = '0.5';
+            btn.style.cursor = 'not-allowed';
+            btn.title = 'Corrija el N° de Expediente para poder guardar';
+        } else {
+            btn.disabled = false;
+            btn.style.opacity = '';
+            btn.style.cursor = '';
+            btn.title = '';
+        }
     }
     
     // ============================================

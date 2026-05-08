@@ -337,6 +337,68 @@ def buscar_cliente_por_dni(dni):
     return jsonify({'encontrado': False})
 
 # ============================================
+# API PARA VALIDAR UNICIDAD DE EXPEDIENTE (TIEMPO REAL)
+# ============================================
+
+@bp.route('/api/validar-expediente')
+@requiere_login
+@no_cache
+def validar_expediente():
+    """
+    Valida unicidad de número de expediente en tiempo real.
+    Retorna: bloqueado (mismo tipo) o advertencia (otro tipo)
+    """
+    numero = request.args.get('numero', '').strip()
+    tipo = request.args.get('tipo', '').strip()
+
+    if not numero or not tipo or tipo == 'administrativo':
+        return jsonify({'valido': True})
+
+    # --- Validar duplicado dentro del MISMO tipo ---
+    existe_mismo_tipo = Expediente.query.filter(
+        Expediente.tipo == tipo,
+        Expediente.numero_expediente == numero
+    ).first()
+
+    if existe_mismo_tipo:
+        return jsonify({
+            'valido': False,
+            'bloquear': True,
+            'mensaje': f'❌ El N° de Expediente "{numero}" ya existe en {existe_mismo_tipo.get_tipo_label()}. '
+                       f'Cliente: {existe_mismo_tipo.cliente}. No se puede registrar duplicado.',
+            'expediente_existente': {
+                'id': existe_mismo_tipo.id,
+                'tipo': existe_mismo_tipo.get_tipo_label(),
+                'cliente': existe_mismo_tipo.cliente
+            }
+        })
+
+    # --- Validar duplicado en OTRO tipo (advertencia) ---
+    tipos_con_expediente = ['civil', 'penal', 'conciliacion', 'archivo']
+    if tipo in tipos_con_expediente:
+        existe_otro = Expediente.query.filter(
+            Expediente.tipo.in_(tipos_con_expediente),
+            Expediente.tipo != tipo,
+            Expediente.numero_expediente == numero
+        ).first()
+
+        if existe_otro:
+            return jsonify({
+                'valido': True,
+                'bloquear': False,
+                'advertencia': True,
+                'mensaje': f'⚠️ Este N° de Expediente ya está registrado en {existe_otro.get_tipo_label()} '
+                           f'(Cliente: {existe_otro.cliente}). Puede continuar si es un caso diferente.',
+                'expediente_existente': {
+                    'id': existe_otro.id,
+                    'tipo': existe_otro.get_tipo_label(),
+                    'cliente': existe_otro.cliente
+                }
+            })
+
+    return jsonify({'valido': True})
+
+# ============================================
 # RUTAS DE AUTENTICACIÓN
 # ============================================
 
@@ -543,24 +605,53 @@ def expedientes_por_tipo(tipo):
 
 
 def verificar_unicidad_expediente(numero_expediente, tipo, id_excluir=None):
-    """Verifica que el número de expediente sea único para el tipo (excepto administrativos)"""
+    """
+    Verifica unicidad del expediente:
+    1. No duplicados dentro del mismo tipo (BLOQUEA)
+    2. Aviso si el mismo número existe en otro tipo (ADVERTENCIA)
+    """
     if tipo == 'administrativo':
-        return True, None
+        return True, None, None
 
-    query = Expediente.query.filter(
+    num_exp = numero_expediente.strip()
+
+    # --- VALIDACIÓN 1: Duplicado dentro del MISMO tipo (BLOQUEA) ---
+    query_mismo_tipo = Expediente.query.filter(
         Expediente.tipo == tipo,
-        Expediente.numero_expediente == numero_expediente.strip()
+        Expediente.numero_expediente == num_exp
     )
-
     if id_excluir:
-        query = query.filter(Expediente.id != id_excluir)
+        query_mismo_tipo = query_mismo_tipo.filter(Expediente.id != id_excluir)
 
-    existe = query.first()
+    existe_mismo_tipo = query_mismo_tipo.first()
+    if existe_mismo_tipo:
+        return False, (
+            f'El N° de Expediente "{num_exp}" ya existe en {existe_mismo_tipo.get_tipo_label()}. '
+            f'Cliente: {existe_mismo_tipo.cliente}. No se permite duplicado.'
+        ), None
 
-    if existe:
-        return False, f'El N° de Expediente "{numero_expediente}" ya existe en otro caso {tipo}'
+    # --- VALIDACIÓN 2: Mismo número en OTRO tipo (ADVERTENCIA, permite continuar) ---
+    tipos_con_expediente = ['civil', 'penal', 'conciliacion', 'archivo']
+    
+    if tipo in tipos_con_expediente:
+        query_otro_tipo = Expediente.query.filter(
+            Expediente.tipo.in_(tipos_con_expediente),
+            Expediente.tipo != tipo,
+            Expediente.numero_expediente == num_exp
+        )
+        if id_excluir:
+            query_otro_tipo = query_otro_tipo.filter(Expediente.id != id_excluir)
 
-    return True, None
+        existe_otro_tipo = query_otro_tipo.first()
+        if existe_otro_tipo:
+            advertencia = (
+                f'⚠️ El N° de Expediente "{num_exp}" ya está registrado '
+                f'en {existe_otro_tipo.get_tipo_label()} (Cliente: {existe_otro_tipo.cliente}). '
+                f'Verifique antes de continuar.'
+            )
+            return True, None, advertencia
+
+    return True, None, None
 
 @bp.route('/expediente/nuevo', methods=['GET', 'POST'])
 @requiere_login
@@ -576,7 +667,7 @@ def nuevo_expediente():
     if form.validate_on_submit():
         try:
             if form.tipo.data != 'administrativo':
-                es_unico, mensaje_error = verificar_unicidad_expediente(
+                es_unico, mensaje_error, advertencia = verificar_unicidad_expediente(
                     form.numero_expediente.data, 
                     form.tipo.data
                 )
@@ -586,6 +677,8 @@ def nuevo_expediente():
                                          title='Nuevo Expediente',
                                          form=form,
                                          rol=session.get('rol', 'USUARIO'))
+                if advertencia:
+                    flash(advertencia, 'warning')
 
             expediente = Expediente(
                 tipo=form.tipo.data,
@@ -793,15 +886,14 @@ def editar_expediente(id):
                     flash('La materia es obligatoria', 'error')
                     return redirect(url_for('main.editar_expediente', id=id))
 
-                existe = Expediente.query.filter(
-                    Expediente.tipo == 'civil',
-                    Expediente.numero_expediente == numero_exp,
-                    Expediente.id != id
-                ).first()
-
-                if existe:
-                    flash(f'El N° de Expediente "{numero_exp}" ya existe en otro caso civil', 'error')
+                es_unico, mensaje_error, advertencia = verificar_unicidad_expediente(
+                    numero_exp, 'civil', id_excluir=id
+                )
+                if not es_unico:
+                    flash(mensaje_error, 'error')
                     return redirect(url_for('main.editar_expediente', id=id))
+                if advertencia:
+                    flash(advertencia, 'warning')
 
                 expediente.numero_expediente = numero_exp
                 expediente.dni = None
@@ -831,15 +923,14 @@ def editar_expediente(id):
                     flash('La materia es obligatoria', 'error')
                     return redirect(url_for('main.editar_expediente', id=id))
 
-                existe = Expediente.query.filter(
-                    Expediente.tipo == 'penal',
-                    Expediente.numero_expediente == numero_exp,
-                    Expediente.id != id
-                ).first()
-
-                if existe:
-                    flash(f'El N° de Expediente "{numero_exp}" ya existe en otro caso penal', 'error')
+                es_unico, mensaje_error, advertencia = verificar_unicidad_expediente(
+                    numero_exp, 'penal', id_excluir=id
+                )
+                if not es_unico:
+                    flash(mensaje_error, 'error')
                     return redirect(url_for('main.editar_expediente', id=id))
+                if advertencia:
+                    flash(advertencia, 'warning')
 
                 expediente.numero_expediente = numero_exp
                 expediente.dni = dni
@@ -869,15 +960,14 @@ def editar_expediente(id):
                     flash('La materia es obligatoria', 'error')
                     return redirect(url_for('main.editar_expediente', id=id))
 
-                existe = Expediente.query.filter(
-                    Expediente.tipo == 'conciliacion',
-                    Expediente.numero_expediente == numero_exp,
-                    Expediente.id != id
-                ).first()
-
-                if existe:
-                    flash(f'El N° de Expediente "{numero_exp}" ya existe en otro caso de conciliación', 'error')
+                es_unico, mensaje_error, advertencia = verificar_unicidad_expediente(
+                    numero_exp, 'conciliacion', id_excluir=id
+                )
+                if not es_unico:
+                    flash(mensaje_error, 'error')
                     return redirect(url_for('main.editar_expediente', id=id))
+                if advertencia:
+                    flash(advertencia, 'warning')
 
                 expediente.numero_expediente = numero_exp
                 expediente.dni = dni
@@ -907,15 +997,14 @@ def editar_expediente(id):
                     flash('La materia es obligatoria', 'error')
                     return redirect(url_for('main.editar_expediente', id=id))
 
-                existe = Expediente.query.filter(
-                    Expediente.tipo == 'archivo',
-                    Expediente.numero_expediente == numero_exp,
-                    Expediente.id != id
-                ).first()
-
-                if existe:
-                    flash(f'El N° de Expediente "{numero_exp}" ya existe en otro caso de archivo', 'error')
+                es_unico, mensaje_error, advertencia = verificar_unicidad_expediente(
+                    numero_exp, 'archivo', id_excluir=id
+                )
+                if not es_unico:
+                    flash(mensaje_error, 'error')
                     return redirect(url_for('main.editar_expediente', id=id))
+                if advertencia:
+                    flash(advertencia, 'warning')
 
                 expediente.numero_expediente = numero_exp
                 expediente.dni = dni
