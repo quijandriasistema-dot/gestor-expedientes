@@ -1,0 +1,131 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="dashboard">
+    <h1>
+        <span>📋</span>
+        <span>Auditoría del Sistema</span>
+    </h1>
+    
+    <span class="rol-badge">{{ rol }}</span>
+    
+    <!-- Filtros -->
+    <div class="search-container" style="background: var(--color-bg-light); padding: 1.5rem; border-radius: 12px; margin-bottom: 2rem;">
+        <form method="GET" action="{{ url_for('main.ver_auditoria') }}" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; align-items: end;">
+            
+            <div class="form-group" style="margin: 0;">
+                <label style="font-size: 0.9rem; font-weight: 500;">Tabla</label>
+                <select name="tabla" style="width: 100%; padding: 0.5rem; border-radius: 6px;">
+                    <option value="">Todas</option>
+                    <option value="expediente" {% if filtro_tabla == 'expediente' %}selected{% endif %}>Expediente</option>
+                    <option value="audiencia" {% if filtro_tabla == 'audiencia' %}selected{% endif %}>Audiencia</option>
+                    <option value="documento" {% if filtro_tabla == 'documento' %}selected{% endif %}>Documento</option>
+                    <option value="usuario" {% if filtro_tabla == 'usuario' %}selected{% endif %}>Usuario</option>
+                </select>
+            </div>
+            
+            <div class="form-group" style="margin: 0;">
+                <label style="font-size: 0.9rem; font-weight: 500;">Acción</label>
+                <select name="accion" style="width: 100%; padding: 0.5rem; border-radius: 6px;">
+                    <option value="">Todas</option>
+                    <option value="crear" {% if filtro_accion == 'crear' %}selected{% endif %}>➕ Crear</option>
+                    <option value="editar" {% if filtro_accion == 'editar' %}selected{% endif %}>✏️ Editar</option>
+                    <option value="eliminar" {% if filtro_accion == 'eliminar' %}selected{% endif %}>🗑️ Eliminar</option>
+                    <option value="login" {% if filtro_accion == 'login' %}selected{% endif %}>🔐 Login</option>
+                </select>
+            </div>
+            
+            <div class="form-group" style="margin: 0;">
+                <label style="font-size: 0.9rem; font-weight: 500;">Usuario</label>
+                <input type="text" name="usuario" value="{{ filtro_usuario }}" 
+                       placeholder="Buscar usuario..." 
+                       style="width: 100%; padding: 0.5rem; border-radius: 6px;">
+            </div>
+            
+            <div class="form-group" style="margin: 0;">
+                <label style="font-size: 0.9rem; font-weight: 500;">Desde</label>
+                <input type="date" name="fecha_desde" value="{{ fecha_desde }}" 
+                       style="width: 100%; padding: 0.5rem; border-radius: 6px;">
+            </div>
+            
+            <div class="form-group" style="margin: 0;">
+                <label style="font-size: 0.9rem; font-weight: 500;">Hasta</label>
+                <input type="date" name="fecha_hasta" value="{{ fecha_hasta }}" 
+                       style="width: 100%; padding: 0.5rem; border-radius: 6px;">
+            </div>
+            
+            <div style="display: flex; gap: 0.5rem;">
+                <button type="submit" class="btn btn-primary">🔍 Filtrar</button>
+                <a href="{{ url_for('main.ver_auditoria') }}" class="btn">🔄 Limpiar</a>
+            </div>
+        </form>
+    </div>
+    
+    <!-- Tabla de logs -->
+    <div class="table-container">
+        <table>
+            <thead>
+                <tr>
+                    <th>Fecha</th>
+                    <th>Usuario</th>
+                    <th>Acción</th>
+                    <th>Tabla</th>
+                    <th>ID</th>
+                    <th>Campo</th>
+                    <th>Valor Anterior</th>
+                    <th>Valor Nuevo</th>
+                    <th>IP</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% if logs.items %}
+                    {% for log in logs.items %}
+                    <tr>
+                        <td>{{ log.fecha.strftime('%d/%m/%Y %H:%M:%S') }}</td>
+                        <td><strong>{{ log.usuario }}</strong></td>
+                        <td>
+                            <span class="badge badge-{{ log.get_accion_color() }}">
+                                {{ log.get_accion_icono() }} {{ log.accion.upper() }}
+                            </span>
+                        </td>
+                        <td>{{ log.tabla }}</td>
+                        <td>#{{ log.registro_id }}</td>
+                        <td>{{ log.campo or '-' }}</td>
+                        <td style="max-width: 150px; overflow: hidden; text-overflow: ellipsis;">
+                            {{ log.valor_anterior or '-' }}
+                        </td>
+                        <td style="max-width: 150px; overflow: hidden; text-overflow: ellipsis;">
+                            {{ log.valor_nuevo or '-' }}
+                        </td>
+                        <td><small>{{ log.ip_address or '-' }}</small></td>
+                    </tr>
+                    {% endfor %}
+                {% else %}
+                    <tr>
+                        <td colspan="9" style="text-align: center; padding: 3rem;">
+                            📭 No hay registros de auditoría
+                        </td>
+                    </tr>
+                {% endif %}
+            </tbody>
+        </table>
+    </div>
+    
+    <!-- Paginación -->
+    {% if logs.pages > 1 %}
+    <div style="display: flex; justify-content: center; gap: 0.5rem; margin-top: 1rem;">
+        {% if logs.has_prev %}
+            <a href="{{ url_for('main.ver_auditoria', page=logs.prev_num, tabla=filtro_tabla, accion=filtro_accion, usuario=filtro_usuario, fecha_desde=fecha_desde, fecha_hasta=fecha_hasta) }}" class="btn">← Anterior</a>
+        {% endif %}
+        <span style="padding: 0.5rem 1rem;">Página {{ logs.page }} de {{ logs.pages }}</span>
+        {% if logs.has_next %}
+            <a href="{{ url_for('main.ver_auditoria', page=logs.next_num, tabla=filtro_tabla, accion=filtro_accion, usuario=filtro_usuario, fecha_desde=fecha_desde, fecha_hasta=fecha_hasta) }}" class="btn">Siguiente →</a>
+        {% endif %}
+    </div>
+    {% endif %}
+    
+    <div style="margin-top: 2rem; text-align: center;">
+        <a href="{{ url_for('main.index') }}" class="btn">← Volver al Panel</a>
+    </div>
+</div>
+{% endblock %}

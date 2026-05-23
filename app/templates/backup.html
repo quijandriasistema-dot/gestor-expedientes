@@ -1,0 +1,283 @@
+{% extends "base.html" %}
+
+{% block title %}Gestión de Backups{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Header -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h2 class="mb-0">
+                        <i class="bi bi-archive-fill text-primary"></i>
+                        Gestión de Backups
+                    </h2>
+                    <p class="text-muted mb-0">Copias de seguridad del sistema</p>
+                </div>
+                <div class="d-flex gap-2">
+                    <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#modalBackup">
+                        <i class="bi bi-plus-circle"></i> Nuevo Backup
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Estadísticas -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card bg-primary text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h6 class="card-title mb-0">Total Backups</h6>
+                            <h3 class="mb-0">{{ total_backups }}</h3>
+                        </div>
+                        <i class="bi bi-archive fs-1 opacity-50"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-success text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h6 class="card-title mb-0">Manuales</h6>
+                            <h3 class="mb-0">{{ backups_manuales }}</h3>
+                        </div>
+                        <i class="bi bi-hand-index-thumb fs-1 opacity-50"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-info text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h6 class="card-title mb-0">Automáticos</h6>
+                            <h3 class="mb-0">{{ backups_auto }}</h3>
+                        </div>
+                        <i class="bi bi-clock-history fs-1 opacity-50"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-warning text-dark">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h6 class="card-title mb-0">Espacio Usado</h6>
+                            <h3 class="mb-0">{{ tamaño_total }}</h3>
+                        </div>
+                        <i class="bi bi-hdd fs-1 opacity-50"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tabla de Backups -->
+    <div class="card">
+        <div class="card-header bg-white">
+            <h5 class="mb-0">
+                <i class="bi bi-list-ul"></i> Historial de Backups
+            </h5>
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Nombre</th>
+                            <th>Tipo</th>
+                            <th>Tamaño</th>
+                            <th>Descripción</th>
+                            <th>Creado por</th>
+                            <th>Fecha</th>
+                            <th>Estado</th>
+                            <th class="text-center">Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for backup in backups %}
+                        <tr>
+                            <td>
+                                <i class="bi bi-file-zip text-warning"></i>
+                                {{ backup.nombre_archivo }}
+                            </td>
+                            <td>
+                                {% if backup.tipo == 'manual' %}
+                                    <span class="badge bg-success">Manual</span>
+                                {% else %}
+                                    <span class="badge bg-info">Automático</span>
+                                {% endif %}
+                            </td>
+                            <td>{{ backup.tamaño_formateado() }}</td>
+                            <td>{{ backup.descripcion or '-' }}</td>
+                            <td>{{ backup.creado_por or 'Sistema' }}</td>
+                            <td>{{ backup.fecha_creacion.strftime('%d/%m/%Y %H:%M') }}</td>
+                            <td>
+                                {% if backup.estado == 'completado' %}
+                                    <span class="badge bg-success">✓ Completado</span>
+                                {% elif backup.estado == 'error' %}
+                                    <span class="badge bg-danger">✗ Error</span>
+                                {% elif backup.estado == 'restaurado' %}
+                                    <span class="badge bg-warning text-dark">↺ Restaurado</span>
+                                {% else %}
+                                    <span class="badge bg-secondary">{{ backup.estado }}</span>
+                                {% endif %}
+                            </td>
+                            <td class="text-center">
+                                <div class="btn-group btn-group-sm" role="group">
+                                    <!-- Descargar -->
+                                    <a href="{{ url_for('main.descargar_backup', id=backup.id) }}" 
+                                       class="btn btn-outline-primary" 
+                                       title="Descargar">
+                                        <i class="bi bi-download"></i>
+                                    </a>
+                                    
+                                    <!-- RESTAURAR (solo si está completado) -->
+                                    {% if backup.estado == 'completado' %}
+                                    <button type="button" 
+                                            class="btn btn-outline-warning" 
+                                            data-bs-toggle="modal" 
+                                            data-bs-target="#modalRestaurar{{ backup.id }}"
+                                            title="Restaurar este backup">
+                                        <i class="bi bi-arrow-counterclockwise"></i>
+                                    </button>
+                                    {% endif %}
+                                    
+                                    <!-- Eliminar (solo DESARROLLADOR) -->
+                                    {% if session.rol == 'DESARROLLADOR' %}
+                                    <form action="{{ url_for('main.eliminar_backup', id=backup.id) }}" 
+                                          method="POST" 
+                                          class="d-inline" 
+                                          onsubmit="return confirm('¿Eliminar permanentemente este backup?')">
+                                        <button type="submit" 
+                                                class="btn btn-outline-danger" 
+                                                title="Eliminar">
+                                            <i class="bi bi-trash"></i>
+                                        </button>
+                                    </form>
+                                    {% endif %}
+                                </div>
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="8" class="text-center py-4 text-muted">
+                                <i class="bi bi-inbox fs-2 d-block mb-2"></i>
+                                No hay backups registrados
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ============================================ -->
+<!-- MODAL: NUEVO BACKUP -->
+<!-- ============================================ -->
+<div class="modal fade" id="modalBackup" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form action="{{ url_for('main.crear_backup') }}" method="POST">
+                <div class="modal-header">
+                    <h5 class="modal-title">
+                        <i class="bi bi-plus-circle"></i> Generar Nuevo Backup
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Descripción (opcional)</label>
+                        <input type="text" name="descripcion" class="form-control" 
+                               placeholder="Ej: Backup antes de actualización">
+                    </div>
+                    <div class="alert alert-info">
+                        <i class="bi bi-info-circle"></i>
+                        El backup incluirá:
+                        <ul class="mb-0 mt-1">
+                            <li>Base de datos (app.db)</li>
+                            <li>Usuarios (usuarios.json)</li>
+                            <li>Documentos adjuntos</li>
+                        </ul>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-archive"></i> Generar Backup
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- ============================================ -->
+<!-- MODALES: RESTAURAR BACKUP -->
+<!-- ============================================ -->
+{% for backup in backups %}
+{% if backup.estado == 'completado' %}
+<div class="modal fade" id="modalRestaurar{{ backup.id }}" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-warning">
+            <form action="{{ url_for('main.restaurar_backup', id=backup.id) }}" method="POST">
+                <div class="modal-header bg-warning">
+                    <h5 class="modal-title text-dark">
+                        <i class="bi bi-exclamation-triangle-fill"></i> 
+                        Restaurar Backup
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="alert alert-danger border-0">
+                        <i class="bi bi-exclamation-circle"></i>
+                        <strong>¡Atención!</strong> Esta acción reemplazará completamente:
+                        <ul class="mb-0 mt-2">
+                            <li>Base de datos actual (todos los expedientes)</li>
+                            <li>Usuarios registrados</li>
+                            <li>Documentos adjuntos</li>
+                        </ul>
+                    </div>
+                    
+                    <div class="card bg-light">
+                        <div class="card-body">
+                            <p class="mb-1"><strong>Archivo:</strong> {{ backup.nombre_archivo }}</p>
+                            <p class="mb-1"><strong>Fecha:</strong> {{ backup.fecha_creacion.strftime('%d/%m/%Y %H:%M') }}</p>
+                            <p class="mb-1"><strong>Tamaño:</strong> {{ backup.tamaño_formateado() }}</p>
+                            <p class="mb-0"><strong>Creado por:</strong> {{ backup.creado_por or 'Sistema' }}</p>
+                        </div>
+                    </div>
+                    
+                    <div class="alert alert-info mt-3 mb-0">
+                        <i class="bi bi-shield-check"></i>
+                        <strong>Seguridad:</strong> Se creará un backup de seguridad automáticamente antes de restaurar.
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                        <i class="bi bi-x-circle"></i> Cancelar
+                    </button>
+                    <button type="submit" 
+                            class="btn btn-warning" 
+                            onclick="return confirm('¿ESTÁ COMPLETAMENTE SEGURO?\n\nLos datos actuales serán reemplazados permanentemente.\nSe recomienda cerrar sesión después de restaurar.')">
+                        <i class="bi bi-arrow-counterclockwise"></i> Sí, Restaurar
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endif %}
+{% endfor %}
+
+{% endblock %}
