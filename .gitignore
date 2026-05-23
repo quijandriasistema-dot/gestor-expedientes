@@ -1,73 +1,30 @@
-# ============================================
-# CREDENCIALES Y SECRETOS - NUNCA SUBIR A GIT
-# ============================================
-service-account.json
-*.json.key
-google-credentials.json
-credentials.json
-client_secret*.json
+﻿# === IGNORAR DATOS SENSIBLES ===
+.env
+app/config.py
+instance/*.db
+instance/*.json
+backups/
+*.zip
 
-# ============================================
-# PYTHON
-# ============================================
+# === IGNORAR ARCHIVOS DE SISTEMA ===
 __pycache__/
-*.py[cod]
-*.class
-*.so
+*.pyc
+*.pyo
+*.pyd
 .Python
-env/
+*.so
+
+# === IGNORAR ENTORNOS ===
 venv/
-.venv/
+env/
 ENV/
 
-# ============================================
-# FLASK / BASE DE DATOS
-# ============================================
-instance/
-*.db
-*.sqlite
-*.sqlite3
-
-# ============================================
-# CONFIGURACIÓN SENSIBLE
-# ============================================
-/config.py
-.env
-*.env
-config.py
-
-# ============================================
-# SUBIDAS DE ARCHIVOS
-# ============================================
-uploads/
-static/uploads/
-
-# ============================================
-# IDE
-# ============================================
+# === IGNORAR IDE ===
 .vscode/
 .idea/
 *.swp
 *.swo
 
-# ============================================
-# SISTEMA OPERATIVO
-# ============================================
-.DS_Store
-Thumbs.db
-
-# ============================================
-# LOGS
-# ============================================
+# === IGNORAR ARCHIVOS TEMPORALES ===
+*.tmp
 *.log
-
-# ============================================
-# SCRIPTS DE PRUEBA (opcional)
-# ============================================
-generar_datos_prueba.py
-insertar_datos.py
-test_audiencia.py
-actualizar_estados.py
-notificaciones.py
-
-script_obtener_token.py

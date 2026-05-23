@@ -34,20 +34,6 @@
             color: white !important;
         }
         
-        /* Logo en el navbar principal */
-        .navbar-logo {
-            height: 55px;
-            width: 55px;
-            object-fit: contain;
-            margin-right: 0.75rem;
-            filter: drop-shadow(0 3px 6px rgba(0,0,0,0.3));
-            transition: transform 0.2s ease;
-        }
-        
-        .navbar-brand:hover .navbar-logo {
-            transform: scale(1.08);
-        }
-        
         .nav-link {
             color: rgba(255,255,255,0.9) !important;
             transition: all 0.3s;
@@ -257,11 +243,8 @@
 <body>
     <nav class="navbar navbar-expand-lg navbar-dark">
         <div class="container">
-            <a class="navbar-brand d-flex align-items-center" href="{{ url_for('main.index') }}">
-                <img src="{{ url_for('static', filename='images/logo-quijandria.png') }}" 
-                     alt="Quijandria" 
-                     class="navbar-logo">
-                <span>Sistema de Gestión de Expedientes</span>
+            <a class="navbar-brand" href="{{ url_for('main.index') }}">
+                <i class="bi bi-scale-balanced"></i> ⚖️ Sistema de Gestión de Expedientes
             </a>
             <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
                 <span class="navbar-toggler-icon"></span>
@@ -289,6 +272,18 @@
                             <i class="bi bi-files"></i> Documentos
                         </a>
                     </li>
+                    {% if session.rol in ['DESARROLLADOR', 'ADMINISTRADOR'] %}
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('main.ver_auditoria') }}">
+                            <i class="bi bi-journal-text"></i> Auditoría
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('main.gestion_backup') }}">
+                            <i class="bi bi-archive"></i> Backups
+                        </a>
+                    </li>
+                    {% endif %}
                     {% endif %}
                 </ul>
                 <ul class="navbar-nav">
