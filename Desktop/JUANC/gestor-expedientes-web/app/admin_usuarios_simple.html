@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+
+{% block content %}
+    <div class="dashboard">
+        <h1>
+            <span>👥</span>
+            <span>Gestión de Usuarios</span>
+        </h1>
+        
+        <span class="rol-badge">ADMINISTRADOR</span>
+        
+        <h2>
+            <span>📝</span>
+            <span>Usuarios del Sistema</span>
+        </h2>
+        
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Usuario</th>
+                        <th>Nombre</th>
+                        <th>Rol</th>
+                        <th>Módulos</th>
+                        <th>Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for username, datos in usuarios.items() %}
+                    <tr>
+                        <td><code>{{ username }}</code></td>
+                        <td>{{ datos.nombre }}</td>
+                        <td>
+                            <span class="rol-badge" style="font-size: 0.75rem; padding: 0.2rem 0.5rem;">
+                                {{ datos.rol }}
+                            </span>
+                        </td>
+                        <td>{{ datos.modulos|length }} módulos</td>
+                        <td>
+                            <button class="btn" style="font-size: 0.8rem; padding: 0.3rem 0.6rem;">Editar</button>
+                            <button class="btn" style="font-size: 0.8rem; padding: 0.3rem 0.6rem; background: var(--color-error);">Eliminar</button>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        
+        <div style="margin-top: 2rem; text-align: center;">
+            <a href="{{ url_for('main.index') }}" class="btn">← Volver al Panel</a>
+        </div>
+    </div>
+{% endblock %}

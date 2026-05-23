@@ -1,0 +1,126 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="dashboard">
+    <!-- Header -->
+    <div class="dashboard-header">
+        <div class="studio-display">
+            <span class="scales-icon">⚖️</span>
+            <div class="studio-name-main">Quijandria Abogados</div>
+        </div>
+        <div class="welcome-text">Sistema de Gestión de Expedientes Legales</div>
+    </div>
+    
+    <!-- Info del expediente -->
+    <div style="background: #e0f2fe; border-left: 4px solid #0369a1; padding: 1rem; margin-bottom: 1.5rem; border-radius: 4px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
+            <div>
+                <strong>📁 Expediente:</strong> {{ expediente.get_identificador_principal() }}<br>
+                <strong>👤 Cliente:</strong> {{ expediente.cliente }}
+            </div>
+            <div>
+                <a href="{{ url_for('main.ver_expediente', id=expediente.id) }}" class="btn btn-secondary">👁️ Ver Expediente</a>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Título -->
+    <h1 style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.5rem;">
+        <span>📂</span>
+        <span>Documentos del Expediente</span>
+        <span style="background: var(--color-accent); color: white; padding: 0.25rem 0.75rem; border-radius: 20px; font-size: 0.9rem;">
+            {{ documentos|length }}
+        </span>
+    </h1>
+    
+    <!-- Acciones -->
+    <div style="display: flex; gap: 1rem; margin-bottom: 1.5rem; flex-wrap: wrap;">
+        <a href="{{ url_for('main.subir_documento_expediente', id=expediente.id) }}" class="btn btn-primary btn-lg">
+            ➕ Agregar Documento
+        </a>
+        <a href="{{ url_for('main.documentos') }}" class="btn btn-secondary btn-lg">
+            📁 Todos los Documentos
+        </a>
+    </div>
+    
+    <!-- Listado -->
+    {% if documentos %}
+    <div class="table-container">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>📄 Documento</th>
+                    <th>🏷️ Tipo</th>
+                    <th>📅 Fecha</th>
+                    <th>👤 Subido por</th>
+                    <th>💾 Tamaño</th>
+                    <th>⚙️ Acciones</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for doc in documentos %}
+                <tr>
+                    <td>
+                        <div style="display: flex; align-items: center; gap: 0.5rem;">
+                            <span style="font-size: 1.5rem;">{{ doc.get_icono() }}</span>
+                            <div>
+                                <strong>{{ doc.titulo }}</strong>
+                                <br>
+                                <small style="color: var(--color-text-light);">{{ doc.nombre_archivo }}</small>
+                                {% if doc.descripcion %}
+                                    <br>
+                                    <small style="color: #6b7280;">{{ doc.descripcion[:50] }}{% if doc.descripcion|length > 50 %}...{% endif %}</small>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </td>
+                    <td>
+                        <span class="badge badge-info">{{ doc.get_tipo_label() }}</span>
+                        {% if doc.fecha_documento %}
+                            <br>
+                            <small style="color: #6b7280;">Doc: {{ doc.fecha_documento.strftime('%d/%m/%Y') }}</small>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {{ doc.fecha_subida.strftime('%d/%m/%Y') }}
+                    </td>
+                    <td>{{ doc.usuario_subida }}</td>
+                    <td>{{ doc.get_tamaño_formateado() }}</td>
+                    <td>
+                        <div style="display: flex; gap: 0.5rem;">
+                            <!-- ✅ NUEVO: Botón Visualizar (solo PDF e imágenes) -->
+                            {% if doc.tipo_archivo.lower() in ['pdf', 'jpg', 'jpeg', 'png', 'gif'] %}
+                            <a href="{{ url_for('main.visualizar_documento', id=doc.id) }}" target="_blank" class="btn btn-small btn-success" title="Visualizar">
+                                👁️ Ver
+                            </a>
+                            {% endif %}
+                            
+                            <a href="{{ url_for('main.descargar_documento', id=doc.id) }}" class="btn btn-small btn-primary">
+                                ⬇️ Descargar
+                            </a>
+                            
+                            {% if rol in ['ADMINISTRADOR', 'DESARROLLADOR'] %}
+                            <form method="POST" action="{{ url_for('main.eliminar_documento', id=doc.id) }}" 
+                                  onsubmit="return confirm('¿Eliminar este documento?');" style="display: inline;">
+                                <button type="submit" class="btn btn-small btn-danger">🗑️</button>
+                            </form>
+                            {% endif %}
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div style="text-align: center; padding: 3rem; background: white; border-radius: 12px; border: 2px dashed #e5e7eb;">
+        <div style="font-size: 4rem; margin-bottom: 1rem;">📂</div>
+        <h3>No hay documentos en este expediente</h3>
+        <p style="color: var(--color-text-light);">Agregue el primer documento.</p>
+        <a href="{{ url_for('main.subir_documento_expediente', id=expediente.id) }}" class="btn btn-primary btn-lg" style="margin-top: 1rem;">
+            ➕ Agregar Documento
+        </a>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

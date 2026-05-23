@@ -1,0 +1,479 @@
+{% extends "base.html" %}
+
+{% block title %}Gestión de Usuarios - Desarrollador{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2 class="mb-0">
+                <i class="bi bi-code-square text-danger me-2"></i>
+                Gestión de Usuarios - Modo Desarrollador
+            </h2>
+            <p class="text-muted mb-0">Acceso total: puede crear administradores, usuarios y eliminar cualquier cuenta</p>
+        </div>
+        <span class="badge bg-danger fs-6">MODO DEV</span>
+    </div>
+
+    <!-- Info de superusuario -->
+    <div class="alert alert-danger mb-4">
+        <i class="bi bi-exclamation-triangle-fill me-2"></i>
+        <strong>Modo Desarrollador:</strong> Tiene acceso total al sistema. Puede crear administradores, usuarios y eliminar cualquier cuenta sin restricciones.
+    </div>
+
+    <!-- Acciones -->
+    <div class="mb-4">
+        <button class="btn btn-danger me-2" data-bs-toggle="modal" data-bs-target="#modalNuevoAdmin">
+            <i class="bi bi-person-plus-fill me-1"></i>
+            Nuevo Administrador
+        </button>
+        <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#modalNuevoUsuario">
+            <i class="bi bi-person-plus me-1"></i>
+            Nuevo Usuario
+        </button>
+    </div>
+
+    <!-- Tabla de usuarios -->
+    <div class="card shadow-sm border-danger">
+        <div class="card-header bg-danger text-white py-3">
+            <h5 class="mb-0">
+                <i class="bi bi-people-fill me-2"></i>
+                Todos los Usuarios ({{ usuarios|length }})
+            </h5>
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover mb-0 align-middle">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Usuario</th>
+                            <th>Nombre</th>
+                            <th>Rol</th>
+                            <th>Contraseña</th>
+                            <th>Módulos</th>
+                            <th>Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for username, datos in usuarios.items() %}
+                        <tr class="{{ 'table-danger fw-bold' if datos.rol == 'DESARROLLADOR' else 'table-warning' if datos.rol == 'ADMINISTRADOR' else '' }}">
+                            <td>
+                                <strong>{{ username }}</strong>
+                                {% if username == session.usuario %}
+                                    <span class="badge bg-dark ms-1">TÚ (DEV)</span>
+                                {% endif %}
+                            </td>
+                            <td>{{ datos.nombre }}</td>
+                            <td>
+                                <span class="badge bg-{{ 'dark' if datos.rol == 'DESARROLLADOR' else 'warning' if datos.rol == 'ADMINISTRADOR' else 'info' }}">
+                                    {{ datos.rol }}
+                                </span>
+                            </td>
+                            <td><code>{{ datos.password }}</code></td>
+                            <td>
+                                {% if 'todo' in datos.modulos %}
+                                    <span class="badge bg-success">Todos</span>
+                                {% else %}
+                                    {% for modulo in datos.modulos %}
+                                        <span class="badge bg-secondary me-1">{{ modulo }}</span>
+                                    {% endfor %}
+                                {% endif %}
+                            </td>
+                            <td>
+                                <button class="btn btn-sm btn-primary me-1" onclick="editarUsuarioDev('{{ username }}')" title="Editar">
+                                    <i class="bi bi-pencil"></i>
+                                </button>
+                                {% if username != session.usuario %}
+                                    <button class="btn btn-sm btn-danger" onclick="eliminarUsuarioDev('{{ username }}')" title="Eliminar">
+                                        <i class="bi bi-trash"></i>
+                                    </button>
+                                {% else %}
+                                    <button class="btn btn-sm btn-secondary" disabled title="No puede eliminarse a sí mismo">
+                                        <i class="bi bi-trash"></i>
+                                    </button>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Debug info -->
+    <div class="card mt-4 border-secondary">
+        <div class="card-header bg-secondary text-white">
+            <i class="bi bi-terminal-fill me-2"></i>
+            Información de Debug
+        </div>
+        <div class="card-body">
+            <p class="mb-2"><strong>Usuario actual:</strong> {{ session.usuario }} ({{ session.rol }})</p>
+            <p class="mb-0"><strong>Total usuarios:</strong> {{ usuarios|length }}</p>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Nuevo Administrador -->
+<div class="modal fade" id="modalNuevoAdmin" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title">
+                    <i class="bi bi-person-plus-fill me-2"></i>
+                    Nuevo Administrador
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="formNuevoAdmin">
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Usuario</label>
+                        <input type="text" class="form-control" name="username" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Nombre Completo</label>
+                        <input type="text" class="form-control" name="nombre" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Contraseña</label>
+                        <input type="password" class="form-control" name="password" required>
+                    </div>
+                    <div class="alert alert-warning">
+                        <i class="bi bi-exclamation-triangle me-2"></i>
+                        El administrador tendrá acceso a crear usuarios y asignar módulos, pero no podrá crear otros administradores ni eliminar al desarrollador.
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-danger" onclick="guardarAdmin()">
+                    <i class="bi bi-check-lg me-1"></i>
+                    Crear Administrador
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Nuevo Usuario -->
+<div class="modal fade" id="modalNuevoUsuario" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title">
+                    <i class="bi bi-person-plus me-2"></i>
+                    Nuevo Usuario
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="formNuevoUsuario">
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Usuario</label>
+                        <input type="text" class="form-control" name="username" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Nombre Completo</label>
+                        <input type="text" class="form-control" name="nombre" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Contraseña</label>
+                        <input type="password" class="form-control" name="password" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Rol</label>
+                        <select class="form-select" name="rol" id="selectRol">
+                            <option value="USUARIO" selected>Usuario</option>
+                            <option value="ADMINISTRADOR">Administrador</option>
+                        </select>
+                    </div>
+                    <div class="mb-3" id="modulosSection">
+                        <label class="form-label fw-bold">Módulos Permitidos</label>
+                        <div class="row">
+                            <div class="col-6">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" name="modulos" value="civil" id="dev_modCivil" checked>
+                                    <label class="form-check-label" for="dev_modCivil">Civil</label>
+                                </div>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" name="modulos" value="penal" id="dev_modPenal">
+                                    <label class="form-check-label" for="dev_modPenal">Penal</label>
+                                </div>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" name="modulos" value="administrativo" id="dev_modAdmin">
+                                    <label class="form-check-label" for="dev_modAdmin">Administrativo</label>
+                                </div>
+                            </div>
+                            <div class="col-6">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" name="modulos" value="conciliacion" id="dev_modConc">
+                                    <label class="form-check-label" for="dev_modConc">Conciliación</label>
+                                </div>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" name="modulos" value="archivo" id="dev_modArch">
+                                    <label class="form-check-label" for="dev_modArch">Archivo</label>
+                                </div>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" name="modulos" value="todo" id="dev_modTodo" onchange="toggleTodosDev(this)">
+                                    <label class="form-check-label fw-bold text-success" for="dev_modTodo">Todos</label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-primary" onclick="guardarUsuarioDev()">
+                    <i class="bi bi-check-lg me-1"></i>
+                    Crear Usuario
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Editar Usuario -->
+<div class="modal fade" id="modalEditarUsuario" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title">
+                    <i class="bi bi-pencil-square me-2"></i>
+                    Editar Usuario
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="formEditarUsuario">
+                    <input type="hidden" name="username_edit">
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Usuario</label>
+                        <input type="text" class="form-control" id="editUsernameDisplay" disabled>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Nombre Completo</label>
+                        <input type="text" class="form-control" name="nombre_edit" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Nueva Contraseña (opcional)</label>
+                        <input type="password" class="form-control" name="password_edit" placeholder="Dejar en blanco para mantener actual">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Rol</label>
+                        <select class="form-select" name="rol_edit">
+                            <option value="USUARIO">Usuario</option>
+                            <option value="ADMINISTRADOR">Administrador</option>
+                            <option value="DESARROLLADOR">Desarrollador</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Módulos Permitidos</label>
+                        <div class="row" id="modulosEditarDev">
+                            <!-- Se llena dinámicamente -->
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-primary" onclick="actualizarUsuarioDev()">
+                    <i class="bi bi-check-lg me-1"></i>
+                    Guardar Cambios
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+let usuarioEditando = null;
+
+function toggleTodosDev(checkbox) {
+    const checkboxes = document.querySelectorAll('#formNuevoUsuario input[name="modulos"]:not([value="todo"])');
+    checkboxes.forEach(cb => {
+        cb.checked = checkbox.checked;
+        cb.disabled = checkbox.checked;
+    });
+}
+
+function guardarAdmin() {
+    const form = document.getElementById('formNuevoAdmin');
+    const formData = new FormData(form);
+    
+    const data = {
+        username: formData.get('username'),
+        nombre: formData.get('nombre'),
+        password: formData.get('password'),
+        rol: 'ADMINISTRADOR',
+        modulos: ['todo']
+    };
+    
+    fetch('/api/usuario/crear', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(data)
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            alert('Administrador creado correctamente');
+            location.reload();
+        } else {
+            alert('Error: ' + data.error);
+        }
+    });
+}
+
+function guardarUsuarioDev() {
+    const form = document.getElementById('formNuevoUsuario');
+    const formData = new FormData(form);
+    
+    const modulos = [];
+    form.querySelectorAll('input[name="modulos"]:checked').forEach(cb => {
+        if (cb.value !== 'todo') modulos.push(cb.value);
+    });
+    
+    const data = {
+        username: formData.get('username'),
+        nombre: formData.get('nombre'),
+        password: formData.get('password'),
+        rol: formData.get('rol'),
+        modulos: modulos
+    };
+    
+    fetch('/api/usuario/crear', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(data)
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            alert('Usuario creado correctamente');
+            location.reload();
+        } else {
+            alert('Error: ' + data.error);
+        }
+    });
+}
+
+function editarUsuarioDev(username) {
+    usuarioEditando = username;
+    
+    fetch('/api/usuario/' + username)
+        .then(r => r.json())
+        .then(data => {
+            document.querySelector('[name="username_edit"]').value = username;
+            document.getElementById('editUsernameDisplay').value = username;
+            document.querySelector('[name="nombre_edit"]').value = data.nombre;
+            document.querySelector('[name="rol_edit"]').value = data.rol;
+            
+            // Módulos
+            const modulosDisponibles = ['civil', 'penal', 'administrativo', 'conciliacion', 'archivo'];
+            const modulosUsuario = data.modulos || [];
+            const tieneTodo = modulosUsuario.includes('todo');
+            
+            let html = '<div class="col-6">';
+            modulosDisponibles.slice(0, 3).forEach(mod => {
+                const checked = tieneTodo || modulosUsuario.includes(mod) ? 'checked' : '';
+                html += `
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" name="modulos_edit" value="${mod}" id="dev_edit_${mod}" ${checked}>
+                        <label class="form-check-label" for="dev_edit_${mod}">${mod.charAt(0).toUpperCase() + mod.slice(1)}</label>
+                    </div>
+                `;
+            });
+            html += '</div><div class="col-6">';
+            modulosDisponibles.slice(3).forEach(mod => {
+                const checked = tieneTodo || modulosUsuario.includes(mod) ? 'checked' : '';
+                html += `
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" name="modulos_edit" value="${mod}" id="dev_edit_${mod}" ${checked}>
+                        <label class="form-check-label" for="dev_edit_${mod}">${mod.charAt(0).toUpperCase() + mod.slice(1)}</label>
+                    </div>
+                `;
+            });
+            html += `
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" name="modulos_edit" value="todo" id="dev_edit_todo" ${tieneTodo ? 'checked' : ''} onchange="toggleTodosEditarDev(this)">
+                    <label class="form-check-label fw-bold text-success" for="dev_edit_todo">Todos</label>
+                </div>
+            `;
+            html += '</div>';
+            
+            document.getElementById('modulosEditarDev').innerHTML = html;
+            
+            new bootstrap.Modal(document.getElementById('modalEditarUsuario')).show();
+        });
+}
+
+function toggleTodosEditarDev(checkbox) {
+    const checkboxes = document.querySelectorAll('input[name="modulos_edit"]:not([value="todo"])');
+    checkboxes.forEach(cb => {
+        cb.checked = checkbox.checked;
+        cb.disabled = checkbox.checked;
+    });
+}
+
+function actualizarUsuarioDev() {
+    const form = document.getElementById('formEditarUsuario');
+    const formData = new FormData(form);
+    
+    const modulos = [];
+    form.querySelectorAll('input[name="modulos_edit"]:checked').forEach(cb => {
+        if (cb.value !== 'todo') modulos.push(cb.value);
+    });
+    
+    const data = {
+        nombre: formData.get('nombre_edit'),
+        rol: formData.get('rol_edit'),
+        modulos: modulos
+    };
+    
+    const password = formData.get('password_edit');
+    if (password) data.password = password;
+    
+    fetch('/api/usuario/editar/' + usuarioEditando, {
+        method: 'PUT',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(data)
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            alert('Usuario actualizado correctamente');
+            location.reload();
+        } else {
+            alert('Error: ' + data.error);
+        }
+    });
+}
+
+function eliminarUsuarioDev(username) {
+    if (username === '{{ session.usuario }}') {
+        alert('No puede eliminarse a sí mismo');
+        return;
+    }
+    
+    if (!confirm('¿Eliminar permanentemente al usuario "' + username + '"?\n\nEsta acción no se puede deshacer.')) {
+        return;
+    }
+    
+    fetch('/api/usuario/eliminar/' + username, {
+        method: 'DELETE'
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            alert('Usuario eliminado correctamente');
+            location.reload();
+        } else {
+            alert('Error: ' + data.error);
+        }
+    });
+}
+</script>
+{% endblock %}
