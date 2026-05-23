@@ -169,8 +169,15 @@
         
         .notification-item {
             border-bottom: 1px solid #f0f0f0;
-            padding: 12px 15px;
+            padding: 0;
             transition: background-color 0.2s;
+        }
+        
+        .notification-item a {
+            display: flex;
+            padding: 12px 15px;
+            text-decoration: none;
+            color: inherit;
         }
         
         .notification-item:hover {
@@ -180,6 +187,10 @@
         .notification-item.unread {
             background-color: #e3f2fd;
             border-left: 3px solid var(--primary-color);
+        }
+        
+        .notification-item.unread:hover {
+            background-color: #bbdefb;
         }
         
         .notification-icon {
@@ -403,7 +414,7 @@
                     if (data.notificaciones && data.notificaciones.length > 0) {
                         preview.innerHTML = data.notificaciones.map(n => `
                             <li class="notification-item ${n.leida ? '' : 'unread'}">
-                                <a href="${n.link || '#'}" class="text-decoration-none text-dark d-flex align-items-start" 
+                                <a href="${n.link || '#'}" 
                                    onclick="marcarLeida(${n.id}, event)">
                                     <div class="notification-icon bg-${n.color || 'info'} bg-opacity-10 text-${n.color || 'info'}">
                                         ${n.icono || '🔔'}
@@ -433,27 +444,16 @@
         }
         
         function marcarLeida(id, event) {
-            if (event) event.preventDefault();
-            
+            // Marcar como leída vía POST en segundo plano (fire and forget)
             fetch(`/notificacion/${id}/leer`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                 }
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    // Redirigir al link si existe
-                    const link = event ? event.currentTarget.getAttribute('href') : null;
-                    if (link && link !== '#') {
-                        window.location.href = link;
-                    } else {
-                        actualizarNotificaciones();
-                    }
-                }
-            })
-            .catch(error => console.error('Error:', error));
+            }).catch(error => console.error('Error:', error));
+            
+            // Permitir navegación normal - NO prevenir default
+            // El enlace navegará al href automáticamente
         }
         
         function marcarTodasLeidas() {

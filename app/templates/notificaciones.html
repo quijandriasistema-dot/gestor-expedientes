@@ -21,7 +21,7 @@
             Todas
         </a>
         <a href="#" class="btn btn-outline-danger" onclick="filtrarNoLeidas()">
-            No leídas {% if no_leidas > 0 %}<span class="badge bg-danger">{{ no_leidas }}</span>{% endif %}
+            No leídas {% if no_leidas > 0 %}<<span class="badge bg-danger">{{ no_leidas }}</span>{% endif %}
         </a>
     </div>
 
@@ -29,7 +29,11 @@
     <div class="notifications-list">
         {% if notificaciones %}
             {% for notif in notificaciones %}
-            <div class="card mb-3 {% if not notif.leida %}border-{{ notif.color }}{% else %}text-muted{% endif %}">
+            <div class="card mb-3 notification-card {% if not notif.leida %}border-{{ notif.color }} unread-card{% else %}text-muted read-card{% endif %}"
+                 {% if notif.link %}
+                 onclick="marcarLeidaYRedirigir({{ notif.id }}, '{{ notif.link }}')"
+                 style="cursor: pointer;"
+                 {% endif %}>
                 <div class="card-body">
                     <div class="d-flex align-items-start">
                         <div class="notification-icon fs-3 me-3">{{ notif.icono }}</div>
@@ -54,15 +58,16 @@
                             </p>
                             {% endif %}
                             
-                            <div class="mt-2">
+                            <div class="mt-2 d-flex align-items-center gap-2">
                                 {% if notif.link %}
-                                <a href="{{ notif.link }}" class="btn btn-sm btn-primary">
-                                    <i class="bi bi-eye"></i> Ver detalle
-                                </a>
+                                <span class="btn btn-sm btn-primary">
+                                    <i class="bi bi-eye"></i> Ver detalle →
+                                </span>
                                 {% endif %}
                                 
                                 {% if not notif.leida %}
-                                <button onclick="marcarLeida({{ notif.id }})" class="btn btn-sm btn-outline-secondary ms-2">
+                                <button onclick="event.stopPropagation(); marcarLeidaSolo({{ notif.id }})" 
+                                        class="btn btn-sm btn-outline-secondary">
                                     <i class="bi bi-check-lg"></i> Marcar leída
                                 </button>
                                 {% endif %}
@@ -81,8 +86,33 @@
     </div>
 </div>
 
+<style>
+.notification-card {
+    transition: all 0.2s ease;
+    border-left: 4px solid transparent;
+}
+
+.notification-card:hover {
+    transform: translateX(4px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+}
+
+.unread-card {
+    border-left-color: var(--primary-color);
+    background: linear-gradient(90deg, rgba(26, 35, 126, 0.03) 0%, white 100%);
+}
+
+.read-card {
+    opacity: 0.85;
+}
+
+.notification-card.unread-card:hover {
+    background: linear-gradient(90deg, rgba(26, 35, 126, 0.06) 0%, white 100%);
+}
+</style>
+
 <script>
-function marcarLeida(id) {
+function marcarLeidaSolo(id) {
     fetch(`/notificacion/${id}/leer`, {
         method: 'POST',
         headers: {
@@ -98,12 +128,30 @@ function marcarLeida(id) {
     .catch(error => console.error('Error:', error));
 }
 
+function marcarLeidaYRedirigir(id, link) {
+    // Marcar como leída en segundo plano
+    fetch(`/notificacion/${id}/leer`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        }
+    })
+    .then(() => {
+        // Redirigir al link de la notificación
+        window.location.href = link;
+    })
+    .catch(() => {
+        // Si falla, igual redirigir
+        window.location.href = link;
+    });
+}
+
 function filtrarNoLeidas() {
-    const cards = document.querySelectorAll('.notifications-list .card');
+    const cards = document.querySelectorAll('.notifications-list .notification-card');
     let hayOcultos = false;
     
     cards.forEach(card => {
-        if (card.classList.contains('text-muted')) {
+        if (card.classList.contains('read-card')) {
             if (card.style.display === 'none') {
                 card.style.display = '';
                 hayOcultos = true;
@@ -117,7 +165,7 @@ function filtrarNoLeidas() {
     const btn = document.querySelector('.btn-outline-danger');
     if (btn) {
         btn.innerHTML = hayOcultos ? 
-            'No leídas {% if no_leidas > 0 %}<span class="badge bg-danger">{{ no_leidas }}</span>{% endif %}' : 
+            'No leídas {% if no_leidas > 0 %}<<span class="badge bg-danger">{{ no_leidas }}</span>{% endif %}' : 
             'Ver todas';
     }
 }
