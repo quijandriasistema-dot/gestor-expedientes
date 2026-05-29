@@ -559,7 +559,7 @@ def expedientes():
         query = query.filter(Expediente.tipo == filtro_tipo)
 
     if filtro_estado:
-        query = query.filter(Expediente.estado == filtro_estado)
+        query = query.filter(Expediente.estado_actual == filtro_estado)
 
     expedientes = query.order_by(Expediente.fecha_registro.desc()).all()
 
