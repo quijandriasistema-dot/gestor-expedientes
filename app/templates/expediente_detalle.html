@@ -221,7 +221,7 @@
                 <div class="timeline-marker"></div>
                 <div class="timeline-content">
                     <div class="timeline-header">
-                        <span class="timeline-estado">{{ h.estado }}</span>
+                        <span class="timeline-estado timeline-estado-{{ h.estado|replace(' ', '-')|replace('_', '-') }}">{{ h.get_estado_label() }}</span>
                         <span class="timeline-fecha">{{ h.fecha | fecha_hora }}</span>
                     </div>
                     
@@ -678,7 +678,6 @@
 
 .timeline-estado {
     font-weight: 700;
-    color: var(--color-primary);
     font-size: 1rem;
 }
 
@@ -824,5 +823,27 @@
         min-width: 100%;
     }
 }
+
+/* ============================================
+    COLORES DE ESTADOS EN TIMELINE
+   ============================================ */
+
+.timeline-estado-ingresado { color: #1e40af; background: #dbeafe; padding: 0.2rem 0.5rem; border-radius: 4px; }
+.timeline-estado-actualizado { color: #92400e; background: #fef3c7; padding: 0.2rem 0.5rem; border-radius: 4px; }
+.timeline-estado-en-proceso { color: #92400e; background: #fef3c7; padding: 0.2rem 0.5rem; border-radius: 4px; }
+.timeline-estado-seguimiento { color: #6b21a8; background: #f3e8ff; padding: 0.2rem 0.5rem; border-radius: 4px; }
+.timeline-estado-espera-documentos { color: #9a3412; background: #ffedd5; padding: 0.2rem 0.5rem; border-radius: 4px; }
+.timeline-estado-derivado-juzgado { color: #1e40af; background: #dbeafe; padding: 0.2rem 0.5rem; border-radius: 4px; }
+.timeline-estado-audiencia-programada { color: #5b21b6; background: #f5f3ff; padding: 0.2rem 0.5rem; border-radius: 4px; }
+.timeline-estado-proceso-completado { color: #14532d; background: #dcfce7; padding: 0.2rem 0.5rem; border-radius: 4px; }
+.timeline-estado-resuelto-favorable { color: #14532d; background: #dcfce7; padding: 0.2rem 0.5rem; border-radius: 4px; }
+.timeline-estado-resuelto-desfavorable { color: #7f1d1d; background: #fee2e2; padding: 0.2rem 0.5rem; border-radius: 4px; }
+.timeline-estado-archivado { color: #374151; background: #f3f4f6; padding: 0.2rem 0.5rem; border-radius: 4px; }
+.timeline-estado-enviado-a-archivo { color: #374151; background: #e5e7eb; padding: 0.2rem 0.5rem; border-radius: 4px; }
+.timeline-estado-anulado { color: #1f2937; background: #e5e7eb; padding: 0.2rem 0.5rem; border-radius: 4px; text-decoration: line-through; }
+.timeline-estado-otro { color: #374151; background: #f3f4f6; padding: 0.2rem 0.5rem; border-radius: 4px; }
+.timeline-estado-Expediente-editado { color: #92400e; background: #fef3c7; padding: 0.2rem 0.5rem; border-radius: 4px; }
+.timeline-estado-Ingresado-a-mesa-de-partes { color: #1e40af; background: #dbeafe; padding: 0.2rem 0.5rem; border-radius: 4px; }
+
 </style>
 {% endblock %}

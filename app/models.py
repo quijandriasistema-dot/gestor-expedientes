@@ -64,12 +64,14 @@ class Expediente(db.Model):
             'resuelto_favorable': '🏆 Resuelto Favorablemente',
             'resuelto_desfavorable': '❌ Resuelto Desfavorablemente',
             'archivado': '📦 Archivado',
+            'enviado_a_archivo': '📤 Enviado a Archivo',
             'anulado': '🚫 Anulado',
             'otro': '🔘 Otro'
         }
         return estados.get(self.estado_actual, self.estado_actual)
     
     def get_estado_color(self):
+        """Color Bootstrap para badges"""
         colores = {
             'ingresado': 'info',
             'actualizado': 'warning',
@@ -82,10 +84,31 @@ class Expediente(db.Model):
             'resuelto_favorable': 'success',
             'resuelto_desfavorable': 'danger',
             'archivado': 'secondary',
+            'enviado_a_archivo': 'secondary',
             'anulado': 'danger',
             'otro': 'secondary'
         }
         return colores.get(self.estado_actual, 'secondary')
+    
+    def get_estado_css(self):
+        """Retorna (clase_css, color_fondo, color_texto) para colorear la fila completa"""
+        css_estados = {
+            'ingresado': ('estado-ingresado', '#dbeafe', '#1e40af'),
+            'actualizado': ('estado-actualizado', '#fef3c7', '#92400e'),
+            'en_proceso': ('estado-en-proceso', '#fef3c7', '#92400e'),
+            'seguimiento': ('estado-seguimiento', '#f3e8ff', '#6b21a8'),
+            'espera_documentos': ('estado-espera', '#ffedd5', '#9a3412'),
+            'derivado_juzgado': ('estado-derivado', '#dbeafe', '#1e40af'),
+            'audiencia_programada': ('estado-audiencia', '#f5f3ff', '#5b21b6'),
+            'proceso_completado': ('estado-completado', '#dcfce7', '#14532d'),
+            'resuelto_favorable': ('estado-favorable', '#dcfce7', '#14532d'),
+            'resuelto_desfavorable': ('estado-desfavorable', '#fee2e2', '#7f1d1d'),
+            'archivado': ('estado-archivado', '#f3f4f6', '#374151'),
+            'enviado_a_archivo': ('estado-enviado', '#e5e7eb', '#374151'),
+            'anulado': ('estado-anulado', '#e5e7eb', '#1f2937'),
+            'otro': ('estado-otro', '#f3f4f6', '#374151')
+        }
+        return css_estados.get(self.estado_actual, ('estado-default', '#ffffff', '#1f2937'))
     
     def get_identificador_principal(self):
         tipo_key = self.tipo.lower() if self.tipo else ''
@@ -117,6 +140,7 @@ class EstadoHistorial(db.Model):
             'resuelto_favorable': '🏆 Resuelto Favorablemente',
             'resuelto_desfavorable': '❌ Resuelto Desfavorablemente',
             'archivado': '📦 Archivado',
+            'enviado_a_archivo': '📤 Enviado a Archivo',
             'anulado': '🚫 Anulado',
             'otro': '🔘 Otro',
             'Expediente editado': '📝 Expediente Editado',

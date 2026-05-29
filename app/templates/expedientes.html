@@ -1,5 +1,77 @@
 {% extends "base.html" %}
 
+{% block extra_css %}
+<style>
+/* ============================================
+   ESTILOS DE ESTADOS - FONDO DE FILA COLOREADO
+   ============================================ */
+
+.estado-ingresado { background-color: #dbeafe !important; }
+.estado-ingresado td { color: #1e40af; }
+
+.estado-actualizado { background-color: #fef3c7 !important; }
+.estado-actualizado td { color: #92400e; }
+
+.estado-en-proceso { background-color: #fef3c7 !important; }
+.estado-en-proceso td { color: #92400e; }
+
+.estado-seguimiento { background-color: #f3e8ff !important; }
+.estado-seguimiento td { color: #6b21a8; }
+
+.estado-espera { background-color: #ffedd5 !important; }
+.estado-espera td { color: #9a3412; }
+
+.estado-derivado { background-color: #dbeafe !important; }
+.estado-derivado td { color: #1e40af; }
+
+.estado-audiencia { background-color: #f5f3ff !important; }
+.estado-audiencia td { color: #5b21b6; }
+
+.estado-completado { background-color: #dcfce7 !important; }
+.estado-completado td { color: #14532d; }
+
+.estado-favorable { background-color: #dcfce7 !important; }
+.estado-favorable td { color: #14532d; }
+
+.estado-desfavorable { background-color: #fee2e2 !important; }
+.estado-desfavorable td { color: #7f1d1d; }
+
+.estado-archivado { background-color: #f3f4f6 !important; }
+.estado-archivado td { color: #374151; }
+
+.estado-enviado { background-color: #e5e7eb !important; }
+.estado-enviado td { color: #374151; }
+
+.estado-anulado { background-color: #e5e7eb !important; }
+.estado-anulado td { color: #1f2937; text-decoration: line-through; }
+
+.estado-otro { background-color: #f3f4f6 !important; }
+.estado-otro td { color: #374151; }
+
+/* Hover effect para filas coloreadas */
+tbody tr[class^="estado-"]:hover {
+    filter: brightness(0.95);
+    transition: filter 0.2s ease;
+}
+
+/* Badges con borde para mejor contraste */
+.badge {
+    font-weight: 600;
+    padding: 0.4rem 0.75rem;
+    border-radius: 20px;
+    font-size: 0.8rem;
+}
+
+/* Columna N° Registro centrada */
+.col-num-registro {
+    text-align: center;
+    font-weight: 700;
+    font-size: 0.95rem;
+    color: var(--color-primary);
+}
+</style>
+{% endblock %}
+
 {% block content %}
     <div class="dashboard">
         <h1>
@@ -70,11 +142,18 @@
                     </label>
                     <select name="filtro_estado" style="width: 100%; padding: 0.75rem; border: 1px solid var(--color-border); border-radius: 8px; font-size: 0.95rem; background: white;">
                         <option value="">Todos los estados</option>
-                        <option value="activo" {% if request.args.get('filtro_estado') == 'activo' %}selected{% endif %}>🟢 Activo</option>
-                        <option value="en_proceso" {% if request.args.get('filtro_estado') == 'en_proceso' %}selected{% endif %}>🟡 En Proceso</option>
-                        <option value="pendiente" {% if request.args.get('filtro_estado') == 'pendiente' %}selected{% endif %}>🟠 Pendiente</option>
-                        <option value="resuelto" {% if request.args.get('filtro_estado') == 'resuelto' %}selected{% endif %}>🔵 Resuelto</option>
-                        <option value="archivado" {% if request.args.get('filtro_estado') == 'archivado' %}selected{% endif %}>⚪ Archivado</option>
+                        <option value="ingresado" {% if request.args.get('filtro_estado') == 'ingresado' %}selected{% endif %}>📥 Ingresado</option>
+                        <option value="en_proceso" {% if request.args.get('filtro_estado') == 'en_proceso' %}selected{% endif %}>⚙️ En Proceso</option>
+                        <option value="seguimiento" {% if request.args.get('filtro_estado') == 'seguimiento' %}selected{% endif %}>👁️ En Seguimiento</option>
+                        <option value="espera_documentos" {% if request.args.get('filtro_estado') == 'espera_documentos' %}selected{% endif %}>⏳ En Espera de Documentos</option>
+                        <option value="derivado_juzgado" {% if request.args.get('filtro_estado') == 'derivado_juzgado' %}selected{% endif %}>⚖️ Derivado a Juzgado</option>
+                        <option value="audiencia_programada" {% if request.args.get('filtro_estado') == 'audiencia_programada' %}selected{% endif %}>📅 Audiencia Programada</option>
+                        <option value="proceso_completado" {% if request.args.get('filtro_estado') == 'proceso_completado' %}selected{% endif %}>✅ Proceso Completado</option>
+                        <option value="resuelto_favorable" {% if request.args.get('filtro_estado') == 'resuelto_favorable' %}selected{% endif %}>🏆 Resuelto Favorable</option>
+                        <option value="resuelto_desfavorable" {% if request.args.get('filtro_estado') == 'resuelto_desfavorable' %}selected{% endif %}>❌ Resuelto Desfavorable</option>
+                        <option value="archivado" {% if request.args.get('filtro_estado') == 'archivado' %}selected{% endif %}>📦 Archivado</option>
+                        <option value="enviado_a_archivo" {% if request.args.get('filtro_estado') == 'enviado_a_archivo' %}selected{% endif %}>📤 Enviado a Archivo</option>
+                        <option value="anulado" {% if request.args.get('filtro_estado') == 'anulado' %}selected{% endif %}>🚫 Anulado</option>
                     </select>
                 </div>
                 
@@ -105,10 +184,28 @@
         </div>
         {% endif %}
         
+        <!-- LEYENDA DE COLORES -->
+        <div style="margin-bottom: 1rem; padding: 0.75rem 1rem; background: #f8fafc; border-radius: 8px; border: 1px solid #e2e8f0; font-size: 0.8rem;">
+            <strong>📋 Leyenda de Estados:</strong>
+            <span style="display: inline-block; margin: 0.2rem 0.5rem; padding: 0.2rem 0.5rem; background: #dbeafe; border-radius: 4px; color: #1e40af;">📥 Ingresado</span>
+            <span style="display: inline-block; margin: 0.2rem 0.5rem; padding: 0.2rem 0.5rem; background: #fef3c7; border-radius: 4px; color: #92400e;">⚙️ En Proceso</span>
+            <span style="display: inline-block; margin: 0.2rem 0.5rem; padding: 0.2rem 0.5rem; background: #f3e8ff; border-radius: 4px; color: #6b21a8;">👁️ Seguimiento</span>
+            <span style="display: inline-block; margin: 0.2rem 0.5rem; padding: 0.2rem 0.5rem; background: #ffedd5; border-radius: 4px; color: #9a3412;">⏳ Espera Docs</span>
+            <span style="display: inline-block; margin: 0.2rem 0.5rem; padding: 0.2rem 0.5rem; background: #dbeafe; border-radius: 4px; color: #1e40af;">⚖️ Derivado</span>
+            <span style="display: inline-block; margin: 0.2rem 0.5rem; padding: 0.2rem 0.5rem; background: #f5f3ff; border-radius: 4px; color: #5b21b6;">📅 Audiencia</span>
+            <span style="display: inline-block; margin: 0.2rem 0.5rem; padding: 0.2rem 0.5rem; background: #dcfce7; border-radius: 4px; color: #14532d;">✅ Completado</span>
+            <span style="display: inline-block; margin: 0.2rem 0.5rem; padding: 0.2rem 0.5rem; background: #dcfce7; border-radius: 4px; color: #14532d;">🏆 Favorable</span>
+            <span style="display: inline-block; margin: 0.2rem 0.5rem; padding: 0.2rem 0.5rem; background: #fee2e2; border-radius: 4px; color: #7f1d1d;">❌ Desfavorable</span>
+            <span style="display: inline-block; margin: 0.2rem 0.5rem; padding: 0.2rem 0.5rem; background: #f3f4f6; border-radius: 4px; color: #374151;">📦 Archivado</span>
+            <span style="display: inline-block; margin: 0.2rem 0.5rem; padding: 0.2rem 0.5rem; background: #e5e7eb; border-radius: 4px; color: #374151;">📤 Enviado Arch.</span>
+            <span style="display: inline-block; margin: 0.2rem 0.5rem; padding: 0.2rem 0.5rem; background: #e5e7eb; border-radius: 4px; color: #1f2937; text-decoration: line-through;">🚫 Anulado</span>
+        </div>
+        
         <div class="table-container">
             <table>
                 <thead>
                     <tr>
+                        <th style="width: 60px;">N° Reg.</th>
                         <th>N° Expediente</th>
                         <th>Tipo</th>
                         <th>Cliente</th>
@@ -121,7 +218,9 @@
                 <tbody>
                     {% if expedientes %}
                         {% for exp in expedientes %}
-                        <tr>
+                        {% set css_class = exp.get_estado_css()[0] %}
+                        <tr class="{{ css_class }}">
+                            <td class="col-num-registro">{{ exp.id }}</td>
                             <td>
                                 {% if exp.tipo == 'administrativo' %}
                                     <strong>DNI:</strong> <strong>{{ exp.dni or '-' }}</strong>
@@ -139,7 +238,7 @@
                             </td>
                             <td>{{ exp.fecha_registro | fecha }}</td>
                             <td>
-                                <!-- BOTÓN VER - USA TU CSS PERSONALIZADO -->
+                                <!-- BOTÓN VER -->
                                 <a href="{{ url_for('main.ver_expediente', id=exp.id) }}" 
                                    class="btn btn-success btn-small">
                                     👁️ Ver
@@ -163,7 +262,7 @@
                         {% endfor %}
                     {% else %}
                         <tr>
-                            <td colspan="7" style="text-align: center; color: var(--color-text-light); padding: 3rem;">
+                            <td colspan="8" style="text-align: center; color: var(--color-text-light); padding: 3rem;">
                                 {% if request.args %}
                                     🔍 No se encontraron expedientes con los criterios de búsqueda.<br>
                                     <small>Prueba con otros términos o <a href="{{ url_for('main.expedientes') }}">ver todos</a></small>
