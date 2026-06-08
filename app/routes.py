@@ -682,7 +682,7 @@ def nuevo_expediente():
 
             expediente = Expediente(
                 tipo=form.tipo.data,
-                numero_expediente=form.numero_expediente.data,
+                numero_expediente=form.numero_expediente.data if form.tipo.data != 'administrativo' else None,
                 cliente=form.cliente.data,
                 telefono=form.telefono.data,
                 materia=form.materia.data,
@@ -859,7 +859,12 @@ def editar_expediente(id):
                     return redirect(url_for('main.editar_expediente', id=id))
 
                 expediente.dni = dni_val
-                expediente.numero_expediente = '-'
+                # numero_expediente: opcional para administrativos
+                # Si ya tiene un número asignado, se respeta. Si se envía uno nuevo, se actualiza.
+                num_exp_admin = request.form.get('numero_expediente', '').strip()
+                if num_exp_admin:
+                    expediente.numero_expediente = num_exp_admin
+                # Si no viene nada en el form, no tocamos el valor actual (puede ser NULL o tener número previo)
                 expediente.materia = materia
                 expediente.entidad_receptora = request.form.get('entidad_receptora', '').strip()
                 expediente.tramite = request.form.get('tramite', '').strip()

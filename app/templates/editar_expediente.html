@@ -65,12 +65,33 @@
                     </div>
                 </div>
                 
-                <!-- N° Expediente -->
-                <div class="form-row" id="campo-expediente-container" style="display: {% if expediente.tipo in ['civil', 'penal', 'conciliacion', 'archivo'] %}flex{% else %}none{% endif %};">
+                <!-- N° Expediente - VISIBLE PARA TODOS LOS TIPOS -->
+                <!-- Administrativo: opcional (puede agregarse después)
+                     Otros tipos: obligatorio -->
+                <div class="form-row" id="campo-expediente-container" style="display: {% if expediente.tipo in ['civil', 'penal', 'conciliacion', 'archivo', 'administrativo'] %}flex{% else %}none{% endif %};">
                     <div class="form-col-2">
                         <div class="form-group">
-                            <label for="numero_expediente">N° de Expediente {% if expediente.tipo != 'administrativo' %}<span style="color: #dc2626;">*</span>{% endif %}</label>
-                            <input type="text" name="numero_expediente" id="numero_expediente" class="form-control" value="{{ expediente.numero_expediente or '' }}" {% if expediente.tipo != 'administrativo' %}required{% endif %}>
+                            <label for="numero_expediente">
+                                N° de Expediente
+                                {% if expediente.tipo != 'administrativo' %}
+                                    <span style="color: #dc2626;">*</span>
+                                {% else %}
+                                    <span style="color: #6b7280; font-size: 0.85rem;">(Opcional)</span>
+                                {% endif %}
+                            </label>
+                            <input type="text" name="numero_expediente" id="numero_expediente" class="form-control" 
+                                   value="{% if expediente.numero_expediente and expediente.numero_expediente != '-' %}{{ expediente.numero_expediente }}{% endif %}" 
+                                   placeholder="{% if expediente.tipo == 'administrativo' %}Ingrese N° de Expediente cuando lo tenga{% else %}Ingrese N° de Expediente{% endif %}"
+                                   {% if expediente.tipo != 'administrativo' %}required{% endif %}>
+                            {% if expediente.tipo == 'administrativo' %}
+                                <small style="color: var(--color-text-light); font-size: 0.85rem;">
+                                    {% if expediente.numero_expediente and expediente.numediente.numero_expediente != '-' %}
+                                        N° de Expediente actual: <strong>{{ expediente.numero_expediente }}</strong>. Puede modificarlo o dejarlo vacío.
+                                    {% else %}
+                                        Aún no tiene N° de Expediente asignado. Puede agregarlo aquí cuando lo reciba.
+                                    {% endif %}
+                                </small>
+                            {% endif %}
                         </div>
                     </div>
                 </div>
