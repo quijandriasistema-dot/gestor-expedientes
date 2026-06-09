@@ -7,7 +7,27 @@
         <div class="header-info">
             <h1 class="page-title">
                 <span>📁</span>
-                Expediente {{ expediente.get_identificador_principal() }}
+                {% if expediente.tipo == 'administrativo' %}
+                    {# Administrativo: DNI es principal, N° Expediente secundario #}
+                    Expediente DNI: {{ expediente.dni or 'Sin DNI' }}
+                    {% if expediente.numero_expediente %}
+                        <span style="color: #6b7280; font-size: 0.85rem; margin-left: 0.5rem;">
+                            | N° Exp: {{ expediente.numero_expediente }}
+                        </span>
+                    {% else %}
+                        <span style="color: #9ca3af; font-size: 0.85rem; margin-left: 0.5rem; font-style: italic;">
+                            | Sin N° de Expediente Asignado
+                        </span>
+                    {% endif %}
+                {% else %}
+                    {# Otros tipos: N° Expediente es principal, DNI secundario #}
+                    Expediente N° {{ expediente.numero_expediente or 'Sin N° de Expediente' }}
+                    {% if expediente.dni %}
+                        <span style="color: #6b7280; font-size: 0.85rem; margin-left: 0.5rem;">
+                            | DNI: {{ expediente.dni }}
+                        </span>
+                    {% endif %}
+                {% endif %}
             </h1>
             <span class="tipo-badge tipo-{{ expediente.tipo }}">
                 {{ expediente.get_tipo_label() }}
@@ -124,6 +144,16 @@
             {% endif %}
 
             {% if expediente.tipo == 'administrativo' %}
+            <div class="info-item">
+                <label>N° de Expediente:</label>
+                <span class="info-value">
+                    {% if expediente.numero_expediente %}
+                        {{ expediente.numero_expediente }}
+                    {% else %}
+                        <span style="color: #9ca3af; font-style: italic;">Sin N° de Expediente Asignado</span>
+                    {% endif %}
+                </span>
+            </div>
             <div class="info-item">
                 <label>Entidad Receptora:</label>
                 <span class="info-value">{{ expediente.entidad_receptora or 'No especificada' }}</span>
