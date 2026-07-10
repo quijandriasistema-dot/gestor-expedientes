@@ -1399,6 +1399,7 @@ def api_desactivar_usuario(username):
 @no_cache
 def api_activar_usuario(username):
     """Reactiva un usuario previamente desactivado"""
+    username = unquote(username)
     rol_actual = session.get('rol')
 
     if rol_actual not in ['ADMINISTRADOR', 'DESARROLLADOR']:
