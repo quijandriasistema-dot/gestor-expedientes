@@ -63,24 +63,26 @@ bp = Blueprint('main', __name__)
 
 USUARIOS = {}
 
-def _cargar_usuarios():
-    """Carga usuarios activos desde Supabase (tabla usuario) - BAJO DEMANDA"""
+def _cargar_usuarios(solo_activos=True):
+    """Carga usuarios desde Supabase (tabla usuario) - BAJO DEMANDA"""
     usuarios = {}
     try:
-        for u in Usuario.query.filter_by(activo=True).all():
+        query = Usuario.query
+        if solo_activos:
+            query = query.filter_by(activo=True)
+        for u in query.all():
             usuarios[u.username] = {
                 'password_hash': u.password_hash,
                 'nombre': u.nombre,
                 'rol': u.rol,
-                'modulos': u.get_modulos_list()
+                'modulos': u.get_modulos_list(),
+                'activo': u.activo,
+                'email': u.email,
+                'fecha_registro': u.fecha_registro
             }
     except Exception as e:
         print(f"Error cargando usuarios: {e}")
     return usuarios
-
-def _guardar_usuarios():
-    """Ya no se usa - los usuarios se guardan directamente en Supabase"""
-    pass
 
 # Cargar usuarios al inicio
 USUARIOS = _cargar_usuarios()
@@ -421,6 +423,11 @@ def login():
         usuario = _get_usuario(username)
 
         if usuario:
+            # Verificar si el usuario está activo
+            if not usuario.activo:
+                flash('Su cuenta ha sido desactivada. Contacte al administrador.', 'error')
+                return render_template('login.html', title='Iniciar Sesión')
+            
             if usuario.check_password(password):
                 usuario.ultimo_acceso = datetime.now()
                 db.session.commit()
@@ -1140,7 +1147,7 @@ def gestion_usuarios_admin():
     """
     ADMINISTRADOR: 
     - Puede crear usuarios (no administradores)
-    - Puede eliminar usuarios (no desarrollador ni otros admins)
+    - Puede eliminar/desactivar usuarios (no admins ni dev)
     """
     if session.get('rol') not in ['ADMINISTRADOR', 'DESARROLLADOR']:
         flash('No tiene permisos para acceder a esta sección', 'error')
@@ -1150,13 +1157,14 @@ def gestion_usuarios_admin():
         return redirect(url_for('main.gestion_usuarios_dev'))
 
     usuarios_db = {}
-    for u in Usuario.query.filter_by(activo=True).all():
+    for u in Usuario.query.all():  # Todos, incluyendo inactivos
         usuarios_db[u.username] = {
             'nombre': u.nombre,
             'rol': u.rol,
             'modulos': u.get_modulos_list(),
             'email': u.email,
-            'fecha_registro': u.fecha_registro
+            'fecha_registro': u.fecha_registro,
+            'activo': u.activo
         }
 
     return render_template('admin_usuarios.html',
@@ -1170,22 +1178,23 @@ def gestion_usuarios_admin():
 def gestion_usuarios_dev():
     """
     DESARROLLADOR:
-    - Vista completa de todos los usuarios
+    - Vista completa de todos los usuarios (activos e inactivos)
     - Puede crear administradores y usuarios
-    - Puede eliminar cualquier usuario
+    - Puede activar/desactivar cualquier usuario
     """
     if session.get('rol') != 'DESARROLLADOR':
         flash('No tiene permisos para acceder a esta sección', 'error')
         return redirect(url_for('main.index'))
 
     usuarios_db = {}
-    for u in Usuario.query.filter_by(activo=True).all():
+    for u in Usuario.query.all():  # Todos, incluyendo inactivos
         usuarios_db[u.username] = {
             'nombre': u.nombre,
             'rol': u.rol,
             'modulos': u.get_modulos_list(),
             'email': u.email,
-            'fecha_registro': u.fecha_registro
+            'fecha_registro': u.fecha_registro,
+            'activo': u.activo
         }
 
     return render_template('admin_usuarios_dev.html',
@@ -1339,6 +1348,73 @@ def api_editar_usuario(username):
 
         db.session.commit()
         return jsonify({'success': True, 'message': 'Usuario actualizado correctamente'})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@bp.route('/api/usuario/desactivar/<username>', methods=['POST'])
+@requiere_login
+@no_cache
+def api_desactivar_usuario(username):
+    """Desactiva un usuario (soft delete) - mantiene historial"""
+    rol_actual = session.get('rol')
+
+    if rol_actual not in ['ADMINISTRADOR', 'DESARROLLADOR']:
+        return jsonify({'success': False, 'error': 'Sin permisos'}), 403
+
+    if username == session.get('usuario'):
+        return jsonify({'success': False, 'error': 'No puede desactivarse a sí mismo'}), 400
+
+    usuario = _get_usuario(username)
+    if not usuario:
+        return jsonify({'success': False, 'error': 'Usuario no encontrado'}), 404
+
+    # Restricciones según rol
+    if rol_actual == 'ADMINISTRADOR':
+        if usuario.rol == 'DESARROLLADOR':
+            return jsonify({'success': False, 'error': 'No puede desactivar al desarrollador'}), 403
+        if usuario.rol == 'ADMINISTRADOR':
+            return jsonify({'success': False, 'error': 'No puede desactivar a otros administradores'}), 403
+        if usuario.rol != 'USUARIO':
+            return jsonify({'success': False, 'error': 'Solo puede desactivar usuarios'}), 403
+
+    try:
+        usuario.activo = False
+        db.session.commit()
+        return jsonify({'success': True, 'message': f'Usuario {username} desactivado correctamente'})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@bp.route('/api/usuario/activar/<username>', methods=['POST'])
+@requiere_login
+@no_cache
+def api_activar_usuario(username):
+    """Reactiva un usuario previamente desactivado"""
+    rol_actual = session.get('rol')
+
+    if rol_actual not in ['ADMINISTRADOR', 'DESARROLLADOR']:
+        return jsonify({'success': False, 'error': 'Sin permisos'}), 403
+
+    # Buscar usuario incluyendo inactivos
+    usuario = Usuario.query.filter_by(username=username).first()
+    if not usuario:
+        return jsonify({'success': False, 'error': 'Usuario no encontrado'}), 404
+
+    # Restricciones según rol
+    if rol_actual == 'ADMINISTRADOR':
+        if usuario.rol == 'DESARROLLADOR':
+            return jsonify({'success': False, 'error': 'No puede activar al desarrollador'}), 403
+        if usuario.rol == 'ADMINISTRADOR' and username != session.get('usuario'):
+            return jsonify({'success': False, 'error': 'No puede activar a otros administradores'}), 403
+        if usuario.rol != 'USUARIO':
+            return jsonify({'success': False, 'error': 'Solo puede activar usuarios'}), 403
+
+    try:
+        usuario.activo = True
+        db.session.commit()
+        return jsonify({'success': True, 'message': f'Usuario {username} activado correctamente'})
     except Exception as e:
         db.session.rollback()
         return jsonify({'success': False, 'error': str(e)}), 500
@@ -3825,3 +3901,5 @@ def oauth2callback():
 # ============================================
 # FIN DEL ARCHIVO
 # ============================================
+
+gestion_usuarios_dev

@@ -11,7 +11,7 @@
                 <i class="bi bi-code-square text-danger me-2"></i>
                 Gestión de Usuarios - Modo Desarrollador
             </h2>
-            <p class="text-muted mb-0">Acceso total: puede crear administradores, usuarios y eliminar cualquier cuenta</p>
+            <p class="text-muted mb-0">Acceso total: puede crear administradores, usuarios y gestionar cualquier cuenta</p>
         </div>
         <span class="badge bg-danger fs-6">MODO DEV</span>
     </div>
@@ -19,7 +19,7 @@
     <!-- Info de superusuario -->
     <div class="alert alert-danger mb-4">
         <i class="bi bi-exclamation-triangle-fill me-2"></i>
-        <strong>Modo Desarrollador:</strong> Tiene acceso total al sistema. Puede crear administradores, usuarios y eliminar cualquier cuenta sin restricciones.
+        <strong>Modo Desarrollador:</strong> Tiene acceso total al sistema. Puede crear administradores, usuarios y gestionar cualquier cuenta sin restricciones.
     </div>
 
     <!-- Acciones -->
@@ -28,10 +28,20 @@
             <i class="bi bi-person-plus-fill me-1"></i>
             Nuevo Administrador
         </button>
-        <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#modalNuevoUsuario">
+        <button class="btn btn-primary me-2" data-bs-toggle="modal" data-bs-target="#modalNuevoUsuario">
             <i class="bi bi-person-plus me-1"></i>
             Nuevo Usuario
         </button>
+        <div class="btn-group" role="group">
+            <input type="radio" class="btn-check" name="filtroEstado" id="filtroTodos" value="todos" checked onchange="filtrarUsuarios()">
+            <label class="btn btn-outline-secondary" for="filtroTodos">Todos</label>
+            
+            <input type="radio" class="btn-check" name="filtroEstado" id="filtroActivos" value="activos" onchange="filtrarUsuarios()">
+            <label class="btn btn-outline-success" for="filtroActivos">Activos</label>
+            
+            <input type="radio" class="btn-check" name="filtroEstado" id="filtroInactivos" value="inactivos" onchange="filtrarUsuarios()">
+            <label class="btn btn-outline-dark" for="filtroInactivos">Inactivos</label>
+        </div>
     </div>
 
     <!-- Tabla de usuarios -->
@@ -44,9 +54,10 @@
         </div>
         <div class="card-body p-0">
             <div class="table-responsive">
-                <table class="table table-hover mb-0 align-middle">
+                <table class="table table-hover mb-0 align-middle" id="tablaUsuarios">
                     <thead class="table-light">
                         <tr>
+                            <th>Estado</th>
                             <th>Usuario</th>
                             <th>Nombre</th>
                             <th>Rol</th>
@@ -57,7 +68,15 @@
                     </thead>
                     <tbody>
                         {% for username, datos in usuarios.items() %}
-                        <tr class="{{ 'table-danger fw-bold' if datos.rol == 'DESARROLLADOR' else 'table-warning' if datos.rol == 'ADMINISTRADOR' else '' }}">
+                        <tr class="fila-usuario {{ 'table-danger fw-bold' if datos.rol == 'DESARROLLADOR' else 'table-warning' if datos.rol == 'ADMINISTRADOR' else '' }} {{ 'usuario-inactivo' if not datos.activo else '' }}" 
+                            data-activo="{{ 'true' if datos.activo else 'false' }}">
+                            <td>
+                                {% if datos.activo %}
+                                    <span class="badge bg-success"><i class="bi bi-check-circle"></i> Activo</span>
+                                {% else %}
+                                    <span class="badge bg-dark"><i class="bi bi-x-circle"></i> Inactivo</span>
+                                {% endif %}
+                            </td>
                             <td>
                                 <strong>{{ username }}</strong>
                                 {% if username == session.usuario %}
@@ -85,12 +104,18 @@
                                     <i class="bi bi-pencil"></i>
                                 </button>
                                 {% if username != session.usuario %}
-                                    <button class="btn btn-sm btn-danger" onclick="eliminarUsuarioDev('{{ username }}')" title="Eliminar">
-                                        <i class="bi bi-trash"></i>
-                                    </button>
+                                    {% if datos.activo %}
+                                        <button class="btn btn-sm btn-dark" onclick="cambiarEstadoUsuario('{{ username }}', false)" title="Desactivar">
+                                            <i class="bi bi-person-x"></i>
+                                        </button>
+                                    {% else %}
+                                        <button class="btn btn-sm btn-success" onclick="cambiarEstadoUsuario('{{ username }}', true)" title="Activar">
+                                            <i class="bi bi-person-check"></i>
+                                        </button>
+                                    {% endif %}
                                 {% else %}
-                                    <button class="btn btn-sm btn-secondary" disabled title="No puede eliminarse a sí mismo">
-                                        <i class="bi bi-trash"></i>
+                                    <button class="btn btn-sm btn-secondary" disabled title="No puede modificarse a sí mismo">
+                                        <i class="bi bi-person"></i>
                                     </button>
                                 {% endif %}
                             </td>
@@ -115,6 +140,7 @@
     </div>
 </div>
 
+<!-- Modales (sin cambios) -->
 <!-- Modal Nuevo Administrador -->
 <div class="modal fade" id="modalNuevoAdmin" tabindex="-1">
     <div class="modal-dialog">
@@ -288,8 +314,40 @@
     </div>
 </div>
 
+<style>
+.usuario-inactivo {
+    background-color: #f8f9fa !important;
+    opacity: 0.6;
+}
+.usuario-inactivo td {
+    text-decoration: line-through;
+    color: #6c757d;
+}
+.usuario-inactivo td:first-child,
+.usuario-inactivo td:last-child {
+    text-decoration: none;
+}
+</style>
+
 <script>
 let usuarioEditando = null;
+
+function filtrarUsuarios() {
+    const filtro = document.querySelector('input[name="filtroEstado"]:checked').value;
+    const filas = document.querySelectorAll('.fila-usuario');
+    
+    filas.forEach(fila => {
+        const activo = fila.getAttribute('data-activo') === 'true';
+        
+        if (filtro === 'todos') {
+            fila.style.display = '';
+        } else if (filtro === 'activos') {
+            fila.style.display = activo ? '' : 'none';
+        } else if (filtro === 'inactivos') {
+            fila.style.display = !activo ? '' : 'none';
+        }
+    });
+}
 
 function toggleTodosDev(checkbox) {
     const checkboxes = document.querySelectorAll('#formNuevoUsuario input[name="modulos"]:not([value="todo"])');
@@ -452,23 +510,26 @@ function actualizarUsuarioDev() {
     });
 }
 
-function eliminarUsuarioDev(username) {
-    if (username === '{{ session.usuario }}') {
-        alert('No puede eliminarse a sí mismo');
+function cambiarEstadoUsuario(username, activar) {
+    const accion = activar ? 'activar' : 'desactivar';
+    const mensaje = activar 
+        ? `¿Activar la cuenta del usuario "${username}"?\n\nPodrá iniciar sesión nuevamente.`
+        : `¿Desactivar la cuenta del usuario "${username}"?\n\nNo podrá iniciar sesión hasta que sea reactivado.\n\nEl historial de expedientes creados por este usuario se mantiene.`;
+    
+    if (!confirm(mensaje)) {
         return;
     }
     
-    if (!confirm('¿Eliminar permanentemente al usuario "' + username + '"?\n\nEsta acción no se puede deshacer.')) {
-        return;
-    }
+    const url = activar ? '/api/usuario/activar/' + username : '/api/usuario/desactivar/' + username;
     
-    fetch('/api/usuario/eliminar/' + username, {
-        method: 'DELETE'
+    fetch(url, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'}
     })
     .then(r => r.json())
     .then(data => {
         if (data.success) {
-            alert('Usuario eliminado correctamente');
+            alert(data.message);
             location.reload();
         } else {
             alert('Error: ' + data.error);
