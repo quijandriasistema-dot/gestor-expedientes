@@ -1365,7 +1365,8 @@ def api_desactivar_usuario(username):
     if username == session.get('usuario'):
         return jsonify({'success': False, 'error': 'No puede desactivarse a sí mismo'}), 400
 
-    usuario = _get_usuario(username)
+    # Buscar usuario SIN filtrar por activo (puede estar activo o inactivo)
+    usuario = Usuario.query.filter_by(username=username).first()
     if not usuario:
         return jsonify({'success': False, 'error': 'Usuario no encontrado'}), 404
 
@@ -1377,6 +1378,10 @@ def api_desactivar_usuario(username):
             return jsonify({'success': False, 'error': 'No puede desactivar a otros administradores'}), 403
         if usuario.rol != 'USUARIO':
             return jsonify({'success': False, 'error': 'Solo puede desactivar usuarios'}), 403
+
+    # Verificar si ya está desactivado
+    if not usuario.activo:
+        return jsonify({'success': False, 'error': 'El usuario ya está desactivado'}), 400
 
     try:
         usuario.activo = False
@@ -1397,7 +1402,7 @@ def api_activar_usuario(username):
     if rol_actual not in ['ADMINISTRADOR', 'DESARROLLADOR']:
         return jsonify({'success': False, 'error': 'Sin permisos'}), 403
 
-    # Buscar usuario incluyendo inactivos
+    # Buscar usuario SIN filtrar por activo
     usuario = Usuario.query.filter_by(username=username).first()
     if not usuario:
         return jsonify({'success': False, 'error': 'Usuario no encontrado'}), 404
@@ -1410,6 +1415,10 @@ def api_activar_usuario(username):
             return jsonify({'success': False, 'error': 'No puede activar a otros administradores'}), 403
         if usuario.rol != 'USUARIO':
             return jsonify({'success': False, 'error': 'Solo puede activar usuarios'}), 403
+
+    # Verificar si ya está activo
+    if usuario.activo:
+        return jsonify({'success': False, 'error': 'El usuario ya está activo'}), 400
 
     try:
         usuario.activo = True
@@ -3901,5 +3910,3 @@ def oauth2callback():
 # ============================================
 # FIN DEL ARCHIVO
 # ============================================
-
-gestion_usuarios_dev
