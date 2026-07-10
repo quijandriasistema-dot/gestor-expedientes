@@ -8,6 +8,7 @@ from datetime import datetime, timedelta, date, timezone
 from app import db
 from app.models import Expediente, EstadoHistorial, Audiencia, Documento, Notificacion, Usuario
 from app.forms import ExpedienteForm, EstadoForm, BusquedaForm, AudienciaForm, BusquedaAudienciaForm, DocumentoForm, BusquedaDocumentoForm
+from urllib.parse import unquote
 import json
 import os
 import bcrypt
@@ -1357,6 +1358,7 @@ def api_editar_usuario(username):
 @no_cache
 def api_desactivar_usuario(username):
     """Desactiva un usuario (soft delete) - mantiene historial"""
+    username = unquote(username)
     rol_actual = session.get('rol')
 
     if rol_actual not in ['ADMINISTRADOR', 'DESARROLLADOR']:
@@ -3910,3 +3912,5 @@ def oauth2callback():
 # ============================================
 # FIN DEL ARCHIVO
 # ============================================
+
+api_desactivar_usuario
