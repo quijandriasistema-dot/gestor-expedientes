@@ -38,11 +38,11 @@
             {% if rol in ['DESARROLLADOR', 'ADMINISTRADOR', 'USUARIO'] %}
             <div class="action-group">
                 <span class="action-label">Exportar:</span>
-                <a href="{{ url_for('main.exportar_resumen_pdf', id=expediente.id) }}" class="btn btn-action btn-resumen-pdf" title="Resumen PDF para cliente">
-                    <span>📄</span> Resumen PDF
+                <a href="{{ url_for('main.exportar_resumen_pdf', id=expediente.id) }}" class="btn btn-action btn-resumen-pdf" title="PDF para archivo interno">
+                    <span>📄</span> PDF PARA ARCHIVO
                 </a>
-                <a href="{{ url_for('main.imprimir_expediente_pdf', id=expediente.id) }}" class="btn btn-action btn-print" target="_blank" title="Imprimir completo">
-                    <span>🖨️</span> Imprimir
+                <a href="{{ url_for('main.imprimir_expediente_pdf', id=expediente.id) }}" class="btn btn-action btn-print" target="_blank" title="PDF con avance para el cliente">
+                    <span>🖨️</span> PDF CLIENTE - AVANCE
                 </a>
                 <a href="{{ url_for('main.exportar_seguimiento_excel', id=expediente.id) }}" class="btn btn-action btn-excel" title="Exportar seguimiento">
                     <span>📊</span> Excel

@@ -3583,14 +3583,20 @@ def exportar_seguimiento_excel(id):
 
 
 # ============================================
-# RUTA PARA EXPORTAR RESUMEN PDF PROFESIONAL
+# RUTA PARA EXPORTAR RESUMEN PDF - FICHA DE ARCHIVO PROFESIONAL
 # ============================================
 
 @bp.route('/expediente/<int:id>/exportar-pdf')
 @requiere_login
 @no_cache
 def exportar_resumen_pdf(id):
-    """Generar PDF resumen profesional del expediente (Admin/Dev/Usuario)"""
+    """
+    Generar PDF FICHA DE ARCHIVO profesional del expediente.
+    - Diseño tipo ficha judicial para archivo físico
+    - SOLO muestra el PRIMER registro con estado 'ingresado' (presentación inicial)
+    - Sin historial completo, sin audiencias, sin documentos
+    - Formato limpio para impresión y archivo
+    """
 
     if not puede_exportar():
         flash('No tiene permisos para exportar expedientes', 'error')
@@ -3598,264 +3604,519 @@ def exportar_resumen_pdf(id):
 
     expediente = Expediente.query.get_or_404(id)
 
+    # OBTENER SOLO EL PRIMER REGISTRO "INGRESADO" DEL HISTORIAL
+    # (La presentación inicial del expediente al sistema)
+    primer_ingreso = EstadoHistorial.query.filter_by(
+        expediente_id=id,
+        estado='ingresado'
+    ).order_by(EstadoHistorial.fecha.asc()).first()
+
     output = io.BytesIO()
     doc = SimpleDocTemplate(
-        output, 
+        output,
         pagesize=letter,
-        topMargin=1.8*inch,
-        bottomMargin=0.75*inch,
-        rightMargin=0.75*inch,
-        leftMargin=0.75*inch
+        topMargin=1.2 * inch,
+        bottomMargin=0.7 * inch,
+        rightMargin=0.7 * inch,
+        leftMargin=0.7 * inch
     )
 
     elements = []
     styles = getSampleStyleSheet()
 
-    titulo_estudio = ParagraphStyle(
-        'TituloEstudio',
+    # ============================================
+    # ESTILOS PERSONALIZADOS
+    # ============================================
+
+    # Título del estudio (encabezado)
+    estudio_titulo_style = ParagraphStyle(
+        'EstudioTitulo',
         parent=styles['Heading1'],
-        fontSize=20,
+        fontSize=16,
         textColor=colors.HexColor('#1e3a8a'),
-        alignment=1,
-        spaceAfter=6,
-        fontName='Helvetica-Bold'
+        alignment=1,  # Centro
+        spaceAfter=2,
+        fontName='Helvetica-Bold',
+        leading=20
     )
 
-    subtitulo_sistema = ParagraphStyle(
-        'SubtituloSistema',
+    estudio_subtitulo_style = ParagraphStyle(
+        'EstudioSubtitulo',
         parent=styles['Normal'],
-        fontSize=10,
+        fontSize=9,
         textColor=colors.HexColor('#64748b'),
         alignment=1,
-        spaceAfter=24,
+        spaceAfter=2,
         fontName='Helvetica'
     )
 
-    titulo_documento = ParagraphStyle(
-        'TituloDocumento',
-        parent=styles['Heading2'],
-        fontSize=14,
-        textColor=colors.HexColor('#334155'),
+    estudio_ruc_style = ParagraphStyle(
+        'EstudioRUC',
+        parent=styles['Normal'],
+        fontSize=10,
+        textColor=colors.HexColor('#1e3a8a'),
         alignment=1,
-        spaceAfter=20,
+        spaceAfter=12,
         fontName='Helvetica-Bold'
     )
 
-    nota_estilo = ParagraphStyle(
-        'Nota',
-        parent=styles['Italic'],
-        fontSize=8,
-        textColor=colors.HexColor('#94a3b8'),
+    # Título del documento
+    ficha_titulo_style = ParagraphStyle(
+        'FichaTitulo',
+        parent=styles['Heading2'],
+        fontSize=13,
+        textColor=colors.white,
         alignment=1,
-        spaceBefore=30
+        spaceAfter=0,
+        fontName='Helvetica-Bold',
+        leading=16
     )
 
-    wrap_style = ParagraphStyle(
-        'WrapStyle',
+    # Sección de la ficha
+    seccion_titulo_style = ParagraphStyle(
+        'SeccionTitulo',
+        parent=styles['Heading3'],
+        fontSize=10,
+        textColor=colors.HexColor('#1e3a8a'),
+        alignment=0,
+        spaceAfter=6,
+        spaceBefore=10,
+        fontName='Helvetica-Bold',
+        leftIndent=0
+    )
+
+    # Etiqueta de campo
+    etiqueta_style = ParagraphStyle(
+        'Etiqueta',
+        parent=styles['Normal'],
+        fontSize=8,
+        textColor=colors.HexColor('#64748b'),
+        alignment=0,
+        spaceAfter=1,
+        fontName='Helvetica-Bold'
+    )
+
+    # Valor de campo
+    valor_style = ParagraphStyle(
+        'Valor',
         parent=styles['Normal'],
         fontSize=10,
+        textColor=colors.HexColor('#1e293b'),
+        alignment=0,
+        spaceAfter=4,
+        fontName='Helvetica',
         leading=13,
         wordWrap='CJK'
     )
 
-    elements.append(Paragraph("QUIADIL EIRL", titulo_estudio))
-    elements.append(Paragraph("RUC: 20604913480", ParagraphStyle(
-        'RUCStyleResumen',
-        parent=subtitulo_sistema,
+    # Valor destacado
+    valor_destacado_style = ParagraphStyle(
+        'ValorDestacado',
+        parent=valor_style,
         fontSize=11,
         textColor=colors.HexColor('#1e3a8a'),
-        fontName='Helvetica-Bold',
-        spaceAfter=18
-    )))
-    elements.append(Paragraph("Sistema de Gestión de Expedientes Legales", subtitulo_sistema))
+        fontName='Helvetica-Bold'
+    )
 
-    elements.append(Table([['']], colWidths=[6.5*inch], style=TableStyle([
-        ('LINEBELOW', (0, 0), (-1, 0), 2, colors.HexColor('#1e3a8a')),
-        ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+    # Nota de confidencialidad
+    confidencial_style = ParagraphStyle(
+        'Confidencial',
+        parent=styles['Italic'],
+        fontSize=7,
+        textColor=colors.HexColor('#94a3b8'),
+        alignment=1,
+        spaceBefore=20,
+        fontName='Helvetica-Oblique'
+    )
+
+    # Estilo para descripción de actuación
+    actuacion_style = ParagraphStyle(
+        'Actuacion',
+        parent=styles['Normal'],
+        fontSize=9,
+        textColor=colors.HexColor('#334155'),
+        alignment=0,
+        leading=14,
+        wordWrap='CJK',
+        leftIndent=8,
+        rightIndent=8,
+        spaceBefore=4,
+        spaceAfter=4
+    )
+
+    # ============================================
+    # ENCABEZADO DEL DOCUMENTO
+    # ============================================
+
+    # Línea decorativa superior azul
+    elements.append(Table([['']], colWidths=[6.5 * inch], style=TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#1e3a8a')),
+        ('BOTTOMPADDING', (0, 0), (-1, 0), 3),
     ])))
+
+    elements.append(Spacer(1, 8))
+
+    # Datos del estudio
+    elements.append(Paragraph("QUIADIL EIRL", estudio_titulo_style))
+    elements.append(Paragraph("QUIJANDRIA ABOGADOS", estudio_subtitulo_style))
+    elements.append(Paragraph("RUC: 20604913480", estudio_ruc_style))
+
+    # Línea separadora
+    elements.append(Table([['']], colWidths=[6.5 * inch], style=TableStyle([
+        ('LINEBELOW', (0, 0), (-1, 0), 1.5, colors.HexColor('#1e3a8a')),
+        ('BOTTOMPADDING', (0, 0), (-1, 0), 10),
+    ])))
+
+    # ============================================
+    # BANNER DE TÍTULO - FICHA DE ARCHIVO
+    # ============================================
 
     tipo_label = expediente.get_tipo_label()
-    elements.append(Paragraph(f"RESUMEN DE {tipo_label.upper()}", titulo_documento))
 
-    datos_principales = [
-        ['INFORMACIÓN GENERAL', ''],
-        ['N° de Expediente:', f"<b>{expediente.numero_expediente if expediente.numero_expediente != '-' else 'No aplica (Administrativo)'}</b>"],
-        ['Tipo de Proceso:', expediente.get_tipo_label()],
-        ['Estado Actual:', expediente.get_estado_label()],
-        ['', ''],
-        ['PARTES DEL PROCESO', ''],
-        ['Cliente:', expediente.cliente],
-        ['DNI:', expediente.dni or 'No registrado'],
-        ['Teléfono:', expediente.telefono or 'No registrado'],
-        ['', ''],
-        ['DETALLES DEL CASO', ''],
-        ['Materia:', expediente.materia],
+    banner_data = [[Paragraph(f"FICHA DE ARCHIVO - {tipo_label.upper()}", ficha_titulo_style)]]
+    banner_table = Table(banner_data, colWidths=[6.5 * inch])
+    banner_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#1e3a8a')),
+        ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
+        ('VALIGN', (0, 0), (-1, 0), 'MIDDLE'),
+        ('TOPPADDING', (0, 0), (-1, 0), 10),
+        ('BOTTOMPADDING', (0, 0), (-1, 0), 10),
+        ('LEFTPADDING', (0, 0), (-1, 0), 12),
+        ('RIGHTPADDING', (0, 0), (-1, 0), 12),
+    ]))
+    elements.append(banner_table)
+    elements.append(Spacer(1, 14))
+
+    # ============================================
+    # SECCIÓN 1: IDENTIFICACIÓN DEL EXPEDIENTE
+    # ============================================
+
+    elements.append(Paragraph("▎ IDENTIFICACIÓN DEL EXPEDIENTE", seccion_titulo_style))
+
+    # Determinar identificación principal según tipo
+    if expediente.tipo == 'administrativo':
+        id_principal = f"DNI: {expediente.dni or 'No registrado'}"
+        id_secundario = f"N° Expediente: {expediente.numero_expediente or 'Sin asignar'}"
+    else:
+        id_principal = f"N° Expediente: {expediente.numero_expediente or 'Sin asignar'}"
+        id_secundario = f"DNI: {expediente.dni or 'No registrado'}"
+
+    ident_data = [
+        [Paragraph("N° de Expediente / Identificación:", etiqueta_style),
+         Paragraph(id_principal, valor_destacado_style)],
+        [Paragraph("Identificación Secundaria:", etiqueta_style),
+         Paragraph(id_secundario, valor_style)],
+        [Paragraph("Tipo de Proceso:", etiqueta_style),
+         Paragraph(tipo_label, valor_style)],
+        [Paragraph("Materia:", etiqueta_style),
+         Paragraph(expediente.materia or 'No especificada', valor_style)],
+        [Paragraph("Estado Actual:", etiqueta_style),
+         Paragraph(expediente.get_estado_label() or 'Sin estado', valor_style)],
     ]
 
+    ident_table = Table(ident_data, colWidths=[2.2 * inch, 4.3 * inch])
+    ident_table.setStyle(TableStyle([
+        ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+        ('LEFTPADDING', (0, 0), (-1, -1), 8),
+        ('RIGHTPADDING', (0, 0), (-1, -1), 8),
+        ('TOPPADDING', (0, 0), (-1, -1), 4),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
+        ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#e2e8f0')),
+        ('BACKGROUND', (0, 0), (0, -1), colors.HexColor('#f8fafc')),
+        ('BOX', (0, 0), (-1, -1), 1, colors.HexColor('#cbd5e1')),
+    ]))
+    elements.append(ident_table)
+    elements.append(Spacer(1, 10))
+
+    # ============================================
+    # SECCIÓN 2: PARTES DEL PROCESO
+    # ============================================
+
+    elements.append(Paragraph("▎ PARTES DEL PROCESO", seccion_titulo_style))
+
+    partes_data = [
+        [Paragraph("Cliente / Demandante:", etiqueta_style),
+         Paragraph(expediente.cliente or 'No registrado', valor_style)],
+        [Paragraph("Teléfono:", etiqueta_style),
+         Paragraph(expediente.telefono or 'No registrado', valor_style)],
+    ]
+
+    # Campos específicos según tipo
     if expediente.tipo == 'civil':
-        datos_principales.extend([
-            ['Juez:', expediente.juez or 'Por asignar'],
-            ['Secretario:', expediente.secretario or 'Por asignar'],
+        partes_data.extend([
+            [Paragraph("Juez:", etiqueta_style),
+             Paragraph(expediente.juez or 'No asignado', valor_style)],
+            [Paragraph("Secretario:", etiqueta_style),
+             Paragraph(expediente.secretario or 'No asignado', valor_style)],
         ])
     elif expediente.tipo == 'penal':
-        datos_principales.extend([
-            ['N° Caso Fiscal:', expediente.numero_cf or 'Por asignar'],
-            ['Fiscal:', expediente.fiscal or 'Por asignar'],
-            ['Juzgado:', expediente.juzgado or 'Por asignar'],
+        partes_data.extend([
+            [Paragraph("N° Caso Fiscal:", etiqueta_style),
+             Paragraph(expediente.numero_cf or 'No asignado', valor_style)],
+            [Paragraph("Fiscal:", etiqueta_style),
+             Paragraph(expediente.fiscal or 'No asignado', valor_style)],
+            [Paragraph("Juzgado:", etiqueta_style),
+             Paragraph(expediente.juzgado or 'No asignado', valor_style)],
         ])
     elif expediente.tipo == 'administrativo':
-        datos_principales.extend([
-            ['Entidad Receptora:', expediente.entidad_receptora or 'Por definir'],
-            ['Trámite:', expediente.tramite or 'Por definir'],
+        partes_data.extend([
+            [Paragraph("Entidad Receptora:", etiqueta_style),
+             Paragraph(expediente.entidad_receptora or 'No especificada', valor_style)],
+            [Paragraph("Trámite:", etiqueta_style),
+             Paragraph(expediente.tramite or 'No especificado', valor_style)],
         ])
     elif expediente.tipo == 'conciliacion':
-        datos_principales.extend([
-            ['Conciliador:', expediente.conciliador or 'Por asignar'],
-            ['Solicitante:', expediente.solicitante or expediente.cliente],
-            ['Invitados:', expediente.invitados or 'No especificados'],
+        partes_data.extend([
+            [Paragraph("Conciliador:", etiqueta_style),
+             Paragraph(expediente.conciliador or 'No asignado', valor_style)],
+            [Paragraph("Solicitante:", etiqueta_style),
+             Paragraph(expediente.solicitante or expediente.cliente or 'No especificado', valor_style)],
+            [Paragraph("Invitados:", etiqueta_style),
+             Paragraph(expediente.invitados or 'No especificados', valor_style)],
         ])
     elif expediente.tipo == 'archivo':
-        datos_principales.extend([
-            ['Ubicación Física:', expediente.ubicacion_archivo or 'Por definir'],
+        partes_data.extend([
+            [Paragraph("Ubicación Física:", etiqueta_style),
+             Paragraph(expediente.ubicacion_archivo or 'No especificada', valor_style)],
+            [Paragraph("Fecha de Archivado:", etiqueta_style),
+             Paragraph(expediente.fecha_archivado.strftime('%d/%m/%Y') if expediente.fecha_archivado else 'No registrada', valor_style)],
         ])
 
-    datos_principales.extend([
-        ['', ''],
-        ['REGISTRO Y SEGUIMIENTO', ''],
-        ['Fecha de Ingreso:', expediente.fecha_registro.strftime('%d de %B de %Y').upper() if expediente.fecha_registro else 'No registrada'],
-        ['Última Actualización:', expediente.fecha_actualizacion.strftime('%d de %B de %Y - %H:%M').upper() if expediente.fecha_actualizacion else 'Sin actualizaciones'],
-        ['Registrado por:', expediente.usuario_registro or 'Sistema'],
-    ])
-
-    tabla_data = []
-    for fila in datos_principales:
-        if fila[0] == '' and fila[1] == '':
-            tabla_data.append(['', ''])
-        elif fila[1] == '':
-            tabla_data.append([fila[0], ''])
-        else:
-            tabla_data.append([fila[0], Paragraph(fila[1], wrap_style)])
-
-    tabla = Table(tabla_data, colWidths=[2*inch, 4.5*inch])
-
-    header_rows = []
-    for idx, fila in enumerate(tabla_data):
-        if fila[0] in ['INFORMACIÓN GENERAL', 'PARTES DEL PROCESO', 'DETALLES DEL CASO', 'REGISTRO Y SEGUIMIENTO']:
-            header_rows.append(idx)
-
-    style_commands = [
-        ('FONTNAME', (0, 1), (0, -1), 'Helvetica-Bold'),
-        ('FONTSIZE', (0, 1), (0, -1), 9),
-        ('TEXTCOLOR', (0, 1), (0, -1), colors.HexColor('#475569')),
-        ('BACKGROUND', (0, 1), (0, -1), colors.HexColor('#f8fafc')),
-        ('ALIGN', (0, 1), (0, -1), 'LEFT'),
-        ('LEFTPADDING', (0, 1), (0, -1), 12),
-        ('FONTNAME', (1, 1), (1, -1), 'Helvetica'),
-        ('FONTSIZE', (1, 1), (1, -1), 10),
-        ('TEXTCOLOR', (1, 1), (1, -1), colors.HexColor('#1e293b')),
-        ('ALIGN', (1, 1), (1, -1), 'LEFT'),
-        ('LEFTPADDING', (1, 1), (1, -1), 12),
-        ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#e2e8f0')),
-        ('BOX', (0, 0), (-1, -1), 1, colors.HexColor('#cbd5e1')),
-        ('BOTTOMPADDING', (0, 1), (-1, -1), 6),
-        ('TOPPADDING', (0, 1), (-1, -1), 6),
+    partes_table = Table(partes_data, colWidths=[2.2 * inch, 4.3 * inch])
+    partes_table.setStyle(TableStyle([
         ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+        ('LEFTPADDING', (0, 0), (-1, -1), 8),
+        ('RIGHTPADDING', (0, 0), (-1, -1), 8),
+        ('TOPPADDING', (0, 0), (-1, -1), 4),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
+        ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#e2e8f0')),
+        ('BACKGROUND', (0, 0), (0, -1), colors.HexColor('#f8fafc')),
+        ('BOX', (0, 0), (-1, -1), 1, colors.HexColor('#cbd5e1')),
+    ]))
+    elements.append(partes_table)
+    elements.append(Spacer(1, 10))
+
+    # ============================================
+    # SECCIÓN 3: PRIMERA ACTUACIÓN / INGRESO AL SISTEMA
+    # ============================================
+
+    elements.append(Paragraph("▎ PRIMERA ACTUACIÓN / INGRESO AL SISTEMA", seccion_titulo_style))
+
+    if primer_ingreso:
+        # Formatear fecha
+        fecha_ingreso = primer_ingreso.fecha.strftime('%d/%m/%Y') if primer_ingreso.fecha else 'Sin fecha'
+        hora_ingreso = primer_ingreso.fecha.strftime('%H:%M') if primer_ingreso.fecha else ''
+        fecha_completa = f"{fecha_ingreso}" + (f" a las {hora_ingreso}" if hora_ingreso else "")
+
+        # Descripción de la primera actuación
+        descripcion_ingreso = primer_ingreso.descripcion or 'Expediente registrado en el sistema'
+        descripcion_formateada = '<br/>'.join(descripcion_ingreso.split('\n')) if descripcion_ingreso else 'Sin descripción'
+
+        ingreso_data = [
+            [Paragraph("Fecha de Ingreso:", etiqueta_style),
+             Paragraph(fecha_completa, valor_destacado_style)],
+            [Paragraph("Estado Inicial:", etiqueta_style),
+             Paragraph("📥 Ingresado", valor_style)],
+            [Paragraph("Registrado por:", etiqueta_style),
+             Paragraph(primer_ingreso.usuario or 'Sistema', valor_style)],
+            [Paragraph("Descripción de la Actuación:", etiqueta_style),
+             Paragraph(descripcion_formateada, actuacion_style)],
+        ]
+
+        ingreso_table = Table(ingreso_data, colWidths=[2.2 * inch, 4.3 * inch])
+        ingreso_table.setStyle(TableStyle([
+            ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+            ('LEFTPADDING', (0, 0), (-1, -1), 8),
+            ('RIGHTPADDING', (0, 0), (-1, -1), 8),
+            ('TOPPADDING', (0, 0), (-1, -1), 4),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
+            ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#e2e8f0')),
+            ('BACKGROUND', (0, 0), (0, -1), colors.HexColor('#f8fafc')),
+            ('BACKGROUND', (0, 3), (-1, 3), colors.HexColor('#eff6ff')),  # Fondo azul claro para descripción
+            ('BOX', (0, 0), (-1, -1), 1, colors.HexColor('#cbd5e1')),
+        ]))
+        elements.append(ingreso_table)
+
+    else:
+        # No hay registro de ingreso
+        no_ingreso_data = [[Paragraph(
+            "No se encontró registro de ingreso inicial. Este expediente fue creado antes de la implementación del historial de estados.",
+            ParagraphStyle('NoIngreso', parent=valor_style, textColor=colors.HexColor('#94a3b8'), alignment=1)
+        )]]
+
+        no_ingreso_table = Table(no_ingreso_data, colWidths=[6.5 * inch])
+        no_ingreso_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#fef3c7')),
+            ('LEFTPADDING', (0, 0), (-1, 0), 12),
+            ('RIGHTPADDING', (0, 0), (-1, 0), 12),
+            ('TOPPADDING', (0, 0), (-1, 0), 10),
+            ('BOTTOMPADDING', (0, 0), (-1, 0), 10),
+            ('BOX', (0, 0), (-1, 0), 1, colors.HexColor('#f59e0b')),
+        ]))
+        elements.append(no_ingreso_table)
+
+    elements.append(Spacer(1, 10))
+
+    # ============================================
+    # SECCIÓN 4: REGISTRO Y SEGUIMIENTO
+    # ============================================
+
+    elements.append(Paragraph("▎ REGISTRO Y SEGUIMIENTO", seccion_titulo_style))
+
+    registro_data = [
+        [Paragraph("Fecha de Registro en Sistema:", etiqueta_style),
+         Paragraph(expediente.fecha_registro.strftime('%d de %B de %Y').upper() if expediente.fecha_registro else 'No registrada', valor_style)],
+        [Paragraph("Última Actualización:", etiqueta_style),
+         Paragraph(expediente.fecha_actualizacion.strftime('%d de %B de %Y - %H:%M').upper() if expediente.fecha_actualizacion else 'Sin actualizaciones', valor_style)],
+        [Paragraph("Usuario de Registro:", etiqueta_style),
+         Paragraph(expediente.usuario_registro or 'Sistema', valor_style)],
     ]
 
-    for h_row in header_rows:
-        style_commands.extend([
-            ('BACKGROUND', (0, h_row), (-1, h_row), colors.HexColor('#1e3a8a')),
-            ('TEXTCOLOR', (0, h_row), (-1, h_row), colors.white),
-            ('FONTNAME', (0, h_row), (-1, h_row), 'Helvetica-Bold'),
-            ('FONTSIZE', (0, h_row), (-1, h_row), 10),
-            ('SPAN', (0, h_row), (-1, h_row)),
-            ('ALIGN', (0, h_row), (-1, h_row), 'CENTER'),
-            ('BOTTOMPADDING', (0, h_row), (-1, h_row), 8),
-            ('TOPPADDING', (0, h_row), (-1, h_row), 8),
-        ])
+    registro_table = Table(registro_data, colWidths=[2.2 * inch, 4.3 * inch])
+    registro_table.setStyle(TableStyle([
+        ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+        ('LEFTPADDING', (0, 0), (-1, -1), 8),
+        ('RIGHTPADDING', (0, 0), (-1, -1), 8),
+        ('TOPPADDING', (0, 0), (-1, -1), 4),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
+        ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#e2e8f0')),
+        ('BACKGROUND', (0, 0), (0, -1), colors.HexColor('#f8fafc')),
+        ('BOX', (0, 0), (-1, -1), 1, colors.HexColor('#cbd5e1')),
+    ]))
+    elements.append(registro_table)
+    elements.append(Spacer(1, 10))
 
-    tabla.setStyle(TableStyle(style_commands))
+    # ============================================
+    # SECCIÓN 5: DESCRIPCIÓN DEL CASO (si existe)
+    # ============================================
 
-    elements.append(tabla)
+    if expediente.descripcion:
+        elements.append(Paragraph("▎ DESCRIPCIÓN DEL CASO", seccion_titulo_style))
+
+        desc_texto = expediente.descripcion
+        desc_formateada = '<br/>'.join(desc_texto.split('\n')) if desc_texto else 'Sin descripción'
+
+        desc_data = [[Paragraph(desc_formateada, actuacion_style)]]
+        desc_table = Table(desc_data, colWidths=[6.5 * inch])
+        desc_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#f8fafc')),
+            ('LEFTPADDING', (0, 0), (-1, 0), 10),
+            ('RIGHTPADDING', (0, 0), (-1, 0), 10),
+            ('TOPPADDING', (0, 0), (-1, 0), 8),
+            ('BOTTOMPADDING', (0, 0), (-1, 0), 8),
+            ('BOX', (0, 0), (-1, 0), 1, colors.HexColor('#cbd5e1')),
+        ]))
+        elements.append(desc_table)
+
     elements.append(Spacer(1, 20))
 
-    # ========== SECCIÓN DESCRIPCIÓN CONTINUA CON RECUADRO ==========
-    if expediente.descripcion:
-        desc_style = ParagraphStyle(
-            'Desc',
-            parent=styles['Normal'],
-            fontSize=10,
-            textColor=colors.HexColor('#334155'),
-            alignment=0,
-            spaceAfter=6,
-            leading=14,
-            wordWrap='CJK'
-        )
-        
-        # Estilo con recuadro visual profesional
-        desc_box_style = ParagraphStyle(
-            'DescBox',
-            parent=desc_style,
-            leftIndent=12,
-            rightIndent=12,
-            spaceBefore=10,
-            spaceAfter=10,
-            backColor=colors.HexColor('#f8fafc'),
-            borderColor=colors.HexColor('#e2e8f0'),
-            borderWidth=1,
-            borderPadding=10
-        )
-        
-        elements.append(Paragraph("<b>DESCRIPCIÓN DEL CASO:</b>", desc_style))
+    # ============================================
+    # LÍNEA SEPARADORA FINAL
+    # ============================================
 
-        descripcion_texto = expediente.descripcion
-        descripcion_formateada = '<br/>'.join(descripcion_texto.split('\n')) if descripcion_texto else 'Sin descripción'
-        
-        # Paragraph maneja división automática entre páginas
-        desc_para = Paragraph(descripcion_formateada, desc_box_style)
-        elements.append(desc_para)
-        
-        elements.append(Spacer(1, 20))
-
-    elements.append(Spacer(1, 40))
-    elements.append(Table([['']], colWidths=[6.5*inch], style=TableStyle([
+    elements.append(Table([['']], colWidths=[6.5 * inch], style=TableStyle([
         ('LINEABOVE', (0, 0), (-1, 0), 1, colors.HexColor('#cbd5e1')),
-        ('TOPPADDING', (0, 0), (-1, 0), 20),
+        ('TOPPADDING', (0, 0), (-1, 0), 16),
     ])))
 
+    # ============================================
+    # NOTA DE CONFIDENCIALIDAD
+    # ============================================
+
     elements.append(Paragraph(
-        "Este documento es confidencial y de uso exclusivo del estudio jurídico. "
-        "Generado el " + ahora_peru().strftime('%d/%m/%Y a las %H:%M') + 
-        " por " + session.get('nombre', 'Sistema'),
-        nota_estilo
+        "<b>DOCUMENTO CONFIDENCIAL</b> — Uso exclusivo del Estudio Jurídico Quijandria Abogados EIRL",
+        ParagraphStyle('ConfidencialTitulo', parent=confidencial_style, fontName='Helvetica-Bold', textColor=colors.HexColor('#64748b'))
     ))
 
-    def draw_logo_first_page(canvas, doc):
-        """Dibuja logo SOLO en la primera página"""
-        try:
-            logo = get_logo_image()
-            if logo:
-                logo_width = 2.0 * inch
-                logo_height = 1.6 * inch
-                page_width = letter[0]
-                x = (page_width - logo_width) / 2
-                y = letter[1] - 1.7 * inch
-                canvas.drawImage(logo, x, y, width=logo_width, height=logo_height, preserveAspectRatio=True, mask='auto')
-        except Exception as e:
-            print(f"Error dibujando logo: {e}")
+    elements.append(Paragraph(
+        f"Generado el {ahora_peru().strftime('%d/%m/%Y a las %H:%M')} por {session.get('nombre', 'Sistema')} | "
+        f"QUIADIL EIRL — RUC: 20604913480",
+        confidencial_style
+    ))
 
-    def draw_no_logo(canvas, doc):
-        """Páginas siguientes sin logo"""
-        pass
+    elements.append(Paragraph(
+        "Su reproducción, distribución o divulgación sin autorización escrita está prohibida.",
+        confidencial_style
+    ))
 
-    doc.build(elements, onFirstPage=draw_logo_first_page, onLaterPages=draw_no_logo)
+    # ============================================
+    # FUNCIONES DE ENCABEZADO Y PIE DE PÁGINA
+    # ============================================
+
+    def draw_header_footer_archivo(canvas, doc):
+        """Dibuja encabezado y pie de página profesional en cada hoja"""
+        canvas.saveState()
+
+        # --- LÍNEA SUPERIOR AZUL ---
+        canvas.setFillColor(colors.HexColor('#1e3a8a'))
+        canvas.rect(0, letter[1] - 0.25 * inch, letter[0], 0.25 * inch, fill=1, stroke=0)
+
+        # --- TEXTO IZQUIERDO (estudio) ---
+        canvas.setFont('Helvetica-Bold', 7)
+        canvas.setFillColor(colors.HexColor('#1e3a8a'))
+        canvas.drawString(0.7 * inch, letter[1] - 0.5 * inch, "QUIADIL EIRL")
+
+        canvas.setFont('Helvetica', 6)
+        canvas.setFillColor(colors.HexColor('#64748b'))
+        canvas.drawString(0.7 * inch, letter[1] - 0.62 * inch, "Sistema de Gestión de Expedientes")
+
+        # --- TEXTO CENTRO (tipo de documento) ---
+        canvas.setFont('Helvetica-Bold', 8)
+        canvas.setFillColor(colors.HexColor('#1e3a8a'))
+        canvas.drawCentredString(letter[0] / 2, letter[1] - 0.56 * inch, "FICHA DE ARCHIVO")
+
+        # --- TEXTO DERECHO (fecha) ---
+        canvas.setFont('Helvetica', 6)
+        canvas.setFillColor(colors.HexColor('#64748b'))
+        canvas.drawRightString(letter[0] - 0.7 * inch, letter[1] - 0.5 * inch,
+                               ahora_peru().strftime('%d/%m/%Y'))
+        canvas.drawRightString(letter[0] - 0.7 * inch, letter[1] - 0.62 * inch,
+                               f"Exp: {expediente.numero_expediente or 'N/A'}")
+
+        # --- LÍNEA SEPARADORA ---
+        canvas.setStrokeColor(colors.HexColor('#cbd5e1'))
+        canvas.setLineWidth(0.5)
+        canvas.line(0.7 * inch, letter[1] - 0.75 * inch, letter[0] - 0.7 * inch, letter[1] - 0.75 * inch)
+
+        # --- PIE DE PÁGINA ---
+        # Línea inferior
+        canvas.setStrokeColor(colors.HexColor('#cbd5e1'))
+        canvas.setLineWidth(0.5)
+        canvas.line(0.7 * inch, 0.45 * inch, letter[0] - 0.7 * inch, 0.45 * inch)
+
+        # Texto izquierdo
+        canvas.setFont('Helvetica', 6)
+        canvas.setFillColor(colors.HexColor('#94a3b8'))
+        canvas.drawString(0.7 * inch, 0.32 * inch,
+                          f"Generado: {ahora_peru().strftime('%d/%m/%Y %H:%M')} | Usuario: {session.get('nombre', 'Sistema')}")
+
+        # Texto centro
+        canvas.setFont('Helvetica-Oblique', 6)
+        canvas.setFillColor(colors.HexColor('#94a3b8'))
+        canvas.drawCentredString(letter[0] / 2, 0.32 * inch,
+                                 "Documento Confidencial - Uso Exclusivo del Estudio Jurídico")
+
+        # Número de página derecha
+        canvas.setFont('Helvetica-Bold', 7)
+        canvas.setFillColor(colors.HexColor('#1e3a8a'))
+        canvas.drawRightString(letter[0] - 0.7 * inch, 0.32 * inch, f"Pág. {doc.page}")
+
+        canvas.restoreState()
+
+    # ============================================
+    # CONSTRUIR PDF
+    # ============================================
+    doc.build(elements, onFirstPage=draw_header_footer_archivo, onLaterPages=draw_header_footer_archivo)
     output.seek(0)
+
+    # Nombre del archivo
+    identificador = expediente.numero_expediente.replace("/", "_") if expediente.numero_expediente and expediente.numero_expediente != '-' else f"DNI_{expediente.dni or 'SIN_ID'}"
 
     return send_file(
         output,
         mimetype='application/pdf',
         as_attachment=True,
-        download_name=f'Resumen_{expediente.numero_expediente.replace("/", "_")}_{ahora_peru().strftime("%Y%m%d")}.pdf'
+        download_name=f'Ficha_Archivo_{identificador}_{ahora_peru().strftime("%Y%m%d")}.pdf'
     )
 
 # RUTA: ENVIAR EXPEDIENTE A ARCHIVO
@@ -4121,4 +4382,4 @@ def eliminar_historial(id):
 # FIN DEL ARCHIVO
 # ============================================
 
-ver_expediente
+exportar_resumen_pdf
