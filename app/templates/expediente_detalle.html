@@ -365,7 +365,7 @@
                     
                     <div class="timeline-nota">
                         <span class="nota-label">📝 Actuación realizada:</span>
-                        <p class="nota-texto">{{ (h.descripcion or 'Sin descripción de actuación') | replace('\n', '<br>') | safe }}</p>
+                        <p class="nota-texto">{{ h.descripcion or 'Sin descripción de actuación' | nl2br }}</p>
                     </div>
                     
                     <div class="timeline-footer">
