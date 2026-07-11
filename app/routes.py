@@ -775,6 +775,7 @@ def ver_expediente(id):
                          audiencias=audiencias,
                          form_estado=form_estado,
                          form_modal=form_modal,
+                         ahora_peru=ahora_peru,  # <-- AGREGAR ESTA LÍNEA
                          rol=session.get('rol', 'USUARIO'))
 
 @bp.route('/expediente/<int:id>/eliminar', methods=['POST'])
@@ -4102,3 +4103,5 @@ def eliminar_historial(id):
 # ============================================
 # FIN DEL ARCHIVO
 # ============================================
+
+ver_expediente
