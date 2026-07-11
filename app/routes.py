@@ -3899,7 +3899,7 @@ def exportar_resumen_pdf(id):
     elements.append(Spacer(1, 10))
 
     # ============================================
-    # SECCION 3: INICIO DE EXPEDIENTE (solo fecha + descripcion)
+    # SECCION 3: INICIO DE EXPEDIENTE
     # ============================================
 
     elements.append(Paragraph("▎ INICIO DE EXPEDIENTE", seccion_titulo_style))
@@ -3912,7 +3912,7 @@ def exportar_resumen_pdf(id):
         ingreso_data = [
             [Paragraph("Fecha de Inicio:", etiqueta_style),
              Paragraph(fecha_ingreso, valor_destacado_style)],
-            [Paragraph("Descripcion de la Actuacion:", etiqueta_style),
+            [Paragraph("Descripcion del Caso:", etiqueta_style),
              Paragraph(descripcion_formateada, actuacion_style)],
         ]
 
@@ -3947,34 +3947,10 @@ def exportar_resumen_pdf(id):
         ]))
         elements.append(no_ingreso_table)
 
-    elements.append(Spacer(1, 10))
-
-    # ============================================
-    # SECCION 4: DESCRIPCION DEL CASO
-    # ============================================
-
-    if expediente.descripcion:
-        elements.append(Paragraph("▎ DESCRIPCION DEL CASO", seccion_titulo_style))
-
-        desc_texto = expediente.descripcion
-        desc_formateada = '<br/>'.join(desc_texto.split('\n')) if desc_texto else 'Sin descripcion'
-
-        desc_data = [[Paragraph(desc_formateada, actuacion_style)]]
-        desc_table = Table(desc_data, colWidths=[6.5 * inch])
-        desc_table.setStyle(TableStyle([
-            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#f8fafc')),
-            ('LEFTPADDING', (0, 0), (-1, 0), 10),
-            ('RIGHTPADDING', (0, 0), (-1, 0), 10),
-            ('TOPPADDING', (0, 0), (-1, 0), 8),
-            ('BOTTOMPADDING', (0, 0), (-1, 0), 8),
-            ('BOX', (0, 0), (-1, 0), 1, colors.HexColor('#cbd5e1')),
-        ]))
-        elements.append(desc_table)
-
     elements.append(Spacer(1, 20))
 
     # ============================================
-    # PIE DE PAGINA
+    # PIE DE PAGINA (sin seccion Descripcion del Caso separada)
     # ============================================
 
     elements.append(Table([['']], colWidths=[6.5 * inch], style=TableStyle([
