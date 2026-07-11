@@ -210,14 +210,12 @@
             </div>
 
             {% if avances %}
-            <div class="avance-lista-compacta">
+            <div class="avance-bitacora">
                 {% for h in avances %}
-                <div class="avance-item-compacto">
-                    <p class="avance-texto">
-                        <span class="avance-fecha-inline">{{ h.fecha.strftime('%d/%m/%Y') if h.fecha else 'Sin fecha' }}</span>
-                        <span class="avance-separator"> - </span>
-                        {{ h.descripcion or 'Sin descripción' }}
-                    </p>
+                <div class="avance-linea">
+                    <span class="avance-fecha-bitacora">{{ h.fecha.strftime('%d/%m/%Y') if h.fecha else 'Sin fecha' }}</span>
+                    <span class="avance-sep">|</span>
+                    <span class="avance-desc-bitacora">{{ h.descripcion or 'Sin descripción' }}</span>
                 </div>
                 {% endfor %}
             </div>
@@ -1003,36 +1001,40 @@
     gap: 0.5rem;
 }
 
-.avance-lista-compacta {
-    display: flex;
-    flex-direction: column;
-    gap: 0.5rem;
-}
-
-.avance-item-compacto {
+.avance-bitacora {
     background: #f8fafc;
-    border-radius: 6px;
-    padding: 0.75rem 1rem;
+    border-radius: 8px;
+    padding: 1rem 1.25rem;
     border-left: 3px solid #3b82f6;
 }
 
-.avance-item-compacto .avance-texto {
-    margin: 0;
-    color: #334155;
-    font-size: 0.95rem;
+.avance-linea {
+    padding: 0.35rem 0;
+    border-bottom: 1px dashed #e2e8f0;
+    font-size: 0.92rem;
     line-height: 1.5;
-    white-space: pre-wrap;
+    color: #334155;
 }
 
-.avance-fecha-inline {
+.avance-linea:last-child {
+    border-bottom: none;
+}
+
+.avance-fecha-bitacora {
     color: #1e40af;
-    font-weight: 600;
-    font-size: 0.9rem;
+    font-weight: 700;
+    font-size: 0.85rem;
+    white-space: nowrap;
 }
 
-.avance-separator {
+.avance-sep {
     color: #94a3b8;
-    margin: 0 0.25rem;
+    margin: 0 0.5rem;
+    font-weight: 400;
+}
+
+.avance-desc-bitacora {
+    color: #334155;
 }
 
 .avance-vacio {
