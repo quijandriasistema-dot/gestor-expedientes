@@ -767,6 +767,7 @@ def ver_expediente(id):
     ).order_by(EstadoHistorial.fecha.desc()).all()
 
     # AVANCES: Solo actuaciones reales (excluir estados automáticos del sistema)
+    # Orden: MAS ANTIGUO arriba, NUEVOS debajo (invertido respecto al historial)
     estados_excluir_avance = [
         'Expediente editado',
         'Expediente registrado en el sistema',
@@ -776,6 +777,8 @@ def ver_expediente(id):
                and h.estado not in estados_excluir_avance
                and not h.descripcion.startswith('Expediente editado por')
                and not h.descripcion.startswith('Expediente registrado')]
+    # Invertir orden: antiguo arriba, nuevo abajo
+    avances = list(reversed(avances))
 
     audiencias = Audiencia.query.filter_by(
         expediente_id=id
