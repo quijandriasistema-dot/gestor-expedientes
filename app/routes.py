@@ -760,9 +760,22 @@ def ver_expediente(id):
     form_modal = ActualizacionModalForm()
 
     expediente = Expediente.query.get_or_404(id)
+    
+    # TODOS los estados para el historial completo (al final)
     historial = EstadoHistorial.query.filter_by(
         expediente_id=id
     ).order_by(EstadoHistorial.fecha.desc()).all()
+
+    # AVANCES: Solo actuaciones reales (excluir estados automáticos del sistema)
+    estados_excluir_avance = [
+        'Expediente editado',
+        'Expediente registrado en el sistema',
+        'ingresado'  # El estado inicial de creación
+    ]
+    avances = [h for h in historial if h.descripcion and h.descripcion.strip() 
+               and h.estado not in estados_excluir_avance
+               and not h.descripcion.startswith('Expediente editado por')
+               and not h.descripcion.startswith('Expediente registrado')]
 
     audiencias = Audiencia.query.filter_by(
         expediente_id=id
@@ -772,10 +785,11 @@ def ver_expediente(id):
                          title=f'Expediente {expediente.get_identificador_principal()}',
                          expediente=expediente,
                          historial=historial,
+                         avances=avances,
                          audiencias=audiencias,
                          form_estado=form_estado,
                          form_modal=form_modal,
-                         ahora_peru=ahora_peru,  # <-- AGREGAR ESTA LÍNEA
+                         ahora_peru=ahora_peru,
                          rol=session.get('rol', 'USUARIO'))
 
 @bp.route('/expediente/<int:id>/eliminar', methods=['POST'])
