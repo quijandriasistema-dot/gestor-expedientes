@@ -3581,7 +3581,6 @@ def exportar_seguimiento_excel(id):
         download_name=f'Seguimiento_{expediente.numero_expediente.replace("/", "_")}_{datetime.now().strftime("%Y%m%d")}.xlsx'
     )
 
-
 # ============================================
 # RUTA PARA EXPORTAR RESUMEN PDF - FICHA DE ARCHIVO PROFESIONAL
 # ============================================
@@ -3592,10 +3591,11 @@ def exportar_seguimiento_excel(id):
 def exportar_resumen_pdf(id):
     """
     Generar PDF FICHA DE ARCHIVO profesional del expediente.
-    - Diseño tipo ficha judicial para archivo físico
-    - SOLO muestra el PRIMER registro con estado 'ingresado' (presentación inicial)
-    - Sin historial completo, sin audiencias, sin documentos
-    - Formato limpio para impresión y archivo
+    - Diseño tipo ficha judicial para archivo fisico
+    - SOLO muestra el PRIMER registro 'ingresado': fecha + descripcion
+    - Logo del estudio restaurado
+    - SIN seccion 'Registro y Seguimiento' (evita repeticion)
+    - 'Inicio de Expediente' con fecha y descripcion del caso
     """
 
     if not puede_exportar():
@@ -3604,8 +3604,7 @@ def exportar_resumen_pdf(id):
 
     expediente = Expediente.query.get_or_404(id)
 
-    # OBTENER SOLO EL PRIMER REGISTRO "INGRESADO" DEL HISTORIAL
-    # (La presentación inicial del expediente al sistema)
+    # OBTENER SOLO EL PRIMER REGISTRO "INGRESADO"
     primer_ingreso = EstadoHistorial.query.filter_by(
         expediente_id=id,
         estado='ingresado'
@@ -3615,7 +3614,7 @@ def exportar_resumen_pdf(id):
     doc = SimpleDocTemplate(
         output,
         pagesize=letter,
-        topMargin=1.2 * inch,
+        topMargin=1.6 * inch,
         bottomMargin=0.7 * inch,
         rightMargin=0.7 * inch,
         leftMargin=0.7 * inch
@@ -3625,16 +3624,15 @@ def exportar_resumen_pdf(id):
     styles = getSampleStyleSheet()
 
     # ============================================
-    # ESTILOS PERSONALIZADOS
+    # ESTILOS
     # ============================================
 
-    # Título del estudio (encabezado)
     estudio_titulo_style = ParagraphStyle(
         'EstudioTitulo',
         parent=styles['Heading1'],
         fontSize=16,
         textColor=colors.HexColor('#1e3a8a'),
-        alignment=1,  # Centro
+        alignment=1,
         spaceAfter=2,
         fontName='Helvetica-Bold',
         leading=20
@@ -3660,7 +3658,6 @@ def exportar_resumen_pdf(id):
         fontName='Helvetica-Bold'
     )
 
-    # Título del documento
     ficha_titulo_style = ParagraphStyle(
         'FichaTitulo',
         parent=styles['Heading2'],
@@ -3672,7 +3669,6 @@ def exportar_resumen_pdf(id):
         leading=16
     )
 
-    # Sección de la ficha
     seccion_titulo_style = ParagraphStyle(
         'SeccionTitulo',
         parent=styles['Heading3'],
@@ -3681,11 +3677,9 @@ def exportar_resumen_pdf(id):
         alignment=0,
         spaceAfter=6,
         spaceBefore=10,
-        fontName='Helvetica-Bold',
-        leftIndent=0
+        fontName='Helvetica-Bold'
     )
 
-    # Etiqueta de campo
     etiqueta_style = ParagraphStyle(
         'Etiqueta',
         parent=styles['Normal'],
@@ -3696,7 +3690,6 @@ def exportar_resumen_pdf(id):
         fontName='Helvetica-Bold'
     )
 
-    # Valor de campo
     valor_style = ParagraphStyle(
         'Valor',
         parent=styles['Normal'],
@@ -3709,7 +3702,6 @@ def exportar_resumen_pdf(id):
         wordWrap='CJK'
     )
 
-    # Valor destacado
     valor_destacado_style = ParagraphStyle(
         'ValorDestacado',
         parent=valor_style,
@@ -3718,18 +3710,6 @@ def exportar_resumen_pdf(id):
         fontName='Helvetica-Bold'
     )
 
-    # Nota de confidencialidad
-    confidencial_style = ParagraphStyle(
-        'Confidencial',
-        parent=styles['Italic'],
-        fontSize=7,
-        textColor=colors.HexColor('#94a3b8'),
-        alignment=1,
-        spaceBefore=20,
-        fontName='Helvetica-Oblique'
-    )
-
-    # Estilo para descripción de actuación
     actuacion_style = ParagraphStyle(
         'Actuacion',
         parent=styles['Normal'],
@@ -3744,8 +3724,18 @@ def exportar_resumen_pdf(id):
         spaceAfter=4
     )
 
+    confidencial_style = ParagraphStyle(
+        'Confidencial',
+        parent=styles['Italic'],
+        fontSize=7,
+        textColor=colors.HexColor('#94a3b8'),
+        alignment=1,
+        spaceBefore=20,
+        fontName='Helvetica-Oblique'
+    )
+
     # ============================================
-    # ENCABEZADO DEL DOCUMENTO
+    # ENCABEZADO CON LOGO
     # ============================================
 
     # Línea decorativa superior azul
@@ -3755,6 +3745,21 @@ def exportar_resumen_pdf(id):
     ])))
 
     elements.append(Spacer(1, 8))
+
+    # Logo centrado
+    try:
+        logo = get_logo_image()
+        if logo:
+            logo_rl = RLImage(logo, width=1.8*inch, height=1.4*inch)
+            logo_table = Table([[logo_rl]], colWidths=[6.5*inch])
+            logo_table.setStyle(TableStyle([
+                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ]))
+            elements.append(logo_table)
+            elements.append(Spacer(1, 4))
+    except Exception as e:
+        print(f"Error cargando logo en PDF: {e}")
 
     # Datos del estudio
     elements.append(Paragraph("QUIADIL EIRL", estudio_titulo_style))
@@ -3768,11 +3773,10 @@ def exportar_resumen_pdf(id):
     ])))
 
     # ============================================
-    # BANNER DE TÍTULO - FICHA DE ARCHIVO
+    # BANNER FICHA DE ARCHIVO
     # ============================================
 
     tipo_label = expediente.get_tipo_label()
-
     banner_data = [[Paragraph(f"FICHA DE ARCHIVO - {tipo_label.upper()}", ficha_titulo_style)]]
     banner_table = Table(banner_data, colWidths=[6.5 * inch])
     banner_table.setStyle(TableStyle([
@@ -3788,12 +3792,11 @@ def exportar_resumen_pdf(id):
     elements.append(Spacer(1, 14))
 
     # ============================================
-    # SECCIÓN 1: IDENTIFICACIÓN DEL EXPEDIENTE
+    # SECCION 1: IDENTIFICACION
     # ============================================
 
-    elements.append(Paragraph("▎ IDENTIFICACIÓN DEL EXPEDIENTE", seccion_titulo_style))
+    elements.append(Paragraph("▎ IDENTIFICACION DEL EXPEDIENTE", seccion_titulo_style))
 
-    # Determinar identificación principal según tipo
     if expediente.tipo == 'administrativo':
         id_principal = f"DNI: {expediente.dni or 'No registrado'}"
         id_secundario = f"N° Expediente: {expediente.numero_expediente or 'Sin asignar'}"
@@ -3802,9 +3805,9 @@ def exportar_resumen_pdf(id):
         id_secundario = f"DNI: {expediente.dni or 'No registrado'}"
 
     ident_data = [
-        [Paragraph("N° de Expediente / Identificación:", etiqueta_style),
+        [Paragraph("N° de Expediente / Identificacion:", etiqueta_style),
          Paragraph(id_principal, valor_destacado_style)],
-        [Paragraph("Identificación Secundaria:", etiqueta_style),
+        [Paragraph("Identificacion Secundaria:", etiqueta_style),
          Paragraph(id_secundario, valor_style)],
         [Paragraph("Tipo de Proceso:", etiqueta_style),
          Paragraph(tipo_label, valor_style)],
@@ -3829,7 +3832,7 @@ def exportar_resumen_pdf(id):
     elements.append(Spacer(1, 10))
 
     # ============================================
-    # SECCIÓN 2: PARTES DEL PROCESO
+    # SECCION 2: PARTES DEL PROCESO
     # ============================================
 
     elements.append(Paragraph("▎ PARTES DEL PROCESO", seccion_titulo_style))
@@ -3837,11 +3840,10 @@ def exportar_resumen_pdf(id):
     partes_data = [
         [Paragraph("Cliente / Demandante:", etiqueta_style),
          Paragraph(expediente.cliente or 'No registrado', valor_style)],
-        [Paragraph("Teléfono:", etiqueta_style),
+        [Paragraph("Telefono:", etiqueta_style),
          Paragraph(expediente.telefono or 'No registrado', valor_style)],
     ]
 
-    # Campos específicos según tipo
     if expediente.tipo == 'civil':
         partes_data.extend([
             [Paragraph("Juez:", etiqueta_style),
@@ -3862,7 +3864,7 @@ def exportar_resumen_pdf(id):
         partes_data.extend([
             [Paragraph("Entidad Receptora:", etiqueta_style),
              Paragraph(expediente.entidad_receptora or 'No especificada', valor_style)],
-            [Paragraph("Trámite:", etiqueta_style),
+            [Paragraph("Tramite:", etiqueta_style),
              Paragraph(expediente.tramite or 'No especificado', valor_style)],
         ])
     elif expediente.tipo == 'conciliacion':
@@ -3876,7 +3878,7 @@ def exportar_resumen_pdf(id):
         ])
     elif expediente.tipo == 'archivo':
         partes_data.extend([
-            [Paragraph("Ubicación Física:", etiqueta_style),
+            [Paragraph("Ubicacion Fisica:", etiqueta_style),
              Paragraph(expediente.ubicacion_archivo or 'No especificada', valor_style)],
             [Paragraph("Fecha de Archivado:", etiqueta_style),
              Paragraph(expediente.fecha_archivado.strftime('%d/%m/%Y') if expediente.fecha_archivado else 'No registrada', valor_style)],
@@ -3897,29 +3899,20 @@ def exportar_resumen_pdf(id):
     elements.append(Spacer(1, 10))
 
     # ============================================
-    # SECCIÓN 3: PRIMERA ACTUACIÓN / INGRESO AL SISTEMA
+    # SECCION 3: INICIO DE EXPEDIENTE (solo fecha + descripcion)
     # ============================================
 
-    elements.append(Paragraph("▎ PRIMERA ACTUACIÓN / INGRESO AL SISTEMA", seccion_titulo_style))
+    elements.append(Paragraph("▎ INICIO DE EXPEDIENTE", seccion_titulo_style))
 
     if primer_ingreso:
-        # Formatear fecha
         fecha_ingreso = primer_ingreso.fecha.strftime('%d/%m/%Y') if primer_ingreso.fecha else 'Sin fecha'
-        hora_ingreso = primer_ingreso.fecha.strftime('%H:%M') if primer_ingreso.fecha else ''
-        fecha_completa = f"{fecha_ingreso}" + (f" a las {hora_ingreso}" if hora_ingreso else "")
-
-        # Descripción de la primera actuación
         descripcion_ingreso = primer_ingreso.descripcion or 'Expediente registrado en el sistema'
-        descripcion_formateada = '<br/>'.join(descripcion_ingreso.split('\n')) if descripcion_ingreso else 'Sin descripción'
+        descripcion_formateada = '<br/>'.join(descripcion_ingreso.split('\n')) if descripcion_ingreso else 'Sin descripcion'
 
         ingreso_data = [
-            [Paragraph("Fecha de Ingreso:", etiqueta_style),
-             Paragraph(fecha_completa, valor_destacado_style)],
-            [Paragraph("Estado Inicial:", etiqueta_style),
-             Paragraph("📥 Ingresado", valor_style)],
-            [Paragraph("Registrado por:", etiqueta_style),
-             Paragraph(primer_ingreso.usuario or 'Sistema', valor_style)],
-            [Paragraph("Descripción de la Actuación:", etiqueta_style),
+            [Paragraph("Fecha de Inicio:", etiqueta_style),
+             Paragraph(fecha_ingreso, valor_destacado_style)],
+            [Paragraph("Descripcion de la Actuacion:", etiqueta_style),
              Paragraph(descripcion_formateada, actuacion_style)],
         ]
 
@@ -3932,15 +3925,14 @@ def exportar_resumen_pdf(id):
             ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
             ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#e2e8f0')),
             ('BACKGROUND', (0, 0), (0, -1), colors.HexColor('#f8fafc')),
-            ('BACKGROUND', (0, 3), (-1, 3), colors.HexColor('#eff6ff')),  # Fondo azul claro para descripción
+            ('BACKGROUND', (0, 1), (-1, 1), colors.HexColor('#eff6ff')),
             ('BOX', (0, 0), (-1, -1), 1, colors.HexColor('#cbd5e1')),
         ]))
         elements.append(ingreso_table)
 
     else:
-        # No hay registro de ingreso
         no_ingreso_data = [[Paragraph(
-            "No se encontró registro de ingreso inicial. Este expediente fue creado antes de la implementación del historial de estados.",
+            "No se encontro registro de ingreso inicial.",
             ParagraphStyle('NoIngreso', parent=valor_style, textColor=colors.HexColor('#94a3b8'), alignment=1)
         )]]
 
@@ -3958,43 +3950,14 @@ def exportar_resumen_pdf(id):
     elements.append(Spacer(1, 10))
 
     # ============================================
-    # SECCIÓN 4: REGISTRO Y SEGUIMIENTO
-    # ============================================
-
-    elements.append(Paragraph("▎ REGISTRO Y SEGUIMIENTO", seccion_titulo_style))
-
-    registro_data = [
-        [Paragraph("Fecha de Registro en Sistema:", etiqueta_style),
-         Paragraph(expediente.fecha_registro.strftime('%d de %B de %Y').upper() if expediente.fecha_registro else 'No registrada', valor_style)],
-        [Paragraph("Última Actualización:", etiqueta_style),
-         Paragraph(expediente.fecha_actualizacion.strftime('%d de %B de %Y - %H:%M').upper() if expediente.fecha_actualizacion else 'Sin actualizaciones', valor_style)],
-        [Paragraph("Usuario de Registro:", etiqueta_style),
-         Paragraph(expediente.usuario_registro or 'Sistema', valor_style)],
-    ]
-
-    registro_table = Table(registro_data, colWidths=[2.2 * inch, 4.3 * inch])
-    registro_table.setStyle(TableStyle([
-        ('VALIGN', (0, 0), (-1, -1), 'TOP'),
-        ('LEFTPADDING', (0, 0), (-1, -1), 8),
-        ('RIGHTPADDING', (0, 0), (-1, -1), 8),
-        ('TOPPADDING', (0, 0), (-1, -1), 4),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
-        ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#e2e8f0')),
-        ('BACKGROUND', (0, 0), (0, -1), colors.HexColor('#f8fafc')),
-        ('BOX', (0, 0), (-1, -1), 1, colors.HexColor('#cbd5e1')),
-    ]))
-    elements.append(registro_table)
-    elements.append(Spacer(1, 10))
-
-    # ============================================
-    # SECCIÓN 5: DESCRIPCIÓN DEL CASO (si existe)
+    # SECCION 4: DESCRIPCION DEL CASO
     # ============================================
 
     if expediente.descripcion:
-        elements.append(Paragraph("▎ DESCRIPCIÓN DEL CASO", seccion_titulo_style))
+        elements.append(Paragraph("▎ DESCRIPCION DEL CASO", seccion_titulo_style))
 
         desc_texto = expediente.descripcion
-        desc_formateada = '<br/>'.join(desc_texto.split('\n')) if desc_texto else 'Sin descripción'
+        desc_formateada = '<br/>'.join(desc_texto.split('\n')) if desc_texto else 'Sin descripcion'
 
         desc_data = [[Paragraph(desc_formateada, actuacion_style)]]
         desc_table = Table(desc_data, colWidths=[6.5 * inch])
@@ -4011,7 +3974,7 @@ def exportar_resumen_pdf(id):
     elements.append(Spacer(1, 20))
 
     # ============================================
-    # LÍNEA SEPARADORA FINAL
+    # PIE DE PAGINA
     # ============================================
 
     elements.append(Table([['']], colWidths=[6.5 * inch], style=TableStyle([
@@ -4019,12 +3982,8 @@ def exportar_resumen_pdf(id):
         ('TOPPADDING', (0, 0), (-1, 0), 16),
     ])))
 
-    # ============================================
-    # NOTA DE CONFIDENCIALIDAD
-    # ============================================
-
     elements.append(Paragraph(
-        "<b>DOCUMENTO CONFIDENCIAL</b> — Uso exclusivo del Estudio Jurídico Quijandria Abogados EIRL",
+        "<b>DOCUMENTO CONFIDENCIAL</b> — Uso exclusivo del Estudio Juridico Quijandria Abogados EIRL",
         ParagraphStyle('ConfidencialTitulo', parent=confidencial_style, fontName='Helvetica-Bold', textColor=colors.HexColor('#64748b'))
     ))
 
@@ -4035,37 +3994,46 @@ def exportar_resumen_pdf(id):
     ))
 
     elements.append(Paragraph(
-        "Su reproducción, distribución o divulgación sin autorización escrita está prohibida.",
+        "Su reproduccion, distribucion o divulgacion sin autorizacion escrita esta prohibida.",
         confidencial_style
     ))
 
     # ============================================
-    # FUNCIONES DE ENCABEZADO Y PIE DE PÁGINA
+    # HEADER/FOOTER EN CADA PAGINA
     # ============================================
 
     def draw_header_footer_archivo(canvas, doc):
-        """Dibuja encabezado y pie de página profesional en cada hoja"""
         canvas.saveState()
 
-        # --- LÍNEA SUPERIOR AZUL ---
+        # Linea superior azul
         canvas.setFillColor(colors.HexColor('#1e3a8a'))
-        canvas.rect(0, letter[1] - 0.25 * inch, letter[0], 0.25 * inch, fill=1, stroke=0)
+        canvas.rect(0, letter[1] - 0.22 * inch, letter[0], 0.22 * inch, fill=1, stroke=0)
 
-        # --- TEXTO IZQUIERDO (estudio) ---
+        # Logo en esquina superior izquierda
+        try:
+            logo = get_logo_image()
+            if logo:
+                canvas.drawImage(logo, 0.6 * inch, letter[1] - 0.95 * inch,
+                                 width=0.8 * inch, height=0.6 * inch,
+                                 preserveAspectRatio=True, mask='auto')
+        except Exception as e:
+            print(f"Error logo header: {e}")
+
+        # Texto izquierdo
         canvas.setFont('Helvetica-Bold', 7)
         canvas.setFillColor(colors.HexColor('#1e3a8a'))
-        canvas.drawString(0.7 * inch, letter[1] - 0.5 * inch, "QUIADIL EIRL")
+        canvas.drawString(1.5 * inch, letter[1] - 0.5 * inch, "QUIADIL EIRL")
 
         canvas.setFont('Helvetica', 6)
         canvas.setFillColor(colors.HexColor('#64748b'))
-        canvas.drawString(0.7 * inch, letter[1] - 0.62 * inch, "Sistema de Gestión de Expedientes")
+        canvas.drawString(1.5 * inch, letter[1] - 0.62 * inch, "Ficha de Archivo")
 
-        # --- TEXTO CENTRO (tipo de documento) ---
+        # Texto centro
         canvas.setFont('Helvetica-Bold', 8)
         canvas.setFillColor(colors.HexColor('#1e3a8a'))
-        canvas.drawCentredString(letter[0] / 2, letter[1] - 0.56 * inch, "FICHA DE ARCHIVO")
+        canvas.drawCentredString(letter[0] / 2, letter[1] - 0.56 * inch, "SISTEMA DE GESTION DE EXPEDIENTES")
 
-        # --- TEXTO DERECHO (fecha) ---
+        # Texto derecho
         canvas.setFont('Helvetica', 6)
         canvas.setFillColor(colors.HexColor('#64748b'))
         canvas.drawRightString(letter[0] - 0.7 * inch, letter[1] - 0.5 * inch,
@@ -4073,33 +4041,28 @@ def exportar_resumen_pdf(id):
         canvas.drawRightString(letter[0] - 0.7 * inch, letter[1] - 0.62 * inch,
                                f"Exp: {expediente.numero_expediente or 'N/A'}")
 
-        # --- LÍNEA SEPARADORA ---
+        # Linea separadora
         canvas.setStrokeColor(colors.HexColor('#cbd5e1'))
         canvas.setLineWidth(0.5)
-        canvas.line(0.7 * inch, letter[1] - 0.75 * inch, letter[0] - 0.7 * inch, letter[1] - 0.75 * inch)
+        canvas.line(0.6 * inch, letter[1] - 1.05 * inch, letter[0] - 0.6 * inch, letter[1] - 1.05 * inch)
 
-        # --- PIE DE PÁGINA ---
-        # Línea inferior
+        # Pie de pagina
         canvas.setStrokeColor(colors.HexColor('#cbd5e1'))
         canvas.setLineWidth(0.5)
         canvas.line(0.7 * inch, 0.45 * inch, letter[0] - 0.7 * inch, 0.45 * inch)
 
-        # Texto izquierdo
         canvas.setFont('Helvetica', 6)
         canvas.setFillColor(colors.HexColor('#94a3b8'))
         canvas.drawString(0.7 * inch, 0.32 * inch,
                           f"Generado: {ahora_peru().strftime('%d/%m/%Y %H:%M')} | Usuario: {session.get('nombre', 'Sistema')}")
 
-        # Texto centro
         canvas.setFont('Helvetica-Oblique', 6)
-        canvas.setFillColor(colors.HexColor('#94a3b8'))
         canvas.drawCentredString(letter[0] / 2, 0.32 * inch,
-                                 "Documento Confidencial - Uso Exclusivo del Estudio Jurídico")
+                                 "Documento Confidencial - Uso Exclusivo del Estudio Juridico")
 
-        # Número de página derecha
         canvas.setFont('Helvetica-Bold', 7)
         canvas.setFillColor(colors.HexColor('#1e3a8a'))
-        canvas.drawRightString(letter[0] - 0.7 * inch, 0.32 * inch, f"Pág. {doc.page}")
+        canvas.drawRightString(letter[0] - 0.7 * inch, 0.32 * inch, f"Pag. {doc.page}")
 
         canvas.restoreState()
 
@@ -4109,7 +4072,6 @@ def exportar_resumen_pdf(id):
     doc.build(elements, onFirstPage=draw_header_footer_archivo, onLaterPages=draw_header_footer_archivo)
     output.seek(0)
 
-    # Nombre del archivo
     identificador = expediente.numero_expediente.replace("/", "_") if expediente.numero_expediente and expediente.numero_expediente != '-' else f"DNI_{expediente.dni or 'SIN_ID'}"
 
     return send_file(
@@ -4381,5 +4343,3 @@ def eliminar_historial(id):
 # ============================================
 # FIN DEL ARCHIVO
 # ============================================
-
-exportar_resumen_pdf
