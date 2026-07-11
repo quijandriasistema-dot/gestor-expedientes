@@ -271,64 +271,6 @@
         </div>
     </div>
 
-            <!-- Modal Editar Historial -->
-            {% if rol in ['ADMINISTRADOR', 'DESARROLLADOR'] %}
-            <div class="modal fade" id="modalEditarHistorial{{ h.id }}" tabindex="-1" aria-hidden="true">
-                <div class="modal-dialog">
-                    <div class="modal-content">
-                        <div class="modal-header bg-warning text-dark">
-                            <h5 class="modal-title">✏️ Editar Entrada del Historial</h5>
-                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                        </div>
-                        <form method="POST" action="{{ url_for('main.editar_historial', id=h.id) }}">
-                            <div class="modal-body">
-                                <div class="mb-3">
-                                    <label class="form-label fw-bold">Fecha de la Actuación</label>
-                                    <input type="date" name="fecha" class="form-control" 
-                                           value="{{ h.fecha.strftime('%Y-%m-%d') if h.fecha else '' }}">
-                                </div>
-                                <div class="mb-3">
-                                    <label class="form-label fw-bold">Estado</label>
-                                    <select name="estado" class="form-control">
-                                        <option value="ingresado" {% if h.estado == 'ingresado' %}selected{% endif %}>📥 Ingresado</option>
-                                        <option value="actualizado" {% if h.estado == 'actualizado' %}selected{% endif %}>📝 Actualizado</option>
-                                        <option value="en_proceso" {% if h.estado == 'en_proceso' %}selected{% endif %}>⚙️ En Proceso</option>
-                                        <option value="seguimiento" {% if h.estado == 'seguimiento' %}selected{% endif %}>👁️ En Seguimiento</option>
-                                        <option value="espera_documentos" {% if h.estado == 'espera_documentos' %}selected{% endif %}>⏳ En Espera de Documentos</option>
-                                        <option value="derivado_juzgado" {% if h.estado == 'derivado_juzgado' %}selected{% endif %}>⚖️ Derivado a Juzgado</option>
-                                        <option value="audiencia_programada" {% if h.estado == 'audiencia_programada' %}selected{% endif %}>📅 Audiencia Programada</option>
-                                        <option value="proceso_completado" {% if h.estado == 'proceso_completado' %}selected{% endif %}>✅ Proceso Completado</option>
-                                        <option value="resuelto_favorable" {% if h.estado == 'resuelto_favorable' %}selected{% endif %}>🏆 Resuelto Favorablemente</option>
-                                        <option value="resuelto_desfavorable" {% if h.estado == 'resuelto_desfavorable' %}selected{% endif %}>❌ Resuelto Desfavorablemente</option>
-                                        <option value="archivado" {% if h.estado == 'archivado' %}selected{% endif %}>📦 Archivado</option>
-                                        <option value="anulado" {% if h.estado == 'anulado' %}selected{% endif %}>🚫 Anulado</option>
-                                        <option value="otro" {% if h.estado == 'otro' %}selected{% endif %}>🔘 Otro</option>
-                                    </select>
-                                </div>
-                                <div class="mb-3">
-                                    <label class="form-label fw-bold">Descripción / Actuación</label>
-                                    <textarea name="descripcion" class="form-control" rows="4">{{ h.descripcion or '' }}</textarea>
-                                </div>
-                            </div>
-                            <div class="modal-footer">
-                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                                <button type="submit" class="btn btn-warning">💾 Guardar Cambios</button>
-                            </div>
-                        </form>
-                    </div>
-                </div>
-            </div>
-            {% endif %}
-            {% endfor %}
-        </div>
-        {% else %}
-        <div class="empty-state">
-            <span>📭</span>
-            <p>No hay historial de estados registrado</p>
-        </div>
-        {% endif %}
-    </div>
-
     <!-- Audiencias -->
     <div class="detalle-section">
         <div class="section-header">
@@ -447,6 +389,64 @@
                     </div>
                 </div>
             </div>
+
+            <!-- Modal Editar Historial -->
+            {% if rol in ['ADMINISTRADOR', 'DESARROLLADOR'] %}
+            <div class="modal fade" id="modalEditarHistorial{{ h.id }}" tabindex="-1" aria-hidden="true">
+                <div class="modal-dialog">
+                    <div class="modal-content">
+                        <div class="modal-header bg-warning text-dark">
+                            <h5 class="modal-title">✏️ Editar Entrada del Historial</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                        </div>
+                        <form method="POST" action="{{ url_for('main.editar_historial', id=h.id) }}">
+                            <div class="modal-body">
+                                <div class="mb-3">
+                                    <label class="form-label fw-bold">Fecha de la Actuación</label>
+                                    <input type="date" name="fecha" class="form-control" 
+                                           value="{{ h.fecha.strftime('%Y-%m-%d') if h.fecha else '' }}">
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label fw-bold">Estado</label>
+                                    <select name="estado" class="form-control">
+                                        <option value="ingresado" {% if h.estado == 'ingresado' %}selected{% endif %}>📥 Ingresado</option>
+                                        <option value="actualizado" {% if h.estado == 'actualizado' %}selected{% endif %}>📝 Actualizado</option>
+                                        <option value="en_proceso" {% if h.estado == 'en_proceso' %}selected{% endif %}>⚙️ En Proceso</option>
+                                        <option value="seguimiento" {% if h.estado == 'seguimiento' %}selected{% endif %}>👁️ En Seguimiento</option>
+                                        <option value="espera_documentos" {% if h.estado == 'espera_documentos' %}selected{% endif %}>⏳ En Espera de Documentos</option>
+                                        <option value="derivado_juzgado" {% if h.estado == 'derivado_juzgado' %}selected{% endif %}>⚖️ Derivado a Juzgado</option>
+                                        <option value="audiencia_programada" {% if h.estado == 'audiencia_programada' %}selected{% endif %}>📅 Audiencia Programada</option>
+                                        <option value="proceso_completado" {% if h.estado == 'proceso_completado' %}selected{% endif %}>✅ Proceso Completado</option>
+                                        <option value="resuelto_favorable" {% if h.estado == 'resuelto_favorable' %}selected{% endif %}>🏆 Resuelto Favorablemente</option>
+                                        <option value="resuelto_desfavorable" {% if h.estado == 'resuelto_desfavorable' %}selected{% endif %}>❌ Resuelto Desfavorablemente</option>
+                                        <option value="archivado" {% if h.estado == 'archivado' %}selected{% endif %}>📦 Archivado</option>
+                                        <option value="anulado" {% if h.estado == 'anulado' %}selected{% endif %}>🚫 Anulado</option>
+                                        <option value="otro" {% if h.estado == 'otro' %}selected{% endif %}>🔘 Otro</option>
+                                    </select>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label fw-bold">Descripción / Actuación</label>
+                                    <textarea name="descripcion" class="form-control" rows="4">{{ h.descripcion or '' }}</textarea>
+                                </div>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                                <button type="submit" class="btn btn-warning">💾 Guardar Cambios</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="empty-state">
+            <span>📭</span>
+            <p>No hay historial de estados registrado</p>
+        </div>
+        {% endif %}
+    </div>
 {% endblock %}
 
 {% block extra_css %}
@@ -1033,7 +1033,6 @@
 .avance-separator {
     color: #94a3b8;
     margin: 0 0.25rem;
-}
 }
 
 .avance-vacio {
