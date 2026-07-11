@@ -195,46 +195,88 @@
             <label>Descripción:</label>
             <p>{{ expediente.descripcion or 'Sin descripción' }}</p>
         </div>
-    </div>
 
-    <!-- ============================================ -->
-    <!-- FORMULARIO: NUEVA ACTUALIZACIÓN DE ESTADO -->
-    <!-- ============================================ -->
-    <div class="detalle-section">
-        <div class="section-header">
-            <h2 class="section-title">
-                <span>➕</span> Nueva Actualización
-            </h2>
-        </div>
-        
-        <form method="POST" action="{{ url_for('main.agregar_estado', id=expediente.id) }}" class="form-actualizacion" novalidate>
-            {{ form_estado.hidden_tag() }}
-            
-            <div class="form-row-actualizacion">
-                <div class="form-group-actualizacion">
-                    <label for="estado">Nuevo Estado *</label>
-                    {{ form_estado.estado(class="form-control", id="estado") }}
-                </div>
-                
-                <div class="form-group-actualizacion flex-grow">
-                    <label for="descripcion">¿Qué se realizó? *</label>
-                    {{ form_estado.descripcion(class="form-control", id="descripcion", placeholder="Ej: Cliente trajo documento X para presentar. Se programó audiencia para el 15/05...") }}
-                </div>
-                
-                <div class="form-group-actualizacion btn-container">
-                    <button type="submit" class="btn btn-primary">
-                        <span>💾</span> Guardar Actualización
-                    </button>
-                </div>
+        <!-- ============================================ -->
+        <!-- AVANCE DE EXPEDIENTE (dentro de Información General) -->
+        <!-- ============================================ -->
+        <div class="avance-section">
+            <div class="avance-header">
+                <h3 class="avance-title">
+                    <span>📋</span> Avance de Expediente
+                </h3>
+                <button type="button" class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#modalNuevaActualizacion">
+                    <span>➕</span> Nuevo Avance
+                </button>
             </div>
-            <small class="form-hint">
-                💡 <strong>Tip:</strong> Describe detalladamente lo que ocurrió en esta actualización. Esto alimenta el historial completo del caso.
-            </small>
-        </form>
+
+            {% if historial %}
+            <div class="avance-lista">
+                {% for h in historial %}
+                <div class="avance-item">
+                    <div class="avance-fecha-usuario">
+                        <span class="avance-fecha">📅 {{ h.fecha.strftime('%d/%m/%Y') if h.fecha else 'Sin fecha' }}</span>
+                        <span class="avance-hora">🕐 {{ h.fecha.strftime('%H:%M') if h.fecha else '' }} (Hora Perú)</span>
+                        <span class="avance-usuario">👤 {{ h.usuario or 'Sistema' }}</span>
+                    </div>
+                    <div class="avance-descripcion">
+                        <p>{{ h.descripcion or 'Sin descripción' }}</p>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="avance-vacio">
+                <span>📝</span>
+                <p>No hay avances registrados</p>
+                <button type="button" class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#modalNuevaActualizacion">
+                    Registrar primer avance
+                </button>
+            </div>
+            {% endif %}
+        </div>
     </div>
 
     <!-- ============================================ -->
-    <!-- HISTORIAL DE ESTADOS (TIMELINE MEJORADO) -->
+    <!-- MODAL: NUEVA ACTUALIZACIÓN (PASO 1) -->
+    <!-- ============================================ -->
+    <div class="modal fade" id="modalNuevaActualizacion" tabindex="-1" aria-labelledby="modalNuevaActualizacionLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header" style="background: linear-gradient(135deg, #1e3a8a 0%, #283593 100%); color: white;">
+                    <h5 class="modal-title" id="modalNuevaActualizacionLabel">
+                        <span>➕</span> Nuevo Avance de Expediente
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+                </div>
+                <form method="POST" action="{{ url_for('main.actualizacion_paso1', id=expediente.id) }}" novalidate>
+                    {{ form_modal.hidden_tag() }}
+                    <div class="modal-body">
+                        <div class="row">
+                            <div class="col-md-4 mb-3">
+                                <label for="fecha_actuacion" class="form-label fw-bold">Fecha de la Actuación *</label>
+                                {{ form_modal.fecha_actuacion(class="form-control", id="fecha_actuacion", value=ahora_peru().strftime('%Y-%m-%d')) }}
+                                <small class="text-muted">Fecha en que ocurrió la actuación</small>
+                            </div>
+                            <div class="col-md-8 mb-3">
+                                <label for="descripcion_modal" class="form-label fw-bold">¿Qué se realizó? *</label>
+                                {{ form_modal.descripcion(class="form-control", id="descripcion_modal", rows="4", placeholder="Ej: Cliente trajo documento X para presentar. Se programó audiencia para el 15/05...") }}
+                                <small class="text-muted">💡 Describe detalladamente lo que ocurrió en esta actuación.</small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                        <button type="submit" class="btn btn-primary">
+                            <span>💾</span> Guardar y Seleccionar Estado
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- ============================================ -->
+    <!-- HISTORIAL DE ESTADOS Y ACTUACIONES (AL FINAL) -->
     <!-- ============================================ -->
     <div class="detalle-section">
         <div class="section-header">
@@ -252,10 +294,12 @@
                 <div class="timeline-content">
                     <div class="timeline-header">
                         <span class="timeline-estado timeline-estado-{{ h.estado|replace(' ', '-')|replace('_', '-') }}">{{ h.get_estado_label() }}</span>
-                        <span class="timeline-fecha">{{ h.fecha | fecha_hora }}</span>
+                        <span class="timeline-fecha">
+                            📅 {{ h.fecha.strftime('%d/%m/%Y') if h.fecha else 'Sin fecha' }} 
+                            🕐 {{ h.fecha.strftime('%H:%M') if h.fecha else '' }} (Hora Perú)
+                        </span>
                     </div>
                     
-                    <!-- NOTA DESCRIPTIVA (lo importante) -->
                     <div class="timeline-nota">
                         <span class="nota-label">📝 Actuación realizada:</span>
                         <p class="nota-texto">{{ h.descripcion or 'Sin descripción de actuación' }}</p>
@@ -263,16 +307,78 @@
                     
                     <div class="timeline-footer">
                         <span class="timeline-usuario">👤 {{ h.usuario or 'Sistema' }}</span>
+                        {% if rol in ['ADMINISTRADOR', 'DESARROLLADOR'] %}
+                        <div class="timeline-actions">
+                            <button type="button" class="btn btn-sm btn-outline-warning" 
+                                    data-bs-toggle="modal" 
+                                    data-bs-target="#modalEditarHistorial{{ h.id }}">
+                                ✏️ Editar
+                            </button>
+                            <form method="POST" action="{{ url_for('main.eliminar_historial', id=h.id) }}" 
+                                  style="display: inline;" 
+                                  onsubmit="return confirm('¿Eliminar esta entrada del historial? Esta acción no se puede deshacer.');">
+                                <button type="submit" class="btn btn-sm btn-outline-danger">🗑️ Eliminar</button>
+                            </form>
+                        </div>
+                        {% endif %}
                     </div>
                 </div>
             </div>
+
+            <!-- Modal Editar Historial -->
+            {% if rol in ['ADMINISTRADOR', 'DESARROLLADOR'] %}
+            <div class="modal fade" id="modalEditarHistorial{{ h.id }}" tabindex="-1" aria-hidden="true">
+                <div class="modal-dialog">
+                    <div class="modal-content">
+                        <div class="modal-header bg-warning text-dark">
+                            <h5 class="modal-title">✏️ Editar Entrada del Historial</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                        </div>
+                        <form method="POST" action="{{ url_for('main.editar_historial', id=h.id) }}">
+                            <div class="modal-body">
+                                <div class="mb-3">
+                                    <label class="form-label fw-bold">Fecha de la Actuación</label>
+                                    <input type="date" name="fecha" class="form-control" 
+                                           value="{{ h.fecha.strftime('%Y-%m-%d') if h.fecha else '' }}">
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label fw-bold">Estado</label>
+                                    <select name="estado" class="form-control">
+                                        <option value="ingresado" {% if h.estado == 'ingresado' %}selected{% endif %}>📥 Ingresado</option>
+                                        <option value="actualizado" {% if h.estado == 'actualizado' %}selected{% endif %}>📝 Actualizado</option>
+                                        <option value="en_proceso" {% if h.estado == 'en_proceso' %}selected{% endif %}>⚙️ En Proceso</option>
+                                        <option value="seguimiento" {% if h.estado == 'seguimiento' %}selected{% endif %}>👁️ En Seguimiento</option>
+                                        <option value="espera_documentos" {% if h.estado == 'espera_documentos' %}selected{% endif %}>⏳ En Espera de Documentos</option>
+                                        <option value="derivado_juzgado" {% if h.estado == 'derivado_juzgado' %}selected{% endif %}>⚖️ Derivado a Juzgado</option>
+                                        <option value="audiencia_programada" {% if h.estado == 'audiencia_programada' %}selected{% endif %}>📅 Audiencia Programada</option>
+                                        <option value="proceso_completado" {% if h.estado == 'proceso_completado' %}selected{% endif %}>✅ Proceso Completado</option>
+                                        <option value="resuelto_favorable" {% if h.estado == 'resuelto_favorable' %}selected{% endif %}>🏆 Resuelto Favorablemente</option>
+                                        <option value="resuelto_desfavorable" {% if h.estado == 'resuelto_desfavorable' %}selected{% endif %}>❌ Resuelto Desfavorablemente</option>
+                                        <option value="archivado" {% if h.estado == 'archivado' %}selected{% endif %}>📦 Archivado</option>
+                                        <option value="anulado" {% if h.estado == 'anulado' %}selected{% endif %}>🚫 Anulado</option>
+                                        <option value="otro" {% if h.estado == 'otro' %}selected{% endif %}>🔘 Otro</option>
+                                    </select>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label fw-bold">Descripción / Actuación</label>
+                                    <textarea name="descripcion" class="form-control" rows="4">{{ h.descripcion or '' }}</textarea>
+                                </div>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                                <button type="submit" class="btn btn-warning">💾 Guardar Cambios</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
             {% endfor %}
         </div>
         {% else %}
         <div class="empty-state">
             <span>📭</span>
             <p>No hay historial de estados registrado</p>
-            <p class="empty-hint">Use el formulario de arriba para registrar la primera actualización</p>
         </div>
         {% endif %}
     </div>
@@ -875,5 +981,146 @@
 .timeline-estado-Expediente-editado { color: #92400e; background: #fef3c7; padding: 0.2rem 0.5rem; border-radius: 4px; }
 .timeline-estado-Ingresado-a-mesa-de-partes { color: #1e40af; background: #dbeafe; padding: 0.2rem 0.5rem; border-radius: 4px; }
 
+/* ============================================
+   AVANCE DE EXPEDIENTE (dentro de Info General)
+   ============================================ */
+
+.avance-section {
+    margin-top: 1.5rem;
+    padding-top: 1.5rem;
+    border-top: 2px solid #e2e8f0;
+}
+
+.avance-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+}
+
+.avance-title {
+    font-size: 1.1rem;
+    color: var(--color-primary);
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.avance-lista {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.avance-item {
+    background: #f8fafc;
+    border-radius: 8px;
+    padding: 0.875rem 1rem;
+    border-left: 3px solid #3b82f6;
+    transition: all 0.2s ease;
+}
+
+.avance-item:hover {
+    background: #eff6ff;
+    transform: translateX(4px);
+}
+
+.avance-fecha-usuario {
+    display: flex;
+    gap: 1rem;
+    flex-wrap: wrap;
+    align-items: center;
+    margin-bottom: 0.5rem;
+    font-size: 0.8rem;
+}
+
+.avance-fecha {
+    color: #1e40af;
+    font-weight: 600;
+}
+
+.avance-hora {
+    color: #059669;
+    font-weight: 500;
+}
+
+.avance-usuario {
+    color: #6b7280;
+    font-style: italic;
+}
+
+.avance-descripcion {
+    color: #334155;
+    font-size: 0.95rem;
+    line-height: 1.5;
+}
+
+.avance-descripcion p {
+    margin: 0;
+    white-space: pre-wrap;
+}
+
+.avance-vacio {
+    text-align: center;
+    padding: 2rem;
+    color: #94a3b8;
+}
+
+.avance-vacio span {
+    font-size: 2.5rem;
+    display: block;
+    margin-bottom: 0.5rem;
+}
+
+/* ============================================
+   TIMELINE - ACCIONES EDITAR/ELIMINAR
+   ============================================ */
+
+.timeline-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+.timeline-actions {
+    display: flex;
+    gap: 0.4rem;
+}
+
+.timeline-actions .btn {
+    font-size: 0.75rem;
+    padding: 0.25rem 0.5rem;
+}
+
+/* ============================================
+   MODAL ESTILOS
+   ============================================ */
+
+.modal-header {
+    border-radius: 0.5rem 0.5rem 0 0;
+}
+
+.modal-content {
+    border: none;
+    border-radius: 12px;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .avance-fecha-usuario {
+        flex-direction: column;
+        gap: 0.25rem;
+        align-items: flex-start;
+    }
+
+    .timeline-footer {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+}
 </style>
 {% endblock %}

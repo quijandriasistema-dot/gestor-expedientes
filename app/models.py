@@ -124,7 +124,7 @@ class EstadoHistorial(db.Model):
     expediente_id = db.Column(db.Integer, db.ForeignKey('expedientes.id'), nullable=False)
     estado = db.Column(db.String(100), nullable=False)
     descripcion = db.Column(db.Text)
-    fecha = db.Column(db.DateTime, default=datetime.now)
+    fecha = db.Column(db.DateTime, default=datetime.now)  # Se mantiene, pero ahora será editable
     usuario = db.Column(db.String(100))
     
     def get_estado_label(self):

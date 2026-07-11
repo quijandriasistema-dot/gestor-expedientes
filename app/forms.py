@@ -237,3 +237,42 @@ class BusquedaDocumentoForm(FlaskForm):
                                 validators=[Optional()])
     
     submit = SubmitField('🔍 Buscar')
+
+# ============================================
+# FORMULARIO MODAL - NUEVA ACTUALIZACIÓN (2 pasos)
+# ============================================
+
+class ActualizacionModalForm(FlaskForm):
+    """Paso 1: Fecha y descripción de la actuación"""
+    fecha_actuacion = DateField('Fecha de la Actuación *', 
+                                format='%Y-%m-%d',
+                                validators=[DataRequired()])
+    
+    descripcion = TextAreaField('¿Qué se realizó? *', 
+                                validators=[DataRequired()],
+                                render_kw={"placeholder": "Ej: Cliente trajo documento X para presentar. Se programó audiencia para el 15/05..."})
+    
+    submit = SubmitField('💾 Guardar y Seleccionar Estado')
+
+
+class EstadoSelectorForm(FlaskForm):
+    """Paso 2: Seleccionar estado que corresponde a la actuación"""
+    estado = SelectField('Estado que corresponde a esta actuación *',
+                        choices=[
+                            ('ingresado', '📥 Ingresado'),
+                            ('actualizado', '📝 Actualizado'),
+                            ('en_proceso', '⚙️ En Proceso'),
+                            ('seguimiento', '👁️ En Seguimiento'),
+                            ('espera_documentos', '⏳ En Espera de Documentos'),
+                            ('derivado_juzgado', '⚖️ Derivado a Juzgado'),
+                            ('audiencia_programada', '📅 Audiencia Programada'),
+                            ('proceso_completado', '✅ Proceso Completado'),
+                            ('resuelto_favorable', '🏆 Resuelto Favorablemente'),
+                            ('resuelto_desfavorable', '❌ Resuelto Desfavorablemente'),
+                            ('archivado', '📦 Archivado'),
+                            ('anulado', '🚫 Anulado'),
+                            ('otro', '🔘 Otro')
+                        ],
+                        validators=[DataRequired()])
+    
+    submit = SubmitField('✅ Confirmar Estado')

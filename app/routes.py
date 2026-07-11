@@ -746,12 +746,13 @@ def nuevo_expediente():
 @requiere_login
 @no_cache
 def ver_expediente(id):
-    """Ver detalle de un expediente específico"""
+    """Ver detalle de un expediente específico - VISTA REORGANIZADA"""
     if not puede_ver_modulo('expedientes'):
         flash('No tiene permisos para ver expedientes', 'error')
         return redirect(url_for('main.index'))
 
     form_estado = EstadoForm()
+    form_modal = ActualizacionModalForm()
 
     expediente = Expediente.query.get_or_404(id)
     historial = EstadoHistorial.query.filter_by(
@@ -768,6 +769,7 @@ def ver_expediente(id):
                          historial=historial,
                          audiencias=audiencias,
                          form_estado=form_estado,
+                         form_modal=form_modal,
                          rol=session.get('rol', 'USUARIO'))
 
 @bp.route('/expediente/<int:id>/eliminar', methods=['POST'])
@@ -1061,13 +1063,99 @@ def editar_expediente(id):
                          form=form,
                          title='Editar Expediente')
 
+# ============================================
+# RUTAS DE ACTUALIZACIÓN - MODAL 2 PASOS
+# ============================================
+
+@bp.route('/expediente/<int:id>/actualizacion/paso1', methods=['POST'])
+@requiere_login
+@no_cache
+def actualizacion_paso1(id):
+    """Paso 1: Guardar fecha y descripción, luego redirigir a selección de estado"""
+    if not puede_ver_modulo('expedientes'):
+        flash('No tiene permisos para modificar expedientes', 'error')
+        return redirect(url_for('main.index'))
+
+    form = ActualizacionModalForm()
+
+    if form.validate_on_submit():
+        # Guardar en sesión temporal los datos del paso 1
+        session['actualizacion_temp'] = {
+            'expediente_id': id,
+            'fecha_actuacion': form.fecha_actuacion.data.strftime('%Y-%m-%d'),
+            'descripcion': form.descripcion.data
+        }
+        return redirect(url_for('main.actualizacion_paso2', id=id))
+    else:
+        flash('Error en los datos. Verifique fecha y descripción.', 'error')
+        return redirect(url_for('main.ver_expediente', id=id))
+
+
+@bp.route('/expediente/<int:id>/actualizacion/paso2', methods=['GET', 'POST'])
+@requiere_login
+@no_cache
+def actualizacion_paso2(id):
+    """Paso 2: Seleccionar estado que corresponde a la actuación"""
+    if not puede_ver_modulo('expedientes'):
+        flash('No tiene permisos', 'error')
+        return redirect(url_for('main.index'))
+
+    temp_data = session.get('actualizacion_temp')
+    if not temp_data or temp_data.get('expediente_id') != id:
+        flash('Sesión de actualización expirada. Intente nuevamente.', 'warning')
+        return redirect(url_for('main.ver_expediente', id=id))
+
+    form = EstadoSelectorForm()
+
+    if form.validate_on_submit():
+        try:
+            # Crear fecha completa con hora de Perú
+            fecha_str = temp_data['fecha_actuacion']
+            fecha_base = datetime.strptime(fecha_str, '%Y-%m-%d')
+            # Combinar con hora actual de Perú
+            ahora = ahora_peru()
+            fecha_completa = fecha_base.replace(hour=ahora.hour, minute=ahora.minute, second=ahora.second)
+
+            nuevo_estado = EstadoHistorial(
+                expediente_id=id,
+                estado=form.estado.data,
+                descripcion=temp_data['descripcion'],
+                usuario=session.get('nombre', 'Sistema'),
+                fecha=fecha_completa
+            )
+            db.session.add(nuevo_estado)
+
+            expediente = Expediente.query.get_or_404(id)
+            expediente.estado_actual = form.estado.data
+            expediente.fecha_actualizacion = ahora_peru()
+
+            db.session.commit()
+
+            # Limpiar sesión temporal
+            session.pop('actualizacion_temp', None)
+
+            flash('✅ Avance registrado correctamente', 'success')
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Error al registrar avance: {str(e)}', 'error')
+        return redirect(url_for('main.ver_expediente', id=id))
+
+    return render_template('seleccionar_estado.html',
+                         title='Seleccionar Estado',
+                         form=form,
+                         descripcion=temp_data['descripcion'],
+                         fecha=temp_data['fecha_actuacion'],
+                         expediente=Expediente.query.get_or_404(id),
+                         rol=session.get('rol', 'USUARIO'))
+
+
 @bp.route('/expediente/<int:id>/estado', methods=['POST'])
 @requiere_login
 @no_cache
 def agregar_estado(id):
-    """Agregar nuevo estado a un expediente"""
+    """RUTA LEGACY: Mantener por compatibilidad con otras partes del sistema"""
     if not puede_ver_modulo('expedientes'):
-        flash('No tiene permisos para modificar expedientes', 'error')
+        flash('No tiene permisos', 'error')
         return redirect(url_for('main.index'))
 
     form = EstadoForm()
@@ -1078,20 +1166,20 @@ def agregar_estado(id):
                 expediente_id=id,
                 estado=form.estado.data,
                 descripcion=form.descripcion.data,
-                usuario=session.get('nombre', 'Sistema')
+                usuario=session.get('nombre', 'Sistema'),
+                fecha=ahora_peru()
             )
             db.session.add(nuevo_estado)
 
             expediente = Expediente.query.get_or_404(id)
             expediente.estado_actual = form.estado.data
-            expediente.fecha_actualizacion = datetime.now()
+            expediente.fecha_actualizacion = ahora_peru()
 
             db.session.commit()
-
             flash('Estado agregado correctamente', 'success')
         except Exception as e:
             db.session.rollback()
-            flash(f'Error al agregar estado: {str(e)}', 'error')
+            flash(f'Error: {str(e)}', 'error')
     else:
         flash('Error al agregar estado. Verifique los datos.', 'error')
 
@@ -3877,6 +3965,102 @@ def oauth2callback():
     flash('Autenticación OAuth desactivada. Use subida directa.', 'info')
     return redirect(url_for('main.index'))
 
+# ============================================
+# EDITAR / ELIMINAR HISTORIAL DE ESTADOS
+# ============================================
+
+@bp.route('/historial/<int:id>/editar', methods=['GET', 'POST'])
+@requiere_login
+@no_cache
+def editar_historial(id):
+    """Editar una entrada del historial de estados"""
+    if session.get('rol') not in ['ADMINISTRADOR', 'DESARROLLADOR']:
+        flash('No tiene permisos para editar el historial', 'error')
+        return redirect(url_for('main.index'))
+
+    historial = EstadoHistorial.query.get_or_404(id)
+    expediente_id = historial.expediente_id
+
+    if request.method == 'POST':
+        try:
+            # Actualizar fecha, estado y descripción
+            fecha_str = request.form.get('fecha', '').strip()
+            if fecha_str:
+                try:
+                    fecha_base = datetime.strptime(fecha_str, '%Y-%m-%d')
+                    # Mantener hora original o usar hora actual de Perú
+                    hora_original = historial.fecha.hour if historial.fecha else 0
+                    minuto_original = historial.fecha.minute if historial.fecha else 0
+                    historial.fecha = fecha_base.replace(hour=hora_original, minute=minuto_original)
+                except ValueError:
+                    pass  # Mantener fecha original si hay error
+
+            nuevo_estado = request.form.get('estado', '').strip()
+            if nuevo_estado:
+                historial.estado = nuevo_estado
+                # Si es la última entrada, actualizar también el estado del expediente
+                ultima_entrada = EstadoHistorial.query.filter_by(
+                    expediente_id=expediente_id
+                ).order_by(EstadoHistorial.fecha.desc()).first()
+                if ultima_entrada and ultima_entrada.id == id:
+                    expediente = Expediente.query.get(expediente_id)
+                    if expediente:
+                        expediente.estado_actual = nuevo_estado
+
+            nueva_descripcion = request.form.get('descripcion', '').strip()
+            if nueva_descripcion:
+                historial.descripcion = nueva_descripcion
+
+            db.session.commit()
+            flash('✅ Entrada del historial actualizada correctamente', 'success')
+            return redirect(url_for('main.ver_expediente', id=expediente_id))
+
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Error al actualizar: {str(e)}', 'error')
+            return redirect(url_for('main.ver_expediente', id=expediente_id))
+
+    return redirect(url_for('main.ver_expediente', id=expediente_id))
+
+
+@bp.route('/historial/<int:id>/eliminar', methods=['POST'])
+@requiere_login
+@no_cache
+def eliminar_historial(id):
+    """Eliminar una entrada del historial de estados"""
+    if session.get('rol') not in ['ADMINISTRADOR', 'DESARROLLADOR']:
+        flash('No tiene permisos para eliminar del historial', 'error')
+        return redirect(url_for('main.index'))
+
+    historial = EstadoHistorial.query.get_or_404(id)
+    expediente_id = historial.expediente_id
+
+    try:
+        db.session.delete(historial)
+        db.session.commit()
+
+        # Actualizar estado del expediente a la última entrada restante
+        ultima_entrada = EstadoHistorial.query.filter_by(
+            expediente_id=expediente_id
+        ).order_by(EstadoHistorial.fecha.desc()).first()
+
+        expediente = Expediente.query.get(expediente_id)
+        if expediente:
+            if ultima_entrada:
+                expediente.estado_actual = ultima_entrada.estado
+            else:
+                expediente.estado_actual = 'ingresado'
+            expediente.fecha_actualizacion = ahora_peru()
+
+        db.session.commit()
+        flash('🗑️ Entrada eliminada del historial', 'success')
+
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Error al eliminar: {str(e)}', 'error')
+
+    return redirect(url_for('main.ver_expediente', id=expediente_id))
+
 
 # ============================================
 # NOTA SOBRE DOCUMENTOS - LÓGICA DUAL
@@ -3913,5 +4097,3 @@ def oauth2callback():
 # ============================================
 # FIN DEL ARCHIVO
 # ============================================
-
-api_desactivar_usuario

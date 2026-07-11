@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container py-5">
+    <div class="row justify-content-center">
+        <div class="col-md-6">
+            <div class="card shadow-lg">
+                <div class="card-header text-white" style="background: linear-gradient(135deg, #1e3a8a 0%, #283593 100%);">
+                    <h4 class="mb-0"><span>⚖️</span> Paso 2: Seleccionar Estado</h4>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-info">
+                        <strong>📋 Actuación registrada:</strong><br>
+                        <small class="text-muted">Fecha: {{ fecha }}</small><br>
+                        <p class="mb-0 mt-2">{{ descripcion }}</p>
+                    </div>
+
+                    <form method="POST" action="{{ url_for('main.actualizacion_paso2', id=expediente.id) }}">
+                        {{ form.hidden_tag() }}
+                        
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">¿Qué estado corresponde a esta actuación? *</label>
+                            {{ form.estado(class="form-select form-select-lg") }}
+                            <small class="text-muted">Este estado se asignará al expediente y se registrará en el historial.</small>
+                        </div>
+
+                        <div class="d-grid gap-2">
+                            <button type="submit" class="btn btn-primary btn-lg">
+                                <span>✅</span> Confirmar Estado
+                            </button>
+                            <a href="{{ url_for('main.ver_expediente', id=expediente.id) }}" class="btn btn-outline-secondary">
+                                Cancelar
+                            </a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
