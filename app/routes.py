@@ -7,7 +7,12 @@ from functools import wraps
 from datetime import datetime, timedelta, date, timezone
 from app import db
 from app.models import Expediente, EstadoHistorial, Audiencia, Documento, Notificacion, Usuario
-from app.forms import ExpedienteForm, EstadoForm, BusquedaForm, AudienciaForm, BusquedaAudienciaForm, DocumentoForm, BusquedaDocumentoForm
+from app.forms import (
+    ExpedienteForm, EstadoForm, BusquedaForm, 
+    AudienciaForm, BusquedaAudienciaForm, 
+    DocumentoForm, BusquedaDocumentoForm,
+    ActualizacionModalForm, EstadoSelectorForm
+)
 from urllib.parse import unquote
 import json
 import os
