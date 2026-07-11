@@ -215,7 +215,7 @@
                 <div class="avance-linea">
                     <span class="avance-fecha-bitacora">{{ h.fecha.strftime('%d/%m/%Y') if h.fecha else 'Sin fecha' }}</span>
                     <span class="avance-sep">|</span>
-                    <span class="avance-desc-bitacora">{{ h.descripcion or 'Sin descripción' | nl2br }}</span>
+                    <span class="avance-desc-bitacora">{{ (h.descripcion or 'Sin descripción')|replace('\n', '<br>')|safe }}</span>
                 </div>
                 {% endfor %}
             </div>
@@ -365,7 +365,7 @@
                     
                     <div class="timeline-nota">
                         <span class="nota-label">📝 Actuación realizada:</span>
-                        <p class="nota-texto">{{ h.descripcion or 'Sin descripción de actuación' | nl2br }}</p>
+                        <p class="nota-texto">{{ (h.descripcion or 'Sin descripción de actuación')|replace('\n', '<br>')|safe }}</p>
                     </div>
                     
                     <div class="timeline-footer">
