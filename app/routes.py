@@ -477,9 +477,104 @@ def index():
     conciliacion_count = Expediente.query.filter_by(tipo='conciliacion').count()
     archivo_count = Expediente.query.filter_by(tipo='archivo').count()
 
-    expedientes_recientes = Expediente.query.order_by(
-        Expediente.fecha_registro.desc()
-    ).limit(5).all()
+    # ============================================
+    # SEGUIMIENTO DE EXPEDIENTES - ÚLTIMAS ACTUALIZACIONES
+    # ============================================
+    # Obtener todos los expedientes activos (no archivados ni concluidos)
+    # y su última actualización real (excluir registros automáticos del sistema)
+
+    estados_excluir_seguimiento = [
+        'Expediente editado',
+        'Expediente registrado en el sistema',
+        'ingresado'
+    ]
+
+    # Subconsulta: última fecha de actualización real por expediente
+    from sqlalchemy import func
+
+    ultima_actualizacion_subq = db.session.query(
+        EstadoHistorial.expediente_id,
+        func.max(EstadoHistorial.fecha).label('ultima_fecha')
+    ).filter(
+        EstadoHistorial.descripcion.isnot(None),
+        EstadoHistorial.descripcion != '',
+        ~EstadoHistorial.estado.in_(estados_excluir_seguimiento),
+        ~EstadoHistorial.descripcion.like('Expediente editado por%'),
+        ~EstadoHistorial.descripcion.like('Expediente registrado%')
+    ).group_by(
+        EstadoHistorial.expediente_id
+    ).subquery()
+
+    # Obtener expedientes con su última actualización
+    seguimiento_expedientes = db.session.query(
+        Expediente,
+        EstadoHistorial
+    ).outerjoin(
+        ultima_actualizacion_subq,
+        Expediente.id == ultima_actualizacion_subq.c.expediente_id
+    ).outerjoin(
+        EstadoHistorial,
+        db.and_(
+            EstadoHistorial.expediente_id == ultima_actualizacion_subq.c.expediente_id,
+            EstadoHistorial.fecha == ultima_actualizacion_subq.c.ultima_fecha
+        )
+    ).filter(
+        # Excluir expedientes ya concluidos o archivados del seguimiento activo
+        ~Expediente.estado_actual.in_(['proceso_completado', 'resuelto_favorable', 
+                                        'resuelto_desfavorable', 'archivado', 
+                                        'enviado_a_archivo', 'anulado'])
+    ).order_by(
+        # Primero los más estancados (sin actualización o más antiguos)
+        func.coalesce(ultima_actualizacion_subq.c.ultima_fecha, Expediente.fecha_registro).asc()
+    ).all()
+
+    # Calcular días transcurridos y nivel de alerta para cada expediente
+    hoy = ahora_peru().date()
+    seguimiento_data = []
+
+    for exp, hist in seguimiento_expedientes:
+        if hist and hist.fecha:
+            ultima_fecha = hist.fecha.date() if hasattr(hist.fecha, 'date') else hist.fecha
+            dias_transcurridos = (hoy - ultima_fecha).days
+            ultima_descripcion = hist.descripcion
+        else:
+            # Sin actualizaciones reales, usar fecha de registro
+            ultima_fecha = exp.fecha_registro.date() if hasattr(exp.fecha_registro, 'date') else exp.fecha_registro
+            dias_transcurridos = (hoy - ultima_fecha).days
+            ultima_descripcion = 'Sin actuaciones registradas'
+
+        # Nivel de alerta
+        if dias_transcurridos > 30:
+            alerta = 'critica'
+            alerta_label = '🔴 CRÍTICO'
+            alerta_color = 'danger'
+        elif dias_transcurridos > 15:
+            alerta = 'advertencia'
+            alerta_label = '🟠 ADVERTENCIA'
+            alerta_color = 'warning'
+        elif dias_transcurridos > 7:
+            alerta = 'atencion'
+            alerta_label = '🟡 ATENCIÓN'
+            alerta_color = 'warning'
+        else:
+            alerta = 'normal'
+            alerta_label = '🟢 ACTUALIZADO'
+            alerta_color = 'success'
+
+        seguimiento_data.append({
+            'expediente': exp,
+            'ultima_fecha': ultima_fecha,
+            'dias_transcurridos': dias_transcurridos,
+            'ultima_descripcion': ultima_descripcion,
+            'alerta': alerta,
+            'alerta_label': alerta_label,
+            'alerta_color': alerta_color
+        })
+
+    # Contadores para resumen
+    total_criticos = sum(1 for s in seguimiento_data if s['alerta'] == 'critica')
+    total_advertencias = sum(1 for s in seguimiento_data if s['alerta'] == 'advertencia')
+    total_atencion = sum(1 for s in seguimiento_data if s['alerta'] == 'atencion')
 
     # AUDIENCIAS - Datos reales
     hoy = date.today()
@@ -529,7 +624,10 @@ def index():
                          admin_count=admin_count,
                          conciliacion_count=conciliacion_count,
                          archivo_count=archivo_count,
-                         expedientes_recientes=expedientes_recientes,
+                         seguimiento_data=seguimiento_data,
+                         total_criticos=total_criticos,
+                         total_advertencias=total_advertencias,
+                         total_atencion=total_atencion,
                          audiencias_hoy=audiencias_hoy,
                          audiencias_manana=audiencias_manana,
                          audiencias_semana=audiencias_semana,
@@ -4600,4 +4698,3 @@ def eliminar_historial(id):
 # FIN DEL ARCHIVO
 # ============================================
 
-imprimir_expediente_pdf

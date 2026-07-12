@@ -10,7 +10,7 @@
         </div>
         <div class="welcome-text">Sistema de Gestión de Expedientes Legales</div>
     </div>
-    
+
     <!-- Bienvenida y Rol -->
     <!-- ALERTA DE ESPACIO EN GOOGLE DRIVE (solo Admin/Dev) -->
     {% if espacio_drive and espacio_drive.porcentaje >= 80 %}
@@ -52,29 +52,29 @@
         </h1>
         <span class="rol-badge">{{ rol }}</span>
     </div>
-    
+
     <!-- Acciones Rápidas -->
     <h2 class="section-title">
         <span>⚡</span>
         <span>Acciones Rápidas</span>
     </h2>
-    
+
     <div class="quick-actions">
         <a href="{{ url_for('main.nuevo_expediente') }}" class="quick-action-btn">
             <span class="quick-icon">➕</span>
             <span class="quick-label">Nuevo Expediente</span>
         </a>
-        
+
         <a href="{{ url_for('main.subir_documento') }}" class="quick-action-btn">
             <span class="quick-icon">📄</span>
             <span class="quick-label">Nuevo Documento</span>
         </a>
-        
+
         <a href="{{ url_for('main.nueva_audiencia') }}" class="quick-action-btn">
             <span class="quick-icon">📅</span>
             <span class="quick-label">Programar Audiencia</span>
         </a>
-        
+
         {% if rol in ['DESARROLLADOR', 'ADMINISTRADOR'] %}
         <a href="{{ url_for('main.gestion_usuarios_admin') if rol == 'ADMINISTRADOR' else url_for('main.gestion_usuarios_dev') }}" class="quick-action-btn">
             <span class="quick-icon">👥</span>
@@ -82,14 +82,14 @@
         </a>
         {% endif %}
     </div>
-    
+
     <!-- Resumen del Estudio -->
     <div class="section-header-with-export">
         <h2 class="section-title">
             <span>📊</span>
             <span>Resumen del Estudio</span>
         </h2>
-        
+
         {% if rol in ['DESARROLLADOR', 'ADMINISTRADOR'] %}
         <div class="export-buttons">
             <a href="{{ url_for('main.exportar_excel', tipo='todos') }}" class="btn btn-export btn-excel" title="Exportar todos a Excel">
@@ -101,7 +101,7 @@
         </div>
         {% endif %}
     </div>
-    
+
     <div class="stats-grid">
         <!-- Total Expedientes -->
         <div class="stat-card stat-total">
@@ -109,7 +109,7 @@
             <div class="stat-number">{{ total_expedientes }}</div>
             <div class="stat-label">Total Expedientes</div>
             <a href="{{ url_for('main.expedientes') }}" class="stat-link">Ver todos →</a>
-            
+
             {% if rol in ['DESARROLLADOR', 'ADMINISTRADOR'] %}
             <div class="stat-export">
                 <a href="{{ url_for('main.exportar_excel', tipo='todos') }}" class="export-link" title="Excel">📊</a>
@@ -117,7 +117,7 @@
             </div>
             {% endif %}
         </div>
-        
+
         <!-- Civil -->
         {% if 'todo' in modulos_permitidos or 'civil' in modulos_permitidos %}
         <div class="stat-card stat-civil">
@@ -125,7 +125,7 @@
             <div class="stat-number">{{ civil_count }}</div>
             <div class="stat-label">Derecho Civil</div>
             <a href="{{ url_for('main.expedientes_por_tipo', tipo='civil') }}" class="stat-link">Acceder →</a>
-            
+
             {% if rol in ['DESARROLLADOR', 'ADMINISTRADOR'] %}
             <div class="stat-export">
                 <a href="{{ url_for('main.exportar_excel', tipo='civil') }}" class="export-link" title="Excel">📊</a>
@@ -134,7 +134,7 @@
             {% endif %}
         </div>
         {% endif %}
-        
+
         <!-- Penal -->
         {% if 'todo' in modulos_permitidos or 'penal' in modulos_permitidos %}
         <div class="stat-card stat-penal">
@@ -142,7 +142,7 @@
             <div class="stat-number">{{ penal_count }}</div>
             <div class="stat-label">Derecho Penal</div>
             <a href="{{ url_for('main.expedientes_por_tipo', tipo='penal') }}" class="stat-link">Acceder →</a>
-            
+
             {% if rol in ['DESARROLLADOR', 'ADMINISTRADOR'] %}
             <div class="stat-export">
                 <a href="{{ url_for('main.exportar_excel', tipo='penal') }}" class="export-link" title="Excel">📊</a>
@@ -151,7 +151,7 @@
             {% endif %}
         </div>
         {% endif %}
-        
+
         <!-- Administrativo -->
         {% if 'todo' in modulos_permitidos or 'administrativo' in modulos_permitidos %}
         <div class="stat-card stat-admin">
@@ -159,7 +159,7 @@
             <div class="stat-number">{{ admin_count }}</div>
             <div class="stat-label">Administrativo</div>
             <a href="{{ url_for('main.expedientes_por_tipo', tipo='administrativo') }}" class="stat-link">Acceder →</a>
-            
+
             {% if rol in ['DESARROLLADOR', 'ADMINISTRADOR'] %}
             <div class="stat-export">
                 <a href="{{ url_for('main.exportar_excel', tipo='administrativo') }}" class="export-link" title="Excel">📊</a>
@@ -168,7 +168,7 @@
             {% endif %}
         </div>
         {% endif %}
-        
+
         <!-- Conciliación -->
         {% if 'todo' in modulos_permitidos or 'conciliacion' in modulos_permitidos %}
         <div class="stat-card stat-conciliacion">
@@ -176,7 +176,7 @@
             <div class="stat-number">{{ conciliacion_count }}</div>
             <div class="stat-label">Conciliación</div>
             <a href="{{ url_for('main.expedientes_por_tipo', tipo='conciliacion') }}" class="stat-link">Acceder →</a>
-            
+
             {% if rol in ['DESARROLLADOR', 'ADMINISTRADOR'] %}
             <div class="stat-export">
                 <a href="{{ url_for('main.exportar_excel', tipo='conciliacion') }}" class="export-link" title="Excel">📊</a>
@@ -185,7 +185,7 @@
             {% endif %}
         </div>
         {% endif %}
-        
+
         <!-- Archivo -->
         {% if 'todo' in modulos_permitidos or 'archivo' in modulos_permitidos %}
         <div class="stat-card stat-archivo">
@@ -193,7 +193,7 @@
             <div class="stat-number">{{ archivo_count }}</div>
             <div class="stat-label">Archivo</div>
             <a href="{{ url_for('main.expedientes_por_tipo', tipo='archivo') }}" class="stat-link">Acceder →</a>
-            
+
             {% if rol in ['DESARROLLADOR', 'ADMINISTRADOR'] %}
             <div class="stat-export">
                 <a href="{{ url_for('main.exportar_excel', tipo='archivo') }}" class="export-link" title="Excel">📊</a>
@@ -203,18 +203,18 @@
         </div>
         {% endif %}
     </div>
-    
+
     <!-- Búsqueda Rápida -->
     <h2 class="section-title">
         <span>🔍</span>
         <span>Búsqueda Rápida</span>
     </h2>
-    
+
     <div class="search-section" style="background: white; padding: 1.5rem; border-radius: 12px; border: 1px solid var(--color-border);">
         <form action="{{ url_for('main.expedientes') }}" method="GET" class="search-form">
-            
+
             <div class="search-row" style="display: grid; grid-template-columns: 2fr 2fr 1fr auto; gap: 1rem; align-items: end;">
-                
+
                 <!-- Buscar por Expediente/DNI -->
                 <div class="form-group" style="margin: 0;">
                     <label style="display: block; margin-bottom: 0.5rem; font-weight: 500; font-size: 0.9rem; color: var(--color-text);">
@@ -226,7 +226,7 @@
                            placeholder="Ej: 00123-2024 o 12345678"
                            style="width: 100%; padding: 0.75rem; border: 1px solid var(--color-border); border-radius: 8px; font-size: 0.95rem;">
                 </div>
-                
+
                 <!-- Buscar por Cliente -->
                 <div class="form-group" style="margin: 0;">
                     <label style="display: block; margin-bottom: 0.5rem; font-weight: 500; font-size: 0.9rem; color: var(--color-text);">
@@ -238,7 +238,7 @@
                            placeholder="Ej: García López Juan"
                            style="width: 100%; padding: 0.75rem; border: 1px solid var(--color-border); border-radius: 8px; font-size: 0.95rem;">
                 </div>
-                
+
                 <!-- Filtro por Tipo -->
                 <div class="form-group" style="margin: 0;">
                     <label style="display: block; margin-bottom: 0.5rem; font-weight: 500; font-size: 0.9rem; color: var(--color-text);">
@@ -255,7 +255,7 @@
                         <option value="archivo">📦 Archivo</option>
                     </select>
                 </div>
-                
+
                 <!-- Botón Buscar -->
                 <div class="form-group" style="margin: 0;">
                     <button type="submit" class="btn btn-primary" style="padding: 0.75rem 1.5rem; width: 100%; display: flex; align-items: center; justify-content: center; gap: 0.5rem;">
@@ -264,7 +264,7 @@
                 </div>
             </div>
         </form>
-        
+
         <div class="search-filters" style="margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--color-border);">
             <span class="search-tip-title" style="color: var(--color-primary); font-weight: 500;">💡 Consejos de búsqueda:</span>
             <span class="search-tip-text" style="display: block; margin-top: 0.5rem; font-size: 0.9rem; color: var(--color-text-light); line-height: 1.6;">
@@ -275,13 +275,134 @@
             </span>
         </div>
     </div>
-    
+
+    <!-- ============================================ -->
+    <!-- SEGUIMIENTO DE EXPEDIENTES - NUEVA SECCIÓN   -->
+    <!-- ============================================ -->
+    <div class="seguimiento-section">
+        <div class="section-header-with-export" style="margin-bottom: 1rem;">
+            <h2 class="section-title" style="margin: 0;">
+                <span>📋</span>
+                <span>Seguimiento de Expedientes</span>
+            </h2>
+
+            <!-- Resumen de alertas -->
+            <div class="alertas-resumen">
+                {% if total_criticos > 0 %}
+                <span class="alerta-badge alerta-critica" title="Más de 30 días sin actualización">
+                    🔴 {{ total_criticos }} Crítico{{ 's' if total_criticos > 1 else '' }}
+                </span>
+                {% endif %}
+                {% if total_advertencias > 0 %}
+                <span class="alerta-badge alerta-advertencia" title="Más de 15 días sin actualización">
+                    🟠 {{ total_advertencias }} Advertencia{{ 's' if total_advertencias > 1 else '' }}
+                </span>
+                {% endif %}
+                {% if total_atencion > 0 %}
+                <span class="alerta-badge alerta-atencion" title="Más de 7 días sin actualización">
+                    🟡 {{ total_atencion }} Atención{{ 's' if total_atencion > 1 else '' }}
+                </span>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Leyenda de alertas -->
+        <div class="alertas-leyenda">
+            <span class="leyenda-item"><span class="leyenda-dot dot-critica"></span> >30 días sin movimiento</span>
+            <span class="leyenda-item"><span class="leyenda-dot dot-advertencia"></span> >15 días</span>
+            <span class="leyenda-item"><span class="leyenda-dot dot-atencion"></span> >7 días</span>
+            <span class="leyenda-item"><span class="leyenda-dot dot-normal"></span> Actualizado</span>
+        </div>
+
+        <div class="table-container seguimiento-table-container">
+            <table class="seguimiento-table">
+                <thead>
+                    <tr>
+                        <th style="width: 50px;">Alerta</th>
+                        <th>Expediente</th>
+                        <th>Cliente</th>
+                        <th>Estado Actual</th>
+                        <th>Última Actuación</th>
+                        <th style="width: 100px;">Días</th>
+                        <th style="width: 140px;">Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% if seguimiento_data %}
+                        {% for item in seguimiento_data %}
+                        <tr class="fila-seguimiento fila-{{ item.alerta }}">
+                            <td class="celda-alerta">
+                                <span class="indicador-alerta indicador-{{ item.alerta }}" title="{{ item.alerta_label }}"></span>
+                            </td>
+                            <td>
+                                <div class="exp-identificador">
+                                    {% if item.expediente.tipo == 'administrativo' %}
+                                        <strong>DNI:</strong> {{ item.expediente.dni or '-' }}
+                                    {% else %}
+                                        <strong>Exp:</strong> {{ item.expediente.numero_expediente }}
+                                    {% endif %}
+                                </div>
+                                <span class="exp-tipo-badge tipo-{{ item.expediente.tipo }}">
+                                    {{ item.expediente.get_tipo_label() }}
+                                </span>
+                            </td>
+                            <td>
+                                <div class="exp-cliente">{{ item.expediente.cliente }}</div>
+                            </td>
+                            <td>
+                                <span class="badge badge-{{ item.expediente.get_estado_color() }}">
+                                    {{ item.expediente.get_estado_label() }}
+                                </span>
+                            </td>
+                            <td>
+                                <div class="ultima-actuacion">
+                                    <div class="actuacion-fecha">
+                                        📅 {{ item.ultima_fecha.strftime('%d/%m/%Y') if item.ultima_fecha else 'Sin fecha' }}
+                                    </div>
+                                    <div class="actuacion-desc" title="{{ item.ultima_descripcion }}">
+                                        {{ item.ultima_descripcion[:60] }}{% if item.ultima_descripcion|length > 60 %}...{% endif %}
+                                    </div>
+                                </div>
+                            </td>
+                            <td class="celda-dias">
+                                <span class="dias-badge dias-{{ item.alerta }}">
+                                    {{ item.dias_transcurridos }} día{{ 's' if item.dias_transcurridos != 1 else '' }}
+                                </span>
+                            </td>
+                            <td class="celda-acciones">
+                                <a href="{{ url_for('main.ver_expediente', id=item.expediente.id) }}" 
+                                   class="btn btn-sm btn-outline-primary" title="Ver expediente">
+                                    👁️ Ver
+                                </a>
+                                <a href="{{ url_for('main.ver_expediente', id=item.expediente.id) }}#avance" 
+                                   class="btn btn-sm btn-success" title="Agregar avance">
+                                    ➕ Avance
+                                </a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    {% else %}
+                        <tr>
+                            <td colspan="7" class="empty-state">
+                                <div class="empty-icon">📋</div>
+                                <div class="empty-text">No hay expedientes activos para seguimiento</div>
+                                <div class="empty-hint">
+                                    Todos los expedientes están concluidos, archivados o aún no hay registros.
+                                </div>
+                            </td>
+                        </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
     <!-- Agenda de Audiencias -->
     <h2 class="section-title">
         <span>📅</span>
         <span>Agenda de Audiencias</span>
     </h2>
-    
+
     <div class="agenda-section">
         <div class="agenda-cards">
             <div class="agenda-card agenda-hoy">
@@ -292,7 +413,7 @@
                 <div class="agenda-count">{{ audiencias_hoy }}</div>
                 <div class="agenda-label">audiencias</div>
             </div>
-            
+
             <div class="agenda-card agenda-manana">
                 <div class="agenda-header">
                     <span class="agenda-icon">⏰</span>
@@ -301,7 +422,7 @@
                 <div class="agenda-count">{{ audiencias_manana }}</div>
                 <div class="agenda-label">audiencias</div>
             </div>
-            
+
             <div class="agenda-card agenda-semana">
                 <div class="agenda-header">
                     <span class="agenda-icon">📅</span>
@@ -311,7 +432,7 @@
                 <div class="agenda-label">audiencias</div>
             </div>
         </div>
-        
+
         <!-- Alerta de audiencias próximas -->
         {% if proximas_audiencias %}
         <div class="audiencias-alert">
@@ -337,73 +458,12 @@
             </ul>
         </div>
         {% endif %}
-        
+
         <div class="agenda-actions">
             <a href="{{ url_for('main.audiencias') }}" class="btn btn-primary">
                 <span>📅</span> Ver Calendario Completo
             </a>
         </div>
-    </div>
-    
-    <!-- Expedientes Recientes -->
-    <h2 class="section-title">
-        <span>📋</span>
-        <span>Expedientes Recientes</span>
-    </h2>
-    
-    <div class="table-container">
-        <table>
-            <thead>
-                <tr>
-                    <th>ID</th>
-                    <th>Tipo</th>
-                    <th>Identificación</th>
-                    <th>Cliente</th>
-                    <th>Materia</th>
-                    <th>Estado</th>
-                    <th>Fecha</th>
-                    <th>Acciones</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% if expedientes_recientes %}
-                    {% for exp in expedientes_recientes %}
-                    <tr>
-                        <td>#{{ exp.id }}</td>
-                        <td>{{ exp.get_tipo_label() }}</td>
-                        <td>
-                            {% if exp.tipo == 'administrativo' %}
-                                <strong>DNI:</strong> {{ exp.dni or '-' }}
-                            {% else %}
-                                <strong>Exp:</strong> {{ exp.numero_expediente }}
-                            {% endif %}
-                        </td>
-                        <td>{{ exp.cliente }}</td>
-                        <td>{{ exp.materia }}</td>
-                        <td>
-                            <span class="badge badge-{{ exp.get_estado_color() }}">
-                                {{ exp.get_estado_label() }}
-                            </span>
-                        </td>
-                        <td>{{ exp.fecha_registro|fecha }}</td>
-                        <td>
-                            <a href="{{ url_for('main.ver_expediente', id=exp.id) }}" class="btn btn-small">Ver</a>
-                        </td>
-                    </tr>
-                    {% endfor %}
-                {% else %}
-                    <tr>
-                        <td colspan="8" class="empty-state">
-                            <div class="empty-icon">📭</div>
-                            <div class="empty-text">No hay expedientes registrados aún</div>
-                            <div class="empty-hint">
-                                Use "Nuevo Expediente" en Acciones Rápidas para comenzar
-                            </div>
-                        </td>
-                    </tr>
-                {% endif %}
-            </tbody>
-        </table>
     </div>
 </div>
 {% endblock %}
@@ -492,18 +552,385 @@
         flex-direction: column;
         align-items: flex-start;
     }
-    
+
     .export-buttons {
         width: 100%;
     }
-    
+
     .btn-export {
         flex: 1;
         justify-content: center;
     }
-    
+
     .search-row {
         grid-template-columns: 1fr !important;
+    }
+}
+
+/* ============================================
+   ESTILOS PARA SEGUIMIENTO DE EXPEDIENTES
+   ============================================ */
+
+.seguimiento-section {
+    margin: 2rem 0;
+}
+
+/* Resumen de alertas */
+.alertas-resumen {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.alerta-badge {
+    padding: 0.35rem 0.75rem;
+    border-radius: 20px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.alerta-critica {
+    background: #fee2e2;
+    color: #991b1b;
+    border: 1px solid #fecaca;
+}
+
+.alerta-advertencia {
+    background: #ffedd5;
+    color: #9a3412;
+    border: 1px solid #fed7aa;
+}
+
+.alerta-atencion {
+    background: #fef3c7;
+    color: #92400e;
+    border: 1px solid #fde68a;
+}
+
+/* Leyenda */
+.alertas-leyenda {
+    display: flex;
+    gap: 1.5rem;
+    flex-wrap: wrap;
+    margin-bottom: 1rem;
+    padding: 0.5rem 0;
+}
+
+.leyenda-item {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.8rem;
+    color: #64748b;
+}
+
+.leyenda-dot {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    display: inline-block;
+}
+
+.dot-critica { background: #dc2626; }
+.dot-advertencia { background: #f59e0b; }
+.dot-atencion { background: #eab308; }
+.dot-normal { background: #10b981; }
+
+/* Tabla de seguimiento */
+.seguimiento-table-container {
+    overflow-x: auto;
+    border-radius: 12px;
+    border: 1px solid #e2e8f0;
+    background: white;
+}
+
+.seguimiento-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.9rem;
+}
+
+.seguimiento-table thead th {
+    background: linear-gradient(135deg, #1e3a8a 0%, #283593 100%);
+    color: white;
+    padding: 0.85rem 0.75rem;
+    text-align: left;
+    font-weight: 600;
+    font-size: 0.82rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    white-space: nowrap;
+}
+
+.seguimiento-table thead th:first-child {
+    border-radius: 12px 0 0 0;
+}
+
+.seguimiento-table thead th:last-child {
+    border-radius: 0 12px 0 0;
+}
+
+.seguimiento-table tbody td {
+    padding: 0.85rem 0.75rem;
+    border-bottom: 1px solid #f1f5f9;
+    vertical-align: middle;
+}
+
+/* Filas con colores según alerta */
+.fila-seguimiento {
+    transition: background-color 0.2s ease;
+}
+
+.fila-seguimiento:hover {
+    background-color: #f8fafc;
+}
+
+.fila-critica {
+    background-color: #fef2f2;
+    border-left: 4px solid #dc2626;
+}
+
+.fila-critica:hover {
+    background-color: #fee2e2;
+}
+
+.fila-advertencia {
+    background-color: #fff7ed;
+    border-left: 4px solid #f97316;
+}
+
+.fila-advertencia:hover {
+    background-color: #ffedd5;
+}
+
+.fila-atencion {
+    background-color: #fefce8;
+    border-left: 4px solid #eab308;
+}
+
+.fila-atencion:hover {
+    background-color: #fef3c7;
+}
+
+.fila-normal {
+    border-left: 4px solid #10b981;
+}
+
+/* Indicador de alerta */
+.celda-alerta {
+    text-align: center;
+    padding: 0.5rem !important;
+}
+
+.indicador-alerta {
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    display: inline-block;
+    animation: pulse-alerta 2s infinite;
+    box-shadow: 0 0 0 0 rgba(0,0,0,0.2);
+}
+
+.indicador-critica {
+    background: #dc2626;
+    animation: pulse-critica 1.5s infinite;
+}
+
+.indicador-advertencia {
+    background: #f97316;
+    animation: pulse-advertencia 2s infinite;
+}
+
+.indicador-atencion {
+    background: #eab308;
+}
+
+.indicador-normal {
+    background: #10b981;
+}
+
+@keyframes pulse-critica {
+    0% { box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.7); }
+    70% { box-shadow: 0 0 0 8px rgba(220, 38, 38, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(220, 38, 38, 0); }
+}
+
+@keyframes pulse-advertencia {
+    0% { box-shadow: 0 0 0 0 rgba(249, 115, 22, 0.5); }
+    70% { box-shadow: 0 0 0 6px rgba(249, 115, 22, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(249, 115, 22, 0); }
+}
+
+/* Identificador del expediente */
+.exp-identificador {
+    font-weight: 600;
+    color: #1e293b;
+    font-size: 0.9rem;
+    margin-bottom: 0.25rem;
+}
+
+.exp-tipo-badge {
+    display: inline-block;
+    padding: 0.15rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+}
+
+.tipo-civil { background: #dbeafe; color: #1e40af; }
+.tipo-penal { background: #fee2e2; color: #991b1b; }
+.tipo-administrativo { background: #d1fae5; color: #065f46; }
+.tipo-conciliacion { background: #fef3c7; color: #92400e; }
+.tipo-archivo { background: #f3f4f6; color: #374151; }
+
+/* Cliente */
+.exp-cliente {
+    font-weight: 500;
+    color: #334155;
+}
+
+/* Última actuación */
+.ultima-actuacion {
+    max-width: 280px;
+}
+
+.actuacion-fecha {
+    font-size: 0.8rem;
+    color: #64748b;
+    margin-bottom: 0.25rem;
+    font-weight: 500;
+}
+
+.actuacion-desc {
+    font-size: 0.85rem;
+    color: #475569;
+    line-height: 1.4;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+}
+
+/* Días transcurridos */
+.celda-dias {
+    text-align: center;
+    white-space: nowrap;
+}
+
+.dias-badge {
+    display: inline-block;
+    padding: 0.35rem 0.6rem;
+    border-radius: 20px;
+    font-size: 0.8rem;
+    font-weight: 600;
+}
+
+.dias-critica {
+    background: #fee2e2;
+    color: #991b1b;
+    border: 1px solid #fecaca;
+}
+
+.dias-advertencia {
+    background: #ffedd5;
+    color: #9a3412;
+    border: 1px solid #fed7aa;
+}
+
+.dias-atencion {
+    background: #fef3c7;
+    color: #92400e;
+    border: 1px solid #fde68a;
+}
+
+.dias-normal {
+    background: #d1fae5;
+    color: #065f46;
+    border: 1px solid #a7f3d0;
+}
+
+/* Acciones */
+.celda-acciones {
+    white-space: nowrap;
+    text-align: center;
+}
+
+.celda-acciones .btn {
+    padding: 0.3rem 0.5rem;
+    font-size: 0.75rem;
+    margin: 0 0.1rem;
+}
+
+/* Responsive */
+@media (max-width: 992px) {
+    .seguimiento-table {
+        font-size: 0.8rem;
+    }
+
+    .seguimiento-table thead th,
+    .seguimiento-table tbody td {
+        padding: 0.6rem 0.4rem;
+    }
+
+    .ultima-actuacion {
+        max-width: 180px;
+    }
+
+    .alertas-leyenda {
+        gap: 0.75rem;
+    }
+}
+
+@media (max-width: 768px) {
+    .seguimiento-table-container {
+        border-radius: 8px;
+    }
+
+    .seguimiento-table thead {
+        display: none;
+    }
+
+    .seguimiento-table tbody tr {
+        display: block;
+        margin-bottom: 1rem;
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+        padding: 1rem;
+    }
+
+    .seguimiento-table tbody td {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 0.5rem 0;
+        border-bottom: 1px solid #f1f5f9;
+    }
+
+    .seguimiento-table tbody td:last-child {
+        border-bottom: none;
+    }
+
+    .seguimiento-table tbody td::before {
+        content: attr(data-label);
+        font-weight: 600;
+        color: #64748b;
+        font-size: 0.8rem;
+    }
+
+    .celda-alerta {
+        justify-content: flex-start !important;
+    }
+
+    .celda-dias {
+        justify-content: flex-end !important;
+    }
+
+    .ultima-actuacion {
+        max-width: 100%;
+        text-align: right;
     }
 }
 </style>
