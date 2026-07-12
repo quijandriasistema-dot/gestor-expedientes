@@ -204,82 +204,81 @@
         {% endif %}
     </div>
 
-    <!-- Búsqueda Rápida -->
+    <!-- ============================================ -->
+    <!-- AGENDA DE AUDIENCIAS (AHORA ANTES DE SEGUIMIENTO) -->
+    <!-- ============================================ -->
     <h2 class="section-title">
-        <span>🔍</span>
-        <span>Búsqueda Rápida</span>
+        <span>📅</span>
+        <span>Agenda de Audiencias</span>
     </h2>
 
-    <div class="search-section" style="background: white; padding: 1.5rem; border-radius: 12px; border: 1px solid var(--color-border);">
-        <form action="{{ url_for('main.expedientes') }}" method="GET" class="search-form">
-
-            <div class="search-row" style="display: grid; grid-template-columns: 2fr 2fr 1fr auto; gap: 1rem; align-items: end;">
-
-                <!-- Buscar por Expediente/DNI -->
-                <div class="form-group" style="margin: 0;">
-                    <label style="display: block; margin-bottom: 0.5rem; font-weight: 500; font-size: 0.9rem; color: var(--color-text);">
-                        N° Expediente o DNI
-                    </label>
-                    <input type="text" 
-                           name="buscar_numero" 
-                           class="form-control"
-                           placeholder="Ej: 00123-2024 o 12345678"
-                           style="width: 100%; padding: 0.75rem; border: 1px solid var(--color-border); border-radius: 8px; font-size: 0.95rem;">
+    <div class="agenda-section">
+        <div class="agenda-cards">
+            <div class="agenda-card agenda-hoy">
+                <div class="agenda-header">
+                    <span class="agenda-icon">🔴</span>
+                    <span class="agenda-title">Hoy</span>
                 </div>
-
-                <!-- Buscar por Cliente -->
-                <div class="form-group" style="margin: 0;">
-                    <label style="display: block; margin-bottom: 0.5rem; font-weight: 500; font-size: 0.9rem; color: var(--color-text);">
-                        Cliente (Apellidos/Nombres)
-                    </label>
-                    <input type="text" 
-                           name="buscar_cliente" 
-                           class="form-control"
-                           placeholder="Ej: García López Juan"
-                           style="width: 100%; padding: 0.75rem; border: 1px solid var(--color-border); border-radius: 8px; font-size: 0.95rem;">
-                </div>
-
-                <!-- Filtro por Tipo -->
-                <div class="form-group" style="margin: 0;">
-                    <label style="display: block; margin-bottom: 0.5rem; font-weight: 500; font-size: 0.9rem; color: var(--color-text);">
-                        Tipo
-                    </label>
-                    <select name="filtro_tipo" 
-                            class="form-control"
-                            style="width: 100%; padding: 0.75rem; border: 1px solid var(--color-border); border-radius: 8px; background: white; font-size: 0.95rem;">
-                        <option value="">Todos</option>
-                        <option value="civil">⚖️ Civil</option>
-                        <option value="penal">⚔️ Penal</option>
-                        <option value="administrativo">🏛️ Admin</option>
-                        <option value="conciliacion">🤝 Conciliación</option>
-                        <option value="archivo">📦 Archivo</option>
-                    </select>
-                </div>
-
-                <!-- Botón Buscar -->
-                <div class="form-group" style="margin: 0;">
-                    <button type="submit" class="btn btn-primary" style="padding: 0.75rem 1.5rem; width: 100%; display: flex; align-items: center; justify-content: center; gap: 0.5rem;">
-                        <span>🔍</span> Buscar
-                    </button>
-                </div>
+                <div class="agenda-count">{{ audiencias_hoy }}</div>
+                <div class="agenda-label">audiencias</div>
             </div>
-        </form>
 
-        <div class="search-filters" style="margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--color-border);">
-            <span class="search-tip-title" style="color: var(--color-primary); font-weight: 500;">💡 Consejos de búsqueda:</span>
-            <span class="search-tip-text" style="display: block; margin-top: 0.5rem; font-size: 0.9rem; color: var(--color-text-light); line-height: 1.6;">
-                • <strong>N° Expediente:</strong> Busca en Civil, Penal, Conciliación y Archivo<br>
-                • <strong>DNI:</strong> Busca en casos Administrativos (también funciona en otros tipos)<br>
-                • <strong>Cliente:</strong> Búsqueda parcial por apellidos o nombres<br>
-                • Puedes combinar filtros para resultados más precisos
-            </span>
+            <div class="agenda-card agenda-manana">
+                <div class="agenda-header">
+                    <span class="agenda-icon">⏰</span>
+                    <span class="agenda-title">Mañana</span>
+                </div>
+                <div class="agenda-count">{{ audiencias_manana }}</div>
+                <div class="agenda-label">audiencias</div>
+            </div>
+
+            <div class="agenda-card agenda-semana">
+                <div class="agenda-header">
+                    <span class="agenda-icon">📅</span>
+                    <span class="agenda-title">Esta Semana</span>
+                </div>
+                <div class="agenda-count">{{ audiencias_semana }}</div>
+                <div class="agenda-label">audiencias</div>
+            </div>
+        </div>
+
+        <!-- Alerta de audiencias próximas -->
+        {% if proximas_audiencias %}
+        <div class="audiencias-alert">
+            <div class="alert-header">
+                <span>⚠️</span>
+                <strong>Audiencias Próximas</strong>
+            </div>
+            <ul class="alert-list">
+                {% for aud in proximas_audiencias[:3] %}
+                <li class="alert-item">
+                    <span class="alert-date">
+                        {{ aud.fecha|fecha }} a las {{ aud.hora|hora }}
+                    </span>
+                    <span class="alert-client">
+                        {{ aud.expediente.cliente if aud.expediente else 'Cliente' }}
+                    </span>
+                    <span class="alert-tipo">({{ aud.get_tipo_label() }})</span>
+                    <a href="{{ url_for('main.ver_audiencia', id=aud.id) }}" class="btn btn-small btn-warning">
+                        Ver
+                    </a>
+                </li>
+                {% endfor %}
+            </ul>
+        </div>
+        {% endif %}
+
+        <div class="agenda-actions">
+            <a href="{{ url_for('main.audiencias') }}" class="btn btn-primary">
+                <span>📅</span> Ver Calendario Completo
+            </a>
         </div>
     </div>
 
     <!-- ============================================ -->
-    <!-- SEGUIMIENTO DE EXPEDIENTES - CON PAGINACIÓN Y FILTRO SEMÁFORO -->
+    <!-- SEGUIMIENTO DE EXPEDIENTES (AHORA DESPUÉS DE AGENDA) -->
     <!-- ============================================ -->
-    <div class="seguimiento-section">
+    <div class="seguimiento-section" id="seguimiento">
         <div class="section-header-with-export" style="margin-bottom: 1rem;">
             <h2 class="section-title" style="margin: 0;">
                 <span>📋</span>
@@ -308,19 +307,19 @@
 
         <!-- Filtro por Semáforo -->
         <div class="semaforo-filtros">
-            <a href="{{ url_for('main.index') }}" class="semaforo-btn {{ 'active' if not filtro_semaforo else '' }}">
+            <a href="{{ url_for('main.index') }}#seguimiento" class="semaforo-btn {{ 'active' if not filtro_semaforo else '' }}">
                 📋 Todos ({{ seguimiento_data|length }})
             </a>
-            <a href="{{ url_for('main.index', semaforo='critica') }}" class="semaforo-btn semaforo-critica {{ 'active' if filtro_semaforo == 'critica' else '' }}">
+            <a href="{{ url_for('main.index', semaforo='critica') }}#seguimiento" class="semaforo-btn semaforo-critica {{ 'active' if filtro_semaforo == 'critica' else '' }}">
                 🔴 Crítico{{ 's' if total_criticos > 1 else '' }} ({{ total_criticos }})
             </a>
-            <a href="{{ url_for('main.index', semaforo='advertencia') }}" class="semaforo-btn semaforo-advertencia {{ 'active' if filtro_semaforo == 'advertencia' else '' }}">
+            <a href="{{ url_for('main.index', semaforo='advertencia') }}#seguimiento" class="semaforo-btn semaforo-advertencia {{ 'active' if filtro_semaforo == 'advertencia' else '' }}">
                 🟠 Advertencia{{ 's' if total_advertencias > 1 else '' }} ({{ total_advertencias }})
             </a>
-            <a href="{{ url_for('main.index', semaforo='atencion') }}" class="semaforo-btn semaforo-atencion {{ 'active' if filtro_semaforo == 'atencion' else '' }}">
+            <a href="{{ url_for('main.index', semaforo='atencion') }}#seguimiento" class="semaforo-btn semaforo-atencion {{ 'active' if filtro_semaforo == 'atencion' else '' }}">
                 🟡 Atención{{ 's' if total_atencion > 1 else '' }} ({{ total_atencion }})
             </a>
-            <a href="{{ url_for('main.index', semaforo='normal') }}" class="semaforo-btn semaforo-normal {{ 'active' if filtro_semaforo == 'normal' else '' }}">
+            <a href="{{ url_for('main.index', semaforo='normal') }}#seguimiento" class="semaforo-btn semaforo-normal {{ 'active' if filtro_semaforo == 'normal' else '' }}">
                 🟢 Actualizado{{ 's' if total_normal > 1 else '' }} ({{ total_normal }})
             </a>
         </div>
@@ -423,7 +422,7 @@
                                 </div>
                                 <div class="empty-hint">
                                     {% if filtro_semaforo %}
-                                        <a href="{{ url_for('main.index') }}">Ver todos los expedientes</a>
+                                        <a href="{{ url_for('main.index') }}#seguimiento">Ver todos los expedientes</a>
                                     {% else %}
                                         Todos los expedientes están concluidos, archivados o aún no hay registros.
                                     {% endif %}
@@ -435,11 +434,11 @@
             </table>
         </div>
 
-        <!-- Paginación -->
+        <!-- Paginación con ancla #seguimiento -->
         {% if total_paginas > 1 %}
         <div class="paginacion-controles">
             {% if pagina_actual > 1 %}
-            <a href="{{ url_for('main.index', page=pagina_actual-1, semaforo=filtro_semaforo) }}" class="pag-btn pag-anterior">
+            <a href="{{ url_for('main.index', page=pagina_actual-1, semaforo=filtro_semaforo) }}#seguimiento" class="pag-btn pag-anterior">
                 ← Anterior
             </a>
             {% else %}
@@ -451,13 +450,13 @@
                     {% if p == pagina_actual %}
                         <span class="pag-numero pag-activo">{{ p }}</span>
                     {% else %}
-                        <a href="{{ url_for('main.index', page=p, semaforo=filtro_semaforo) }}" class="pag-numero">{{ p }}</a>
+                        <a href="{{ url_for('main.index', page=p, semaforo=filtro_semaforo) }}#seguimiento" class="pag-numero">{{ p }}</a>
                     {% endif %}
                 {% endfor %}
             </div>
 
             {% if pagina_actual < total_paginas %}
-            <a href="{{ url_for('main.index', page=pagina_actual+1, semaforo=filtro_semaforo) }}" class="pag-btn pag-siguiente">
+            <a href="{{ url_for('main.index', page=pagina_actual+1, semaforo=filtro_semaforo) }}#seguimiento" class="pag-btn pag-siguiente">
                 Siguiente →
             </a>
             {% else %}
@@ -465,75 +464,6 @@
             {% endif %}
         </div>
         {% endif %}
-    </div>
-
-    <!-- Agenda de Audiencias -->
-    <h2 class="section-title">
-        <span>📅</span>
-        <span>Agenda de Audiencias</span>
-    </h2>
-
-    <div class="agenda-section">
-        <div class="agenda-cards">
-            <div class="agenda-card agenda-hoy">
-                <div class="agenda-header">
-                    <span class="agenda-icon">🔴</span>
-                    <span class="agenda-title">Hoy</span>
-                </div>
-                <div class="agenda-count">{{ audiencias_hoy }}</div>
-                <div class="agenda-label">audiencias</div>
-            </div>
-
-            <div class="agenda-card agenda-manana">
-                <div class="agenda-header">
-                    <span class="agenda-icon">⏰</span>
-                    <span class="agenda-title">Mañana</span>
-                </div>
-                <div class="agenda-count">{{ audiencias_manana }}</div>
-                <div class="agenda-label">audiencias</div>
-            </div>
-
-            <div class="agenda-card agenda-semana">
-                <div class="agenda-header">
-                    <span class="agenda-icon">📅</span>
-                    <span class="agenda-title">Esta Semana</span>
-                </div>
-                <div class="agenda-count">{{ audiencias_semana }}</div>
-                <div class="agenda-label">audiencias</div>
-            </div>
-        </div>
-
-        <!-- Alerta de audiencias próximas -->
-        {% if proximas_audiencias %}
-        <div class="audiencias-alert">
-            <div class="alert-header">
-                <span>⚠️</span>
-                <strong>Audiencias Próximas</strong>
-            </div>
-            <ul class="alert-list">
-                {% for aud in proximas_audiencias[:3] %}
-                <li class="alert-item">
-                    <span class="alert-date">
-                        {{ aud.fecha|fecha }} a las {{ aud.hora|hora }}
-                    </span>
-                    <span class="alert-client">
-                        {{ aud.expediente.cliente if aud.expediente else 'Cliente' }}
-                    </span>
-                    <span class="alert-tipo">({{ aud.get_tipo_label() }})</span>
-                    <a href="{{ url_for('main.ver_audiencia', id=aud.id) }}" class="btn btn-small btn-warning">
-                        Ver
-                    </a>
-                </li>
-                {% endfor %}
-            </ul>
-        </div>
-        {% endif %}
-
-        <div class="agenda-actions">
-            <a href="{{ url_for('main.audiencias') }}" class="btn btn-primary">
-                <span>📅</span> Ver Calendario Completo
-            </a>
-        </div>
     </div>
 </div>
 {% endblock %}
@@ -631,10 +561,6 @@
         flex: 1;
         justify-content: center;
     }
-
-    .search-row {
-        grid-template-columns: 1fr !important;
-    }
 }
 
 /* ============================================
@@ -643,6 +569,7 @@
 
 .seguimiento-section {
     margin: 2rem 0;
+    scroll-margin-top: 20px;
 }
 
 /* Resumen de alertas */
