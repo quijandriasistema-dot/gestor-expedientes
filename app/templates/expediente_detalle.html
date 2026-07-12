@@ -1006,6 +1006,29 @@
     border-radius: 8px;
     padding: 1rem 1.25rem;
     border-left: 3px solid #3b82f6;
+    max-height: 400px;        /* <-- Altura máxima para ~10 líneas */
+    overflow-y: auto;         /* <-- Scroll vertical cuando excede */
+    scrollbar-width: thin;    /* <-- Scrollbar fino (Firefox) */
+    scrollbar-color: #cbd5e1 #f1f5f9;  /* <-- Colores scrollbar (Firefox) */
+}
+
+/* Scrollbar personalizado para Chrome/Edge/Safari */
+.avance-bitacora::-webkit-scrollbar {
+    width: 8px;
+}
+
+.avance-bitacora::-webkit-scrollbar-track {
+    background: #f1f5f9;
+    border-radius: 4px;
+}
+
+.avance-bitacora::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 4px;
+}
+
+.avance-bitacora::-webkit-scrollbar-thumb:hover {
+    background: #94a3b8;
 }
 
 .avance-linea {
