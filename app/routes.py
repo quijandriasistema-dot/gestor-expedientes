@@ -480,18 +480,15 @@ def index():
     # ============================================
     # SEGUIMIENTO DE EXPEDIENTES - ÚLTIMAS ACTUALIZACIONES
     # ============================================
-    # Obtener todos los expedientes activos (no archivados ni concluidos)
-    # y su última actualización real (excluir registros automáticos del sistema)
-
     estados_excluir_seguimiento = [
         'Expediente editado',
         'Expediente registrado en el sistema',
         'ingresado'
     ]
 
-    # Subconsulta: última fecha de actualización real por expediente
     from sqlalchemy import func
 
+    # Subconsulta: última fecha de actualización real por expediente
     ultima_actualizacion_subq = db.session.query(
         EstadoHistorial.expediente_id,
         func.max(EstadoHistorial.fecha).label('ultima_fecha')
@@ -519,16 +516,14 @@ def index():
             EstadoHistorial.fecha == ultima_actualizacion_subq.c.ultima_fecha
         )
     ).filter(
-        # Excluir expedientes ya concluidos o archivados del seguimiento activo
         ~Expediente.estado_actual.in_(['proceso_completado', 'resuelto_favorable', 
                                         'resuelto_desfavorable', 'archivado', 
                                         'enviado_a_archivo', 'anulado'])
     ).order_by(
-        # Primero los más estancados (sin actualización o más antiguos)
         func.coalesce(ultima_actualizacion_subq.c.ultima_fecha, Expediente.fecha_registro).asc()
     ).all()
 
-    # Calcular días transcurridos y nivel de alerta para cada expediente
+    # Calcular días transcurridos y nivel de alerta
     hoy = ahora_peru().date()
     seguimiento_data = []
 
@@ -538,12 +533,10 @@ def index():
             dias_transcurridos = (hoy - ultima_fecha).days
             ultima_descripcion = hist.descripcion
         else:
-            # Sin actualizaciones reales, usar fecha de registro
             ultima_fecha = exp.fecha_registro.date() if hasattr(exp.fecha_registro, 'date') else exp.fecha_registro
             dias_transcurridos = (hoy - ultima_fecha).days
             ultima_descripcion = 'Sin actuaciones registradas'
 
-        # Nivel de alerta
         if dias_transcurridos > 30:
             alerta = 'critica'
             alerta_label = '🔴 CRÍTICO'
@@ -575,6 +568,32 @@ def index():
     total_criticos = sum(1 for s in seguimiento_data if s['alerta'] == 'critica')
     total_advertencias = sum(1 for s in seguimiento_data if s['alerta'] == 'advertencia')
     total_atencion = sum(1 for s in seguimiento_data if s['alerta'] == 'atencion')
+    total_normal = sum(1 for s in seguimiento_data if s['alerta'] == 'normal')
+
+    # ============================================
+    # FILTRO POR SEMÁFORO
+    # ============================================
+    filtro_semaforo = request.args.get('semaforo', '').strip()
+    if filtro_semaforo and filtro_semaforo in ['critica', 'advertencia', 'atencion', 'normal']:
+        seguimiento_data = [s for s in seguimiento_data if s['alerta'] == filtro_semaforo]
+
+    # ============================================
+    # PAGINACIÓN (10 por página)
+    # ============================================
+    ITEMS_POR_PAGINA = 10
+    pagina_actual = request.args.get('page', 1, type=int)
+    if pagina_actual < 1:
+        pagina_actual = 1
+
+    total_items = len(seguimiento_data)
+    total_paginas = (total_items + ITEMS_POR_PAGINA - 1) // ITEMS_POR_PAGINA
+
+    if pagina_actual > total_paginas and total_paginas > 0:
+        pagina_actual = total_paginas
+
+    inicio = (pagina_actual - 1) * ITEMS_POR_PAGINA
+    fin = inicio + ITEMS_POR_PAGINA
+    seguimiento_paginado = seguimiento_data[inicio:fin]
 
     # AUDIENCIAS - Datos reales
     hoy = date.today()
@@ -596,7 +615,6 @@ def index():
         Audiencia.estado == 'programada'
     ).count()
 
-    # Próximas audiencias para mostrar en dashboard
     proximas_audiencias = Audiencia.query.filter(
         Audiencia.fecha >= hoy,
         Audiencia.estado == 'programada'
@@ -625,9 +643,14 @@ def index():
                          conciliacion_count=conciliacion_count,
                          archivo_count=archivo_count,
                          seguimiento_data=seguimiento_data,
+                         seguimiento_paginado=seguimiento_paginado,
                          total_criticos=total_criticos,
                          total_advertencias=total_advertencias,
                          total_atencion=total_atencion,
+                         total_normal=total_normal,
+                         pagina_actual=pagina_actual,
+                         total_paginas=total_paginas,
+                         filtro_semaforo=filtro_semaforo,
                          audiencias_hoy=audiencias_hoy,
                          audiencias_manana=audiencias_manana,
                          audiencias_semana=audiencias_semana,

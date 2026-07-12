@@ -277,7 +277,7 @@
     </div>
 
     <!-- ============================================ -->
-    <!-- SEGUIMIENTO DE EXPEDIENTES - NUEVA SECCIÓN   -->
+    <!-- SEGUIMIENTO DE EXPEDIENTES - CON PAGINACIÓN Y FILTRO SEMÁFORO -->
     <!-- ============================================ -->
     <div class="seguimiento-section">
         <div class="section-header-with-export" style="margin-bottom: 1rem;">
@@ -306,12 +306,41 @@
             </div>
         </div>
 
-        <!-- Leyenda de alertas -->
+        <!-- Filtro por Semáforo -->
+        <div class="semaforo-filtros">
+            <a href="{{ url_for('main.index') }}" class="semaforo-btn {{ 'active' if not filtro_semaforo else '' }}">
+                📋 Todos ({{ seguimiento_data|length }})
+            </a>
+            <a href="{{ url_for('main.index', semaforo='critica') }}" class="semaforo-btn semaforo-critica {{ 'active' if filtro_semaforo == 'critica' else '' }}">
+                🔴 Crítico{{ 's' if total_criticos > 1 else '' }} ({{ total_criticos }})
+            </a>
+            <a href="{{ url_for('main.index', semaforo='advertencia') }}" class="semaforo-btn semaforo-advertencia {{ 'active' if filtro_semaforo == 'advertencia' else '' }}">
+                🟠 Advertencia{{ 's' if total_advertencias > 1 else '' }} ({{ total_advertencias }})
+            </a>
+            <a href="{{ url_for('main.index', semaforo='atencion') }}" class="semaforo-btn semaforo-atencion {{ 'active' if filtro_semaforo == 'atencion' else '' }}">
+                🟡 Atención{{ 's' if total_atencion > 1 else '' }} ({{ total_atencion }})
+            </a>
+            <a href="{{ url_for('main.index', semaforo='normal') }}" class="semaforo-btn semaforo-normal {{ 'active' if filtro_semaforo == 'normal' else '' }}">
+                🟢 Actualizado{{ 's' if total_normal > 1 else '' }} ({{ total_normal }})
+            </a>
+        </div>
+
+        <!-- Leyenda -->
         <div class="alertas-leyenda">
             <span class="leyenda-item"><span class="leyenda-dot dot-critica"></span> >30 días sin movimiento</span>
             <span class="leyenda-item"><span class="leyenda-dot dot-advertencia"></span> >15 días</span>
             <span class="leyenda-item"><span class="leyenda-dot dot-atencion"></span> >7 días</span>
-            <span class="leyenda-item"><span class="leyenda-dot dot-normal"></span> Actualizado</span>
+            <span class="leyenda-item"><span class="leyenda-dot dot-normal"></span> ≤7 días actualizado</span>
+        </div>
+
+        <!-- Info de paginación -->
+        <div class="paginacion-info">
+            {% if seguimiento_data|length > 0 %}
+            Mostrando <strong>{{ seguimiento_paginado|length }}</strong> de <strong>{{ seguimiento_data|length }}</strong> expedientes
+            {% if filtro_semaforo %}<span class="filtro-activo">— Filtro: {{ filtro_semaforo|title }}</span>{% endif %}
+            {% else %}
+            No hay expedientes activos para seguimiento
+            {% endif %}
         </div>
 
         <div class="table-container seguimiento-table-container">
@@ -328,8 +357,8 @@
                     </tr>
                 </thead>
                 <tbody>
-                    {% if seguimiento_data %}
-                        {% for item in seguimiento_data %}
+                    {% if seguimiento_paginado %}
+                        {% for item in seguimiento_paginado %}
                         <tr class="fila-seguimiento fila-{{ item.alerta }}">
                             <td class="celda-alerta">
                                 <span class="indicador-alerta indicador-{{ item.alerta }}" title="{{ item.alerta_label }}"></span>
@@ -385,9 +414,19 @@
                         <tr>
                             <td colspan="7" class="empty-state">
                                 <div class="empty-icon">📋</div>
-                                <div class="empty-text">No hay expedientes activos para seguimiento</div>
+                                <div class="empty-text">
+                                    {% if filtro_semaforo %}
+                                        No hay expedientes con nivel {{ filtro_semaforo|title }}
+                                    {% else %}
+                                        No hay expedientes activos para seguimiento
+                                    {% endif %}
+                                </div>
                                 <div class="empty-hint">
-                                    Todos los expedientes están concluidos, archivados o aún no hay registros.
+                                    {% if filtro_semaforo %}
+                                        <a href="{{ url_for('main.index') }}">Ver todos los expedientes</a>
+                                    {% else %}
+                                        Todos los expedientes están concluidos, archivados o aún no hay registros.
+                                    {% endif %}
                                 </div>
                             </td>
                         </tr>
@@ -395,6 +434,37 @@
                 </tbody>
             </table>
         </div>
+
+        <!-- Paginación -->
+        {% if total_paginas > 1 %}
+        <div class="paginacion-controles">
+            {% if pagina_actual > 1 %}
+            <a href="{{ url_for('main.index', page=pagina_actual-1, semaforo=filtro_semaforo) }}" class="pag-btn pag-anterior">
+                ← Anterior
+            </a>
+            {% else %}
+            <span class="pag-btn pag-deshabilitado">← Anterior</span>
+            {% endif %}
+
+            <div class="pag-numeros">
+                {% for p in range(1, total_paginas + 1) %}
+                    {% if p == pagina_actual %}
+                        <span class="pag-numero pag-activo">{{ p }}</span>
+                    {% else %}
+                        <a href="{{ url_for('main.index', page=p, semaforo=filtro_semaforo) }}" class="pag-numero">{{ p }}</a>
+                    {% endif %}
+                {% endfor %}
+            </div>
+
+            {% if pagina_actual < total_paginas %}
+            <a href="{{ url_for('main.index', page=pagina_actual+1, semaforo=filtro_semaforo) }}" class="pag-btn pag-siguiente">
+                Siguiente →
+            </a>
+            {% else %}
+            <span class="pag-btn pag-deshabilitado">Siguiente →</span>
+            {% endif %}
+        </div>
+        {% endif %}
     </div>
 
     <!-- Agenda de Audiencias -->
@@ -608,6 +678,81 @@
     border: 1px solid #fde68a;
 }
 
+/* Filtros por semáforo */
+.semaforo-filtros {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    margin-bottom: 1rem;
+    padding: 0.75rem;
+    background: #f8fafc;
+    border-radius: 10px;
+    border: 1px solid #e2e8f0;
+}
+
+.semaforo-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.5rem 1rem;
+    border-radius: 20px;
+    font-size: 0.85rem;
+    font-weight: 500;
+    text-decoration: none;
+    border: 2px solid transparent;
+    transition: all 0.2s ease;
+    cursor: pointer;
+    background: white;
+    color: #475569;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+}
+
+.semaforo-btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.semaforo-btn.active {
+    font-weight: 700;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+}
+
+.semaforo-critica {
+    border-color: #fecaca;
+    color: #991b1b;
+}
+.semaforo-critica:hover, .semaforo-critica.active {
+    background: #fee2e2;
+    border-color: #ef4444;
+}
+
+.semaforo-advertencia {
+    border-color: #fed7aa;
+    color: #9a3412;
+}
+.semaforo-advertencia:hover, .semaforo-advertencia.active {
+    background: #ffedd5;
+    border-color: #f97316;
+}
+
+.semaforo-atencion {
+    border-color: #fde68a;
+    color: #92400e;
+}
+.semaforo-atencion:hover, .semaforo-atencion.active {
+    background: #fef3c7;
+    border-color: #eab308;
+}
+
+.semaforo-normal {
+    border-color: #a7f3d0;
+    color: #065f46;
+}
+.semaforo-normal:hover, .semaforo-normal.active {
+    background: #d1fae5;
+    border-color: #10b981;
+}
+
 /* Leyenda */
 .alertas-leyenda {
     display: flex;
@@ -633,15 +778,36 @@
 }
 
 .dot-critica { background: #dc2626; }
-.dot-advertencia { background: #f59e0b; }
+.dot-advertencia { background: #f97316; }
 .dot-atencion { background: #eab308; }
 .dot-normal { background: #10b981; }
+
+/* Info de paginación */
+.paginacion-info {
+    padding: 0.75rem 1rem;
+    background: #f1f5f9;
+    border-radius: 8px 8px 0 0;
+    font-size: 0.85rem;
+    color: #475569;
+    border-bottom: 1px solid #e2e8f0;
+}
+
+.paginacion-info strong {
+    color: #1e293b;
+}
+
+.filtro-activo {
+    color: #1e3a8a;
+    font-weight: 600;
+    text-transform: capitalize;
+}
 
 /* Tabla de seguimiento */
 .seguimiento-table-container {
     overflow-x: auto;
-    border-radius: 12px;
+    border-radius: 0 0 12px 12px;
     border: 1px solid #e2e8f0;
+    border-top: none;
     background: white;
 }
 
@@ -664,11 +830,11 @@
 }
 
 .seguimiento-table thead th:first-child {
-    border-radius: 12px 0 0 0;
+    border-radius: 0;
 }
 
 .seguimiento-table thead th:last-child {
-    border-radius: 0 12px 0 0;
+    border-radius: 0;
 }
 
 .seguimiento-table tbody td {
@@ -812,6 +978,8 @@
     display: -webkit-box;
     -webkit-line-clamp: 2;
     -webkit-box-orient: vertical;
+    line-clamp: 2;
+    box-orient: vertical;
 }
 
 /* Días transcurridos */
@@ -864,6 +1032,93 @@
     margin: 0 0.1rem;
 }
 
+/* ============================================
+   PAGINACIÓN
+   ============================================ */
+
+.paginacion-controles {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 1rem;
+    margin-top: 1.5rem;
+    padding: 1rem;
+    flex-wrap: wrap;
+}
+
+.pag-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.6rem 1.2rem;
+    border-radius: 8px;
+    font-size: 0.9rem;
+    font-weight: 500;
+    text-decoration: none;
+    transition: all 0.2s ease;
+    border: 1px solid #cbd5e1;
+    background: white;
+    color: #334155;
+}
+
+.pag-btn:hover {
+    background: #f1f5f9;
+    border-color: #94a3b8;
+}
+
+.pag-anterior, .pag-siguiente {
+    background: linear-gradient(135deg, #1e3a8a 0%, #283593 100%);
+    color: white;
+    border: none;
+}
+
+.pag-anterior:hover, .pag-siguiente:hover {
+    background: linear-gradient(135deg, #283593 0%, #3949ab 100%);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(30, 58, 138, 0.3);
+}
+
+.pag-deshabilitado {
+    opacity: 0.5;
+    cursor: not-allowed;
+    background: #e2e8f0 !important;
+    color: #94a3b8 !important;
+    border-color: #cbd5e1 !important;
+}
+
+.pag-numeros {
+    display: flex;
+    gap: 0.3rem;
+}
+
+.pag-numero {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    border-radius: 8px;
+    font-size: 0.9rem;
+    font-weight: 500;
+    text-decoration: none;
+    border: 1px solid #e2e8f0;
+    background: white;
+    color: #475569;
+    transition: all 0.2s ease;
+}
+
+.pag-numero:hover {
+    background: #f1f5f9;
+    border-color: #94a3b8;
+}
+
+.pag-activo {
+    background: linear-gradient(135deg, #1e3a8a 0%, #283593 100%);
+    color: white;
+    border-color: #1e3a8a;
+    font-weight: 700;
+}
+
 /* Responsive */
 @media (max-width: 992px) {
     .seguimiento-table {
@@ -882,11 +1137,24 @@
     .alertas-leyenda {
         gap: 0.75rem;
     }
+
+    .semaforo-filtros {
+        justify-content: center;
+    }
+
+    .paginacion-controles {
+        gap: 0.5rem;
+    }
+
+    .pag-btn {
+        padding: 0.5rem 0.8rem;
+        font-size: 0.8rem;
+    }
 }
 
 @media (max-width: 768px) {
     .seguimiento-table-container {
-        border-radius: 8px;
+        border-radius: 0 0 8px 8px;
     }
 
     .seguimiento-table thead {
@@ -931,6 +1199,22 @@
     .ultima-actuacion {
         max-width: 100%;
         text-align: right;
+    }
+
+    .semaforo-filtros {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .semaforo-btn {
+        justify-content: center;
+    }
+
+    .pag-numeros {
+        order: -1;
+        width: 100%;
+        justify-content: center;
+        margin-bottom: 0.5rem;
     }
 }
 </style>
