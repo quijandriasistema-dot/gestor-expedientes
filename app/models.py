@@ -31,8 +31,8 @@ class Expediente(db.Model):
     fecha_archivado = db.Column(db.Date)
     
     # Metadatos
-    fecha_registro = db.Column(db.DateTime, default=datetime.now)
-    fecha_actualizacion = db.Column(db.DateTime, default=datetime.now, onupdate=datetime.now)
+    fecha_registro = db.Column(db.DateTime, default=datetime.utcnow)
+    fecha_actualizacion = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     usuario_registro = db.Column(db.String(100))
     
     # Relaciones
@@ -124,7 +124,7 @@ class EstadoHistorial(db.Model):
     expediente_id = db.Column(db.Integer, db.ForeignKey('expedientes.id'), nullable=False)
     estado = db.Column(db.String(100), nullable=False)
     descripcion = db.Column(db.Text)
-    fecha = db.Column(db.DateTime, default=datetime.now)  # Se mantiene, pero ahora será editable
+    fecha = db.Column(db.DateTime, default=datetime.utcnow)
     usuario = db.Column(db.String(100))
     
     def get_estado_label(self):
@@ -168,8 +168,8 @@ class Audiencia(db.Model):
     observaciones = db.Column(db.Text)
     estado = db.Column(db.String(50), default='programada')
     recordatorio_dias = db.Column(db.Integer, default=1)
-    fecha_registro = db.Column(db.DateTime, default=datetime.now)
-    fecha_actualizacion = db.Column(db.DateTime, default=datetime.now, onupdate=datetime.now)
+    fecha_registro = db.Column(db.DateTime, default=datetime.utcnow)
+    fecha_actualizacion = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     usuario_registro = db.Column(db.String(100), nullable=False)
     
     def __repr__(self):
@@ -316,7 +316,7 @@ class Notificacion(db.Model):
     mensaje = db.Column(db.Text, nullable=False)
     usuario_destino = db.Column(db.String(100), nullable=True)
     leida = db.Column(db.Boolean, default=False)
-    fecha_creacion = db.Column(db.DateTime, default=datetime.now)
+    fecha_creacion = db.Column(db.DateTime, default=datetime.utcnow)
     fecha_lectura = db.Column(db.DateTime, nullable=True)
     link = db.Column(db.String(500), nullable=True)
     icono = db.Column(db.String(50), default='🔔')

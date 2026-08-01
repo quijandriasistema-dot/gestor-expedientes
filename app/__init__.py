@@ -85,5 +85,60 @@ def create_app():
     if not IS_VERCEL:
         with app.app_context():
             db.create_all()
+
+    # ============================================
+    # FILTROS JINJA2 - HORA PERÚ (UTC-5)
+    # ============================================
+    from datetime import datetime, timedelta, timezone
+    try:
+        import pytz
+        LIMA_TZ = pytz.timezone('America/Lima')
+    except ImportError:
+        LIMA_TZ = None
+
+    def _ahora_peru():
+        """Retorna datetime naive en hora de Perú"""
+        if LIMA_TZ:
+            return datetime.now(LIMA_TZ).replace(tzinfo=None)
+        peru_offset = timezone(timedelta(hours=-5))
+        return datetime.now(peru_offset).replace(tzinfo=None)
+
+    @app.template_filter('hora_peru')
+    def hora_peru_filter(value, formato='%d/%m/%Y %H:%M'):
+        """
+        Convierte un datetime almacenado (que PostgreSQL guarda como UTC)
+        a hora de Perú (UTC-5) para mostrar correctamente.
+        """
+        if value is None:
+            return 'Sin fecha'
+        # El valor viene de PostgreSQL como UTC (naive pero en realidad UTC)
+        # Restamos 5 horas para convertir a Perú
+        try:
+            value_peru = value - timedelta(hours=5)
+            return value_peru.strftime(formato)
+        except:
+            return str(value)
+
+    @app.template_filter('hora_peru_solo_hora')
+    def hora_peru_solo_hora_filter(value, formato='%H:%M'):
+        """Solo la hora en Perú"""
+        if value is None:
+            return '--:--'
+        try:
+            value_peru = value - timedelta(hours=5)
+            return value_peru.strftime(formato)
+        except:
+            return str(value)
+
+    @app.template_filter('hora_peru_solo_fecha')
+    def hora_peru_solo_fecha_filter(value, formato='%d/%m/%Y'):
+        """Solo la fecha en Perú"""
+        if value is None:
+            return 'Sin fecha'
+        try:
+            value_peru = value - timedelta(hours=5)
+            return value_peru.strftime(formato)
+        except:
+            return str(value)
     
     return app

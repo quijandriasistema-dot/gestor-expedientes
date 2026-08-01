@@ -114,7 +114,7 @@
 
             <div class="info-item">
                 <label>Fecha Registro:</label>
-                <span class="info-value">{{ expediente.fecha_registro | fecha_hora }}</span>
+                <span class="info-value">{{ expediente.fecha_registro | hora_peru }}</span>
             </div>
 
             {% if expediente.tipo == 'civil' %}
@@ -213,7 +213,7 @@
             <div class="avance-bitacora">
                 {% for h in avances %}
                 <div class="avance-linea">
-                    <span class="avance-fecha-bitacora">{{ h.fecha.strftime('%d/%m/%Y') if h.fecha else 'Sin fecha' }}</span>
+                    <span class="avance-fecha-bitacora">{{ h.fecha | hora_peru_solo_fecha }}</span>
                     <span class="avance-sep">|</span>
                     <span class="avance-desc-bitacora">{{ (h.descripcion or 'Sin descripción')|replace('\n', '<br>')|safe }}</span>
                 </div>
@@ -358,8 +358,8 @@
                     <div class="timeline-header">
                         <span class="timeline-estado timeline-estado-{{ h.estado|replace(' ', '-')|replace('_', '-') }}">{{ h.get_estado_label() }}</span>
                         <span class="timeline-fecha">
-                            📅 {{ h.fecha.strftime('%d/%m/%Y') if h.fecha else 'Sin fecha' }} 
-                            🕐 {{ h.fecha.strftime('%H:%M') if h.fecha else '' }} (Hora Perú)
+                            📅 {{ h.fecha | hora_peru_solo_fecha }} 
+                            🕐 {{ h.fecha | hora_peru_solo_hora }} (Hora Perú)
                         </span>
                     </div>
                     
@@ -402,7 +402,7 @@
                                 <div class="mb-3">
                                     <label class="form-label fw-bold">Fecha de la Actuación</label>
                                     <input type="date" name="fecha" class="form-control" 
-                                           value="{{ h.fecha.strftime('%Y-%m-%d') if h.fecha else '' }}">
+                                           value="{{ h.fecha | hora_peru_solo_fecha('%Y-%m-%d') if h.fecha else '' }}">
                                 </div>
                                 <div class="mb-3">
                                     <label class="form-label fw-bold">Estado</label>
