@@ -1259,6 +1259,8 @@ def actualizacion_paso2(id):
             # Combinar con hora actual de Perú
             ahora = ahora_peru()
             fecha_completa = fecha_base.replace(hour=ahora.hour, minute=ahora.minute, second=ahora.second)
+            # Convertir a UTC para PostgreSQL (sumar 5 horas)
+            fecha_completa = fecha_completa + timedelta(hours=5)
 
             nuevo_estado = EstadoHistorial(
                 expediente_id=id,
@@ -1311,13 +1313,13 @@ def agregar_estado(id):
                 estado=form.estado.data,
                 descripcion=form.descripcion.data,
                 usuario=session.get('nombre', 'Sistema'),
-                fecha=ahora_peru()
+                fecha=ahora_peru() + timedelta(hours=5)
             )
             db.session.add(nuevo_estado)
 
             expediente = Expediente.query.get_or_404(id)
             expediente.estado_actual = form.estado.data
-            expediente.fecha_actualizacion = ahora_peru()
+            expediente.fecha_actualizacion = ahora_peru() + timedelta(hours=5)
 
             db.session.commit()
             flash('Estado agregado correctamente', 'success')
@@ -4673,7 +4675,7 @@ def eliminar_historial(id):
                 expediente.estado_actual = ultima_entrada.estado
             else:
                 expediente.estado_actual = 'ingresado'
-            expediente.fecha_actualizacion = ahora_peru()
+            expediente.fecha_actualizacion = ahora_peru() + timedelta(hours=5)
 
         db.session.commit()
         flash('🗑️ Entrada eliminada del historial', 'success')
@@ -4721,3 +4723,4 @@ def eliminar_historial(id):
 # FIN DEL ARCHIVO
 # ============================================
 
+eliminar_historial
