@@ -1057,7 +1057,7 @@ def editar_expediente(id):
                 expediente.numero_expediente = numero_exp
                 expediente.dni = dni
                 expediente.materia = materia
-                expediente.juzgado = None
+                expediente.juzgado = request.form.get('juzgado', '').strip()
                 expediente.juez = request.form.get('juez', '').strip()
                 expediente.secretario = request.form.get('secretario', '').strip()
 
