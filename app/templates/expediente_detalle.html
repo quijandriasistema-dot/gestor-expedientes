@@ -124,7 +124,11 @@
             </div>
             <div class="info-item">
                 <label>Secretario:</label>
-                <span class="info-value">{{ expediente.secretario or 'No asignado' }}</span>
+                            <span class="info-value">{{ expediente.secretario or 'No asignado' }}</span>
+            </div>
+            <div class="info-item">
+                <label>Juzgado / Sala:</label>
+                <span class="info-value">{{ expediente.juzgado or 'No asignado' }}</span>
             </div>
             {% endif %}
 
